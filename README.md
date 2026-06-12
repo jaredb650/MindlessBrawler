@@ -69,7 +69,7 @@ Nice-to-haves (not wired yet): footsteps, crowd loop, music, announcer.
 | → + K (opp. downed) | Soccer kick | the premium ground hit: biggest pop, biggest damage |
 | ↑ + K            | Knee        | body shot: drains opponent STAMINA (half through block), chains in from all lights |
 | ← + K            | Spinning back kick | huge telegraph, huge lunge, 100 dmg, blasts them ACROSS the stage — no flow cancel, ends exchanges |
-| ↑ + K, tap JUMP  | **Flying knee** | flat arc, real travel. Early hit = blast away · TIP of arc = instant full gas-out |
+| ↑ + K, tap JUMP  | **Flying knee** | the skill shot: POINT-BLANK = 130 dmg (hardest strike in the game) · rising = blast away · TIP of arc = instant full gas-out |
 | ↑ + P, tap JUMP  | **Flying uppercut** | invuln rise, 3 hits, launches sky-high — the pop-out-of-pressure reversal, death on whiff |
 | P+K (mid-string) | **Clinch throw** | judo toss BEHIND you: side switch, corner escape, knockdown |
 | P+K (opp. gassed + <10% HP, close) | **EXECUTION** | grab → 12-hit flurry → wind-up → haymaker wall splat. Match over. |

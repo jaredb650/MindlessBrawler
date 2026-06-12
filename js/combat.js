@@ -127,10 +127,25 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
-  // Flying knee: spacing decides the payoff. Early (still rising) = blast them
-  // away. TIP of the arc (falling) = their stamina is ZEROED — gassed on the spot.
+  // Flying knee: spacing decides the payoff.
+  //   kissing distance (hit barely off the ground) = bonus damage, the hardest
+  //   single strike in the game · rising = blast away · tip (falling) = gas-out.
   if (move.kneeSpot && vic.state !== 'downed') {
-    if (att.vy < -1 || vic.isAirborne()) {
+    if (att.f <= move.pbWindow && !vic.isAirborne()) {
+      const bonus = Math.max(1, Math.round(move.pbDamage * dmgScale));
+      vic.hp -= bonus;
+      att.meter = Math.min(CFG.MAX_METER, att.meter + bonus * CFG.METER_PER_DAMAGE);
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER + 6);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 3);
+      spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+      spawnSpark(contactPoint.x - 14, contactPoint.y - 16, 'parry');   // gold burst — it's special
+      spawnSpark(contactPoint.x + 10, contactPoint.y + 12, 'hit');
+      spawnFloatText(vic.x, vic.y - CFG.BODY_H - 40, 'POINT BLANK!', '#ffe082');
+      pushFeed(`POINT BLANK KNEE — ${dmg + bonus}!`, '#ffe082');
+      playSfx('explosion');
+      if (vic.hp <= 0) { vic.hp = 0; vic.setLaunched(away * 8, -12, true); return; }
+      vic.setLaunched(away * 8, -12, true);   // violent pop, more up than away
+    } else if (att.vy < -1 || vic.isAirborne()) {
       vic.setLaunched(away * 14, -7, true);
     } else {
       vic.stamina = 0;

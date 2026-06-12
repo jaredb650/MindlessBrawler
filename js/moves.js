@@ -97,13 +97,17 @@ const MOVES = {
     lungeVx: 7, heavy: true, popsGround: true, blast: true, noFlowCancel: true,
   },
   // Flying knee (jump-converted from knee): flat arc, real travel.
-  // Spacing decides the payoff — early in flight = blast them away;
-  // TIP of the arc = their stamina is zeroed and they gas out on the spot.
+  // THREE payoffs by spacing — the skill-shot move:
+  //   point-blank (hit within pbWindow flight frames) = +pbDamage bonus,
+  //     the hardest single strike in the game (harder than backkick/soccer)
+  //   early/rising = blast them across the stage
+  //   TIP of the arc = stamina zeroed, gassed on the spot
   flyknee: {
     anim: 'flyknee', startup: 2, active: 999, recovery: 0,
     damage: 70, hitstun: 0, blockstun: 14, stamina: 8,
     guard: 'mid', kbx: 3.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 8, y: -95, w: 62, h: 48 },
+    pbWindow: 6, pbDamage: 60,
     air: true, flight: { vx: 12, vy: -11.5 }, kneeSpot: true, heavy: true, popsGround: true,   // real height — it FLIES, flatter than a jump but clearly airborne
   },
   // Flying uppercut (jump-converted from uppercut): near-vertical 3-hit rise
