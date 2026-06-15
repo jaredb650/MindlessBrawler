@@ -31,6 +31,8 @@ const game = {
   cine: null,             // ONE canned-cinematic slot: { kind:'suplex'|'groundpound'|'flatliner', att, vic, f, data }
   flatlinerKill: false,   // KO banner reads FLATLINED instead of K.O./EXECUTED
   feed: [],               // strike feed (newest first), drawn by ui.js
+  scene: 'title',         // front-end scene: title | mode | movelist | fight | paused (driven by menu.js)
+  menu: { sel: 0, scroll: 0, t: 0, returnTo: 'mode' },
 };
 
 let cpu = new CPU();
@@ -328,6 +330,12 @@ function dummyInputs() {
 }
 
 function logicStep() {
+  // SCENE layer (menu.js): the title / mode-select / move-list / pause screens run
+  // their own step and never touch the fight. In the fight, a pause keypress (Esc /
+  // Enter / P) lifts us to the pause screen before any fight logic runs.
+  if (game.scene !== 'fight') { menuStep(game); return; }
+  if (consumePauseKey()) { game.scene = 'paused'; game.menu.sel = 0; return; }
+
   game.frame++;
   handleSystemKeys();
   if (game.banner && game.banner.timer > 0 && game.matchState !== 'ko') game.banner.timer--;
@@ -427,8 +435,13 @@ function frame(now) {
     logicStep();
     acc -= STEP;
   }
-  render(ctx, game);
-  drawUI(ctx, game);
+  if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'movelist') {
+    drawMenu(ctx, game);
+  } else {
+    render(ctx, game);
+    drawUI(ctx, game);
+    if (game.scene === 'paused') drawPauseOverlay(ctx, game);   // freeze the fight, overlay the menu
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

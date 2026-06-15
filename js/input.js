@@ -13,7 +13,7 @@ const RawKeys = {};
 const KeyQueue = [];   // one-shot system keys (debug toggles etc.), drained by main
 const INPUT_BUFFER = 8;
 
-const GAME_CODES = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Quote', 'Semicolon']);
+const GAME_CODES = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Quote', 'Semicolon', 'Enter', 'Escape']);
 
 window.addEventListener('keydown', e => {
   if (GAME_CODES.has(e.code)) e.preventDefault();
