@@ -12,12 +12,16 @@ const MOVE_LABELS = {
   backfist: 'BACKFIST', crouchjab: 'BODY JAB', frontkick: 'FRONT KICK',
   legkick: 'LEG KICK', sweep: 'SWEEP!', soccer: 'SOCCER KICK!',
   jumpkick: 'JUMP KICK', knee: 'KNEE', backkick: 'SPINNING BACK KICK!',
-  axekick: 'AXE KICK!',
-  airpunch: 'AIR PUNCH', divekick: 'DIVE KICK!',
-  clinchpunch: 'DIRTY BOXING', clinchknee: 'BODY KNEE!',
+  axekick: 'AXE KICK!', tornado: 'TORNADO KICK!',
+  airpunch: 'AIR PUNCH', divekick: 'DIVE KICK!', elbowdrop: 'ELBOW DROP!',
+  clinchpunch: 'DIRTY BOXING', clinchknee: 'BODY KNEE!', suplex: 'GERMAN SUPLEX!',
   flyknee: 'FLYING KNEE!', flyuppercut: 'FLYING UPPERCUT!', cannon: 'MECH CANNON!!',
   dashpunch: 'DASH PUNCH!', dashkick: 'DASH KICK!',
   machinegun: 'MACHINE-GUN BLOWS!', overhand: 'OVERHAND!', slidetackle: 'SLIDE TACKLE!',
+  livershot: 'LIVER SHOT!', spinelbow: 'SPINNING ELBOW!', calfkick: 'CALF KICK!',
+  superman: 'SUPERMAN PUNCH!!', gazelle: 'GAZELLE HOOK!',
+  groundpound: 'GROUND & POUND!',   // sequencer pushes feed text literally; this is for grep/consistency
+  flatliner: 'THE FLATLINER!!',     // just-frame overhand KO; beginFlatliner pushes feed literally — this is for grep/consistency
 };
 
 function pushFeed(text, color) {
@@ -183,6 +187,10 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
 
   if (vic.hp <= 0) {
+    // A primed just-frame overhand ALWAYS plays the Flatliner cinematic, even when its
+    // own damage was lethal — otherwise the signature finisher silently downgrades to
+    // a plain K.O. exactly at the low HP you'd go for it. (The cine zeroes hp at its end.)
+    if (live && att.flatlinerPrimed && move.canFlatline) { att.flatlinerPrimed = false; beginFlatliner(att, vic, game); return; }
     vic.hp = 0;
     vic.setLaunched(away * 7, -12, true);   // KO: dramatic launch, main takes it from here
     vic.noTech = true;                       // can't tech your own death — set AFTER setLaunched clears it
@@ -219,13 +227,41 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
-  // Spinning back kick: the one strike that blasts people across the stage.
+  // Spinning back kick / overhand: the one strike that blasts people across the stage.
   if (move.blast && vic.state !== 'downed') {
+    // THE FLATLINER: a just-frame overhand (primed in tryCancel) that lands CLEAN
+    // diverts to the one-punch-KO cinematic instead of the blast. The flag only
+    // lives on a primed overhand; consume it here so a later overhand can't reuse it.
+    if (live && att.flatlinerPrimed && move.canFlatline) {
+      att.flatlinerPrimed = false;
+      beginFlatliner(att, vic, game);   // shared cine harness (main.js): freeze → crumple → KO
+      return;
+    }
+    if (live) att.flatlinerPrimed = false;
     vic.setLaunched(away * 15, -7, true);
     return;
   }
 
+  // ── CRUMPLE (shared: liver shot / spinning elbow / calf kick) ──
+  // One router for all three crumple movers. Fires ONLY on a fresh grounded,
+  // non-crumpled body — the `vic.state !== 'crumple'` guard is the SOLE
+  // anti-infinite-restun rule: an already-crumpled body falls through to the
+  // normal launch/knockdown path so a follow-up ENDS the loop. The stamina drain
+  // (liver shot) was already applied by the generic move.staminaDrain line above.
+  if (move.crumple && !vic.isAirborne() && vic.state !== 'downed' && vic.state !== 'crumple') {
+    const frames = move.crumpleFrames || CFG.CRUMPLE_FRAMES;
+    vic.receiveCrumple(frames, move.crumple);   // move.crumple is 'stand' | 'kneel'
+    spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, move.crumple === 'kneel' ? 'BUCKLE!' : 'CRUMPLE!', '#ffe082');
+    return;
+  }
+
   if (vic.isAirborne()) {
+    // SPIKE (diving elbow): slam an airborne body straight to the floor — untechable,
+    // ground-bounce → OTG. Ends the juggle (no airHits++), bounded by MAX_GROUND_HITS.
+    if (move.spike != null) {
+      vic.receiveSpike(move.spike, away, game);   // shared mechanic — drives vy down, noTech, juice
+      return;
+    }
     if (move.multihit) {
       // rising multihit carries them up with you; the FINAL hit launches high —
       // but ONLY if the move actually launches (machine-gun blows has no launchVy,
@@ -251,6 +287,17 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       vic.setLaunched(away * 1.5, move.popVy || CFG.GROUND_POP_VY, true);   // fresh: pop → slam → bounce
       playSfx('ground_pop');
     }
+    return;
+  }
+
+  // ── GROUND BOUNCE (superman punch) ──
+  // A grounded, non-downed victim of a `groundBounce` move is popped UP a little so
+  // the EXISTING launched→impact bounce path (fighter.js) fires when they crash back
+  // down — they rise, slam, and bounce off the floor. Placed before launcher/knockdown
+  // so it takes priority for a standing body. (Airborne victims juggled above; the
+  // knockdown:true flag is the safe fallback if this branch is ever removed.)
+  if (move.groundBounce && !vic.isAirborne() && vic.state !== 'downed') {
+    vic.setLaunched(away * move.kbx, CFG.GROUND_BOUNCE_VY, true);
     return;
   }
 

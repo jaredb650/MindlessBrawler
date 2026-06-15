@@ -16,6 +16,8 @@
 //   slipcounter countered
 //   wakeuproll
 //   wallsplat slip
+//   crumple                         (shared body-shot/kneel stun — stand vs kneel by crumpleKind)
+//   suplexthrow suplexed gpmount gpmounted crumpled   (canned-cinematic bodies — sequencer-driven no-ops)
 // (dashpunch/dashkick are moves that run in the 'attack' state — see moves.js)
 // ─────────────────────────────────────────────────────────────
 
@@ -25,10 +27,35 @@ const NEUTRAL_RESET = new Set(['idle', 'walk', 'crouch', 'run', 'blockstun', 'ge
 // States where this.move stays live (everything else clears it on entry).
 const MOVE_STATES = new Set(['attack', 'airattack', 'flyattack']);
 
+// GROUNDED-LEAP ARC (shared): height above the floor for a move that stays in the
+// `attack` state but visually leaves the ground (gazelleHop). One smooth parabola
+// rises to mv.gazelleHop.apex by the end of [startup+active], then eases back to 0
+// over recovery so the body is grounded again before endMove. NOT an air state —
+// the caller offsets this.y by this and the end-of-update floor-clamp skips it.
+function groundLeapY(f, mv) {
+  const h = mv.gazelleHop;
+  if (!h) return 0;
+  const rise = mv.startup + mv.active;
+  const total = rise + mv.recovery;
+  if (f <= 0 || f >= total) return 0;
+  if (f <= rise) return Math.sin((f / rise) * (Math.PI / 2)) * h.apex;   // 0 → apex (up the lift+swing)
+  return Math.cos(((f - rise) / Math.max(1, mv.recovery)) * (Math.PI / 2)) * h.apex;   // apex → 0 (settle through recovery)
+}
+
 // Execution window: they're gassed, nearly dead, and you're close enough.
 function canExecute(att, opp) {
   return opp.state === 'gassed' && opp.hp > 0 && opp.hp <= CFG.MAX_HP * CFG.EXECUTE_HP_FRAC
     && Math.abs(opp.x - att.x) <= CFG.EXECUTE_RANGE;
+}
+
+// Ground & Pound window: opponent is on the floor, alive, you're close, off cooldown,
+// and you're in a standing/neutral state. Mutually exclusive with canExecute by
+// opp.state (gassed != downed), so the two P+K finishers never both fire.
+function canGroundPound(att, opp) {
+  return (opp.state === 'downed' || opp.state === 'fallheavy') && opp.hp > 0
+    && att.stamina > 0 && att.groundpoundCD <= 0
+    && ['idle', 'walk', 'crouch'].includes(att.state)
+    && Math.abs(opp.x - att.x) <= CFG.GROUNDPOUND_RANGE;
 }
 
 class Fighter {
@@ -60,6 +87,8 @@ class Fighter {
     this.comboHits = 0; this.comboMoves = {}; this.airHits = 0;
     this.jabChain = 0;         // consecutive CONNECTED jabs → the 3rd auto-bursts into machine-gun blows
     this.jabCounted = false;   // whether the current jab has been tallied into jabChain
+    this.crouchjabChain = 0;   // consecutive CONNECTED crouch jabs → a 2nd (connected) down+P upgrades into the liver shot
+    this.crouchjabCounted = false; // whether the current crouch jab has been tallied into crouchjabChain
     this.bounced = false;
     this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
@@ -81,10 +110,13 @@ class Fighter {
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
+    this.groundpoundCD = 0;    // frames until this fighter can ground & pound again
     this.clinchTimer = 0;      // frames held in 'clinch' (auto-release at CLINCH_MAX_FRAMES)
     this.clinchMash = 0;       // victim's escape progress while 'clinched'
     this.inClinch = false;     // a clinch strike is live → endMove returns to 'clinch', not idle
     this.clinchBroke = false;  // victim sets this when mash escapes → clincher reads it next frame
+    this.crumpleKind = 'stand';   // 'stand' (doubled-over body shot) | 'kneel' (buckle to one knee)
+    this.flatlinerPrimed = false; // a just-frame overhand off the machine-gun → flatliner cinematic (consumed once in combat.js)
   }
 
   // ── bookkeeping ────────────────────────────────────────────
@@ -93,7 +125,7 @@ class Fighter {
     this.state = name;
     this.f = 0;
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; }
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }
     if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
     if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
@@ -116,7 +148,7 @@ class Fighter {
   animKey() { return this.move ? this.move.anim : this.state; }
   isAirborne() { return this.state === 'air' || this.state === 'airattack' || this.state === 'flyattack' || this.state === 'launched'; }
   isCrouched() { return this.state === 'crouch' || !!(this.move && this.move.crouching); }
-  inHitState() { return this.state === 'hitstun' || this.state === 'launched'; }
+  inHitState() { return this.state === 'hitstun' || this.state === 'launched' || this.state === 'crumple'; }
 
   // ── boxes ──────────────────────────────────────────────────
   hurtbox() {
@@ -131,7 +163,7 @@ class Fighter {
 
   pushbox() {
     // clinch/clinched are pinned bodies — null pushbox so a stray push-apart can't shove them
-    if (['downed', 'fallheavy', 'getup', 'thrown', 'clinch', 'clinched'].includes(this.state)) return null;
+    if (['downed', 'fallheavy', 'getup', 'thrown', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled', 'clinch', 'clinched'].includes(this.state)) return null;
     return { x: this.x - CFG.PUSHBOX_W / 2, y: this.y - CFG.BODY_H, w: CFG.PUSHBOX_W, h: CFG.BODY_H };
   }
 
@@ -195,9 +227,33 @@ class Fighter {
     this.lastHitF = -99;
     this.jabCounted = false;                 // this move's connecting-jab tally (machine-gun chain)
     if (name !== 'jab') this.jabChain = 0;   // only a jab→jab→jab string builds the burst
+    this.crouchjabCounted = false;           // this move's connecting-crouchjab tally (liver-shot chain)
+    if (name !== 'crouchjab' && name !== 'livershot') this.crouchjabChain = 0;   // only a crouchjab string (→ livershot) builds it
+    this.flatlinerPrimed = false;            // every move starts un-primed; the just-frame remap re-sets it AFTER this returns
     // Dive bomb: a `dive` field redirects the jump arc steeply down-forward on
     // start (e.g. divekick). vy is positive = downward; vx is signed by facing.
     if (mv.dive) { this.vx = this.facing * mv.dive.vx; this.vy = mv.dive.vy; }
+    // Gazelle-step: a grounded LEAP. Carry forward via attackDrift (glided in the
+    // attack case); the vertical arc is driven by the shared groundLeapY helper. Seeding
+    // attackDrift (not vx) keeps the body in the grounded `attack` state, no air physics.
+    if (mv.gazelleHop) this.attackDrift = this.facing * mv.gazelleHop.vx;
+    // Flying leap (superman punch): a `flight` field on a GROUND-started move converts it
+    // into a real airborne strike — flat, fast arc like the flying knee. State swaps to
+    // 'flyattack' so it inherits airborne physics + the FLY_LAND_RECOVERY landing. Mirrors
+    // the in-line flyConvert takeoff but fires straight from startMove so a cancelled-in move launches.
+    if (mv.flight && !isAir) {
+      const toward = Math.sign(this.facing) || this.facing;
+      this.setState('flyattack');
+      this.move = mv; this.moveName = name;
+      this.moveHitDone = false; this.madeContact = false;
+      this.hitCount = 0; this.lastHitF = -99;
+      this.vx = toward * mv.flight.vx;
+      this.vy = mv.flight.vy;
+      this.y = CFG.FLOOR_Y - 1;
+      playSfx('fly_takeoff');
+      this.reversalWhiff = false;
+      return;
+    }
     playSfx(mv.heavy ? 'whoosh_heavy' : 'whoosh_light');
     this.reversalWhiff = false;   // set true only by the wakeup-reversal path, right after this returns
   }
@@ -207,6 +263,9 @@ class Fighter {
     // Whiff tax: HEAVIES only. A whiffed jab is a shrug; a whiffed raw
     // backfist/uppercut/sweep is how you gas out and die.
     if (mv && mv.heavy && !this.madeContact) this.stamina = Math.max(0, this.stamina - mv.stamina * CFG.WHIFF_STAMINA_PENALTY);
+    // Grounded-leap belt-and-suspenders: settle the body back to the floor so the
+    // next move never starts slightly airborne (groundLeapY already returns ~0 by here).
+    if (mv && mv.gazelleHop && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
     // a clinch strike loops back into the hold — keep working the body until auto-release
     if (this.inClinch && this.clinchTimer < CFG.CLINCH_MAX_FRAMES) { this.setState('clinch'); return; }
     this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
@@ -219,6 +278,15 @@ class Fighter {
       p.consume('punch');
       p.consume('kick');
       startExecution(this, opp, game);
+      return true;
+    }
+    // P+K standing over a DOWNED opponent (close) → mount + ground & pound. Placed
+    // AFTER canExecute (a gassed kill wins when both could — they can't, downed != gassed)
+    // and BEFORE the neutral clinch-grab (which already excludes downed bodies → dead slot).
+    if (p.pressed.punch && p.pressed.kick && canGroundPound(this, opp)) {
+      p.consume('punch');
+      p.consume('kick');
+      startGroundPound(this, opp, game);
       return true;
     }
     if (p.pressed.super && this.meter >= CFG.SUPER_COST) {
@@ -272,15 +340,76 @@ class Fighter {
     // attack-state auto-convert below). A jab pressed DURING that 3rd jab just
     // triggers the same burst a hair early — jabChain is counted in the attack case.
     if (cand === 'jab' && this.moveName === 'jab' && this.jabChain >= 3 && mv.cancels.includes('machinegun')) cand = 'machinegun';
-    // OVERHAND: a cross thrown straight out of the machine-gun blows.
-    if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) cand = 'overhand';
-    if (cand && mv.cancels.includes(cand)) { this.pad.consume(btn); this.startMove(cand); }
+    // ── string-special remaps (placed AFTER cross→hook; each guarded on its cancels entry) ──
+    // SUPERMAN PUNCH: frontkick (connected) → forward+P. resolveNeutralMove gives 'cross'; upgrade to the flight punch.
+    if (cand === 'cross' && this.moveName === 'frontkick' && mv.cancels.includes('superman')) cand = 'superman';
+    // LIVER SHOT: a CONNECTED crouchjab → down+P AGAIN. The self-chain still fires at chain 0; only a connected one upgrades.
+    if (cand === 'crouchjab' && this.moveName === 'crouchjab' && this.crouchjabChain >= 1 && mv.cancels.includes('livershot')) cand = 'livershot';
+    // GAZELLE HOOK: jab→jab (jabChain===2) → forward+P. Below chain 2 a forward+P still yields a normal cross.
+    if (cand === 'cross' && this.moveName === 'jab' && this.jabChain >= 2 && mv.cancels.includes('gazelle')) cand = 'gazelle';
+    // SPINNING ELBOW (primary): backfist (connected) → forward+P resolves 'cross' → spinelbow.
+    if (cand === 'cross' && this.moveName === 'backfist' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
+    // SPINNING ELBOW (alternate): cross (connected) → back+P resolves 'backfist' → spinelbow.
+    if (cand === 'backfist' && this.moveName === 'cross' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
+    // CALF KICK COLLAPSE: legkick (connected) → NEUTRAL K resolves 'legkick' → calfkick. Rides the existing
+    // 'legkick' self-chain entry (so legkick.cancels stays untouched); gated moveName==='legkick' so knee→legkick isn't hijacked.
+    // Fires its own consume+startMove because 'calfkick' is NOT in legkick.cancels (the generic tail below would reject it).
+    if (cand === 'legkick' && this.moveName === 'legkick' && mv.cancels.includes('legkick')) {
+      this.pad.consume(btn);
+      this.startMove('calfkick');
+      return;
+    }
+    // TORNADO KICK: frontkick (connected) → back+K resolves 'backkick' → tornado.
+    if (cand === 'backkick' && this.moveName === 'frontkick' && mv.cancels.includes('tornado')) cand = 'tornado';
+    // OVERHAND / THE FLATLINER: a forward+P straight out of the machine-gun blows. If pressed on the
+    // just-frame after the burst's FINAL hit, the resulting overhand is primed into the flatliner cinematic.
+    let flatline = false;
+    if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) {
+      cand = 'overhand';
+      flatline = this.justFrameAfterFinalHit(CFG.FLATLINER_JF_WINDOW);
+    }
+    if (cand && mv.cancels.includes(cand)) {
+      this.pad.consume(btn);
+      this.startMove(cand);                 // clears flatlinerPrimed — re-set it AFTER the start
+      if (flatline) this.flatlinerPrimed = true;
+    }
+  }
+
+  // Just-frame predicate (Flatliner, reusable): true for `window` frames after a
+  // multihit's FINAL hit. After the last hit the move stops re-arming, so
+  // lastHitF FREEZES on that hit's frame — the exact timestamp to measure from.
+  justFrameAfterFinalHit(window) {
+    const mv = this.move;
+    return !!(mv && mv.multihit && this.hitCount >= mv.multihit.times
+      && (this.f - this.lastHitF) <= window);
   }
 
   // ── reactions (combat.js calls these) ──────────────────────
   receiveBlockstun(frames) { this.setState('blockstun'); this.stunFrames = frames; }
   receiveHitstun(frames) { this.setState('hitstun'); this.stunFrames = frames; this.vx = 0; this.vy = 0; }
   receiveParriedStagger() { this.setState('parried'); this.stunFrames = CFG.PARRY_ATTACKER_STAGGER; }
+  // Shared crumple reaction (liver shot / spinning elbow / calf kick). Long OPEN
+  // window held for a guaranteed follow-up, then recovers like hitstun. Stays
+  // GROUNDED — no knockback. `kind` is 'stand' | 'kneel' (render reads crumpleKind).
+  receiveCrumple(frames, kind) {
+    this.setState('crumple');
+    this.stunFrames = frames;
+    this.crumpleKind = kind || 'stand';
+    this.vx = 0; this.vy = 0;
+  }
+
+  // Shared SPIKE reaction (diving elbow; reusable by any future spike). Slams an
+  // airborne body straight to the floor: drives vy hard DOWN (≥ BOUNCE_MIN_VY so the
+  // existing launched→bounce→fallheavy path fires), keeps only a small horizontal
+  // carry, and sets noTech so the slam can't be kip-up/back-rolled. freshLaunch=false
+  // keeps DI off the spike AND preserves noTech (setLaunched only clears it on a fresh
+  // launch); we re-assert noTech after to be explicit, matching the KO/point-blank path.
+  receiveSpike(downVy, away, game) {
+    this.setLaunched(away * 1.5, downVy, false);   // vy positive = DOWN; no fresh-launch DI on a hard spike
+    this.noTech = true;
+    if (game) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+    spawnDust(this.x, CFG.FLOOR_Y, 12);
+  }
 
   beginThrown(thrower) {
     this.setState('thrown');
@@ -292,6 +421,37 @@ class Fighter {
     this.techWindow = CFG.THROW_TECH_WINDOW;   // mash P+K within this to break free
     playSfx('throw_grab');
     pushFeed('JUDO TOSS!', thrower.color);
+  }
+
+  // GERMAN SUPLEX entry: lock the pair, put the victim in a backward over-the-head
+  // bridge, and hand BOTH bodies to the shared canned-cinematic harness (kind:'suplex').
+  // The thrower sits in a 'suplexthrow' anim while runSuplexCine drives the arc + spike +
+  // tech-mash; the Fighter 'suplexthrow'/'suplexed' cases are no-ops while the cine owns them.
+  beginSuplex(opp, game) {
+    this.facing = Math.sign(opp.x - this.x) || this.facing;   // face the victim once
+    this.inClinch = false; opp.inClinch = false;              // leave the clinch — the throw owns them now
+    this.stamina = Math.max(0, this.stamina - CFG.SUPLEX_STAMINA);
+    opp.beginSuplexed(this);                                  // victim → spiked-thrown state + arc endpoints
+    this.setState('suplexthrow');                             // thrower's bridge pose (render key)
+    this.invuln = Math.max(this.invuln, CFG.SUPLEX_FRAMES + 8);
+    this.move = MOVES.suplex; this.moveName = 'suplex';       // so animKey()/feed resolve
+    startCine('suplex', this, opp, game);                     // the harness owns both bodies from here
+    playSfx('throw_grab');
+    pushFeed('GERMAN SUPLEX!', this.color);
+  }
+
+  // Victim side: enter the spiked-throw state + seed the arc endpoints (the cine
+  // interpolates them). Mirrors beginThrown but the body lands BEHIND the thrower
+  // (side switch), head-first. Throw-techable in the opening frames (read in runSuplexCine).
+  beginSuplexed(thrower) {
+    this.setState('suplexed');
+    this.invuln = CFG.SUPLEX_FRAMES + 10;
+    this.thrownFrom = this.x;
+    const to = thrower.x - thrower.facing * CFG.SUPLEX_BACK_DIST;   // OVER the head, far side
+    this.thrownTo = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, to));
+    this.thrower = thrower;
+    this.techWindow = CFG.SUPLEX_TECH_WINDOW;   // mash P+K to break the bridge
+    this.vx = 0; this.vy = 0;
   }
 
   beginClinch(opp) {
@@ -352,8 +512,9 @@ class Fighter {
     this.f++;
     if (this.invuln > 0) this.invuln--;
     if (this.counterCD > 0) this.counterCD--;
+    if (this.groundpoundCD > 0) this.groundpoundCD--;
 
-    const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip']);
+    const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip', 'crumple', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled']);
     if (!NO_REGEN.has(this.state)) this.stamina = Math.min(CFG.MAX_STAMINA, this.stamina + CFG.STAMINA_REGEN);
 
     // Parry timing: how *fresh* is the block? Holding back forever never parries.
@@ -442,6 +603,11 @@ class Fighter {
           this.jabCounted = true;
           this.jabChain = (this.jabChain || 0) + 1;
         }
+        // Same tally for the crouch-jab string: a connected down+P arms the liver-shot upgrade.
+        if (this.moveName === 'crouchjab' && this.madeContact && !this.crouchjabCounted) {
+          this.crouchjabCounted = true;
+          this.crouchjabChain = (this.crouchjabChain || 0) + 1;
+        }
         // FEINT: cancel a NON-convertible move's startup back into neutral for a
         // stamina cost — bait a parry, then whiff-punish. BACK + JUMP during startup.
         // (flyConvert moves keep JUMP for their conversion, so they can't feint.)
@@ -456,6 +622,18 @@ class Fighter {
             pushFeed('FEINT', this.color);
             break;
           }
+        }
+        // GERMAN SUPLEX buffered out of a CLINCH STRIKE (clinchknee/clinchpunch):
+        // up + P + K while a clinch strike is live cancels straight into the spike.
+        // The mid-string P+K guard below is gated `!mv.clinchHit`, so it never sees
+        // this — this branch owns the clinch-strike → suplex cancel without touching it.
+        if (this.inClinch && mv.clinchHit && this.pad.held.up
+            && this.pad.pressed.punch && this.pad.pressed.kick
+            && this.stamina > 0 && this.clinchTimer < CFG.CLINCH_MAX_FRAMES) {
+          this.pad.consume('punch'); this.pad.consume('kick');
+          this.inClinch = false; opp.inClinch = false;   // drop the clinch loop; the throw owns them
+          this.beginSuplex(opp, game);
+          break;
         }
         // P+K mid-string: execution if available, otherwise the clinch throw
         if (!mv.clinchHit && this.madeContact && this.pad.pressed.punch && this.pad.pressed.kick
@@ -497,6 +675,8 @@ class Fighter {
           // momentum glides through the strike…
           this.x += this.attackDrift;
           this.attackDrift *= 0.92;
+          // grounded-leap arc: gazelle rises off the floor and settles by recovery (no air state)
+          if (mv.gazelleHop) this.y = CFG.FLOOR_Y - groundLeapY(this.f, mv);
           // …and holding toward keeps you advancing — pressing the attack sips stamina
           const toward = Math.sign(opp.x - this.x) || this.facing;
           const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
@@ -547,6 +727,14 @@ class Fighter {
       case 'hitstun':
       case 'parried': {
         if (this.f >= this.stunFrames) this.setState('idle');
+        break;
+      }
+      case 'crumple': {
+        // A long OPEN window held for a guaranteed follow-up, then recovers like
+        // hitstun (a free-follow-up window, not a guaranteed knockdown). The kneel
+        // buckle slumps into a real collapse (feeds okizeme); the stand body-shot
+        // freeze stands frozen then recovers to idle/gassed.
+        if (this.f >= this.stunFrames) this.setState(this.crumpleKind === 'kneel' ? 'fallheavy' : (this.stamina <= 0 ? 'gassed' : 'idle'));
         break;
       }
       case 'flyattack':
@@ -644,6 +832,14 @@ class Fighter {
         if (this.clinchTimer >= CFG.CLINCH_MAX_FRAMES) { this.breakClinch(opp, game); break; }
         this.clinchTimer++;
         const p = this.pad;
+        // GERMAN SUPLEX: up + P + K → backward over-the-head spike (side switch).
+        // FIRST action check — must beat the punch-only / kick-only branches below,
+        // else pressing P fires clinchpunch before the K is ever read. Consumes BOTH.
+        if (p.pressed.punch && p.pressed.kick && p.held.up && this.stamina > 0) {
+          p.consume('punch'); p.consume('kick');
+          this.beginSuplex(opp, game);
+          break;
+        }
         if (p.pressed.punch && this.stamina > 0) { p.consume('punch'); this.startMove('clinchpunch'); break; }
         if (p.pressed.kick && this.stamina > 0) { p.consume('kick'); this.startMove('clinchknee'); break; }
         // BACK (held away from the opponent) → judo throw, ends the clinch.
@@ -691,6 +887,12 @@ class Fighter {
       case 'execute':
       case 'executed':
         break;   // the execution sequencer in main.js drives both bodies
+      case 'suplexthrow':
+      case 'suplexed':
+      case 'gpmount':
+      case 'gpmounted':
+      case 'crumpled':
+        break;   // canned-cinematic bodies — the cine sequencer (runCine in main.js) drives them; cases exist for state-machine completeness + render
       case 'slipcounter':
       case 'countered':
         break;   // the counter sequencer in main.js drives both bodies
@@ -822,6 +1024,7 @@ class Fighter {
           this.landFrames = this.state === 'flyattack'
             ? (this.madeContact ? CFG.FLY_LAND_RECOVERY_HIT : CFG.FLY_LAND_RECOVERY)
             : this.moveName === 'divekick' ? CFG.DIVEKICK_LAND_RECOVERY
+            : this.moveName === 'elbowdrop' ? CFG.DIVEKICK_LAND_RECOVERY   // diving elbow = same long, punishable plant as the divekick
             : this.moveName === 'airpunch' ? CFG.AIRPUNCH_LAND_RECOVERY
             : this.state === 'airattack' ? CFG.LAND_FRAMES + 4 : CFG.LAND_FRAMES;
           this.setState('land');
@@ -840,7 +1043,7 @@ class Fighter {
     // of a jump). 'thrown' is exempt — its arc is driven directly, not by physics.
     // 'wallsplat' is exempt too — a mid-air splat must HOLD at impact height, not
     // get yanked to the floor before the pin renders (it pops down on timeout).
-    if (!this.isAirborne() && this.state !== 'thrown' && this.state !== 'wallsplat' && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
+    if (!this.isAirborne() && this.state !== 'thrown' && this.state !== 'suplexed' && this.state !== 'wallsplat' && !(this.move && this.move.gazelleHop) && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
 
     // Walls — the phone booth has hard edges. Launched bodies splat and rebound.
     const minX = CFG.WALL_L + 30, maxX = CFG.WALL_R - 30;

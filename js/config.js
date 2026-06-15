@@ -79,6 +79,10 @@ const CFG = {
   SAME_MOVE_EXTRA_DECAY: 0.22,  // repeating the SAME move decays much faster
   MIN_HITSTUN_SCALE: 0.30,
   MAX_AIR_HITS: 3,              // juggle limit — after this, hits stop lifting
+  // Gazelle hook — a leaping lead hook off 2 jabs (forward+P). Launches into the air juggle.
+  GAZELLE_LAUNCH_VY: -13,       // launch height of the gazelle hook (between hook's drop and uppercut's -13.5 pop) — starts the air juggle
+  GAZELLE_HOP_VX: 6.5,          // forward leap speed of the gazelle-step (seeded into attackDrift, glides/decays through the swing)
+  GAZELLE_HOP_APEX: 64,         // px the body rises at the peak of the grounded leap (cosmetic+spacing; not an air state)
 
   // Knockdown / ground game — downed bodies are HITTABLE (full damage).
   // Kicks/heavies pop them off the floor for ground juggles; after
@@ -125,6 +129,24 @@ const CFG = {
   SUPER_FREEZE: 40,
   SHAKE_HEAVY: 7,
   KO_SLOWMO_FRAMES: 90,
+  KO_FLASH: 12,                 // screen-flash frames on EVERY KO (shared KO-juice helper)
+
+  // Crumple stun (shared: liver shot / spinning elbow / calf kick). One state,
+  // one router, one timer. Stand = doubled-over body-shot freeze; kneel = buckle.
+  CRUMPLE_FRAMES: 34,           // shared default open window (kneel/elbow)
+  LIVERSHOT_CRUMPLE_FRAMES: 46, // liver shot's longer body-shot freeze (via move.crumpleFrames)
+  LIVERSHOT_DRAIN: 30,          // stamina ripped by the liver shot
+
+  // THE FLATLINER — just-frame overhand off the machine-gun's FINAL hit → one-punch KO.
+  // A clean primed overhand diverts into the shared cine harness (kind:'flatliner') instead
+  // of the blast: small impact hitstop, white flash, freeze, body crumples, round ends.
+  FLATLINER_JF_WINDOW: 3,       // just-frame window (frames after the machine-gun's final hit) for the flatliner overhand
+  FLATLINER_FLASH: 12,          // white-flash frames on the connect (reuses game.flash)
+  FLATLINER_SLOWMO: 70,         // slow-mo frames after the release (reuses game.slowmo)
+  FLATLINER_FREEZE: 26,         // beat 1: dead-still freeze on the connected fist (runFlatlinerCine OWNS this — startCine sets only a small hitstop)
+  FLATLINER_CRUMPLE: 28,        // beat 2: the body folds straight down into a heap (also drives the render fold)
+  FLATLINER_END: 54,            // beat 3 (= FREEZE+CRUMPLE): release → hp 0, both reset, round ends
+  FLATLINER_DMG: 240,           // the KO punch's damage (overkill — it ends the round regardless)
 
   // Flying moves — tap jump during knee/uppercut startup to convert.
   // Range-gated so they're strikes, not a movement exploit.
@@ -132,6 +154,9 @@ const CFG = {
   FLY_UPPERCUT_RANGE: 260,
   FLY_LAND_RECOVERY: 16,        // whiffed flight = long, punishable landing
   FLY_LAND_RECOVERY_HIT: 6,
+  SUPERMAN_VX: 15,              // flat, FAST forward leap of the superman punch (× facing) — crosses a big chunk of the stage
+  SUPERMAN_VY: -8.5,           // shallow upward hop: the arc stays FLAT (a dive, not a jump)
+  GROUND_BOUNCE_VY: -8,        // shared: groundBounce moves pop a standing victim up so the slam triggers the existing bounce
 
   // Aerials — air P / air K / divekick (one attack per jump, gated by usedAirAttack).
   // Divekick redirects your jump arc steeply down-forward on start, then plants
@@ -141,10 +166,24 @@ const CFG = {
   DIVEKICK_LAND_RECOVERY: 14,     // whiffed dive = long, punishable landing
   AIRPUNCH_LAND_RECOVERY: 5,      // air punch = short, safe landing
 
+  // Elbow drop — down+P in the air: diving elbow that SPIKES an airborne body to the floor.
+  ELBOWDROP_VX: 7,                // forward punch of the dive (× facing) — slightly shorter reach than divekick
+  ELBOWDROP_VY: 13,               // downward dive speed (positive = down)
+  ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into an airborne victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
+
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
   THROW_RANGE: 95,
   THROW_DMG: 50,
   THROW_FRAMES: 26,             // canned arc over your head
+
+  // German Suplex — clinch up+P+K: backward over-the-head bridge that SPIKES
+  // them head-first BEHIND the thrower (side switch). Bigger than the judo toss.
+  SUPLEX_STAMINA: 16,           // costs more than clinchknee (4) — a committed finisher
+  SUPLEX_DMG: 130,             // the spike — hardest throw in the game (vs THROW_DMG 50)
+  SUPLEX_FRAMES: 32,           // canned bridge arc duration (a touch longer than THROW_FRAMES 26)
+  SUPLEX_ARC_H: 150,           // peak height of the over-the-head bridge (vs throw's 120)
+  SUPLEX_BACK_DIST: 95,        // px the victim lands BEHIND the thrower (over the head, far side)
+  SUPLEX_TECH_WINDOW: 6,       // mash P+K within this to break the bridge (reuses thrown-tech feel)
 
   // Clinch — neutral P+K locks the bodies together: dirty boxing, body knees,
   // a judo throw off BACK, and a mash-escape for the victim. Auto-releases.
@@ -160,6 +199,17 @@ const CFG = {
   // Execution — opponent gassed + below this HP fraction + close → P+K finishes them
   EXECUTE_HP_FRAC: 0.10,
   EXECUTE_RANGE: 120,
+
+  // Ground & Pound — P+K standing over a DOWNED opponent (close) → mount + 4
+  // hammerfists. NON-lethal: drains stamina only, never HP. Re-seats them downed
+  // (true oki). Cooldown stops immediate re-mount looping (must exceed KNOCKDOWN_FRAMES).
+  GROUNDPOUND_RANGE: 110,        // must be this close to a downed body to mount (tighter than EXECUTE_RANGE)
+  GROUNDPOUND_DRAIN_PER_HIT: 16, // stamina ripped per hammerfist (4 hits → up to 64; can gas them out)
+  GROUNDPOUND_COOLDOWN: 70,      // attacker lockout after a pound — can't instantly re-mount the same wakeup (> KNOCKDOWN_FRAMES 55)
+  GP_MOUNT: 14,                  // beat 1: seat onto the body (no damage)
+  GP_FLURRY: 48,                 // beat 2: the 4-hammerfist window
+  GP_BEAT: 12,                   // a hammerfist every this-many flurry frames (4 across GP_FLURRY)
+  GP_OUT: 10,                    // beat 3: dismount → attacker idle, victim re-seated downed
 
   // Counter-hit — a clean strike during the victim's STARTUP triggers a cinematic.
   // Modeled on the execution sequencer: flash → slip → one hard blow → knockdown.

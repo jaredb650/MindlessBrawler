@@ -147,7 +147,7 @@ function drawFighter(ctx, f, game) {
   if (f.facing === -1) ctx.scale(-1, 1);
   // Spinning moves (back kick / backfist): a VISUAL 360 — flip away during the
   // wind-up, whip back around as the strike extends. Gameplay facing is untouched.
-  if ((key === 'backkick' || key === 'backfist') && f.move) {
+  if ((key === 'backkick' || key === 'backfist' || key === 'spinelbow' || key === 'tornado') && f.move) {
     const sm = f.move, a = Math.min(1, f.f / (sm.startup + sm.active));
     let sx = Math.cos(a * Math.PI * 2);
     sx = sx >= 0 ? Math.max(0.12, sx) : Math.min(-0.12, sx);
@@ -169,6 +169,24 @@ function drawFighter(ctx, f, game) {
     ball(ctx, 28, -16, 15, skin);                       // head
     drawFace(ctx, 28, -16, 0.6, dead, flash);
     capsule(ctx, 8, -14, 28, 4, 11, body);             // front arm
+    ctx.restore();
+    return;
+  }
+
+  // ── SUPLEX victim: inverted head-first bridge → spike. The arc lifts y above the
+  // floor, so it gets a dedicated INVERTED ragdoll (head DOWN, leading the drop).
+  // Rotation tips past vertical as the bridge progresses. ──
+  if (key === 'suplexed') {
+    const a = Math.min(1, f.f / CFG.SUPLEX_FRAMES);
+    ctx.translate(0, -(CFG.FLOOR_Y - f.y > 4 ? 70 : 40));
+    ctx.rotate(Math.PI * (0.55 + 0.6 * a) * f.facing);   // tip past inverted as it falls
+    capsule(ctx, -16, 14, -34, 30, 13, dark);            // rear leg flailing up
+    capsule(ctx, -20, -10, -38, 6, 11, dark);            // rear arm
+    capsule(ctx, -14, 8, 16, -8, 30, body);              // torso
+    capsule(ctx, 12, 14, 30, 28, 13, body);              // front leg up
+    ball(ctx, 28, -16, 15, skin);                         // head — now leading downward
+    drawFace(ctx, 28, -16, -1, dead, flash);              // hurt face
+    capsule(ctx, 8, -14, 28, 4, 11, body);               // front arm
     ctx.restore();
     return;
   }
@@ -226,6 +244,24 @@ function drawFighter(ctx, f, game) {
     return;
   }
 
+  // ── THE FLATLINER victim: fold straight down into a heap ──
+  // Frozen upright through the freeze beat, then the knees buckle, the torso pitches
+  // forward and the head drops as the body collapses to the floor. Driven off f.f (the
+  // cine sequencer drives vic.f); leaves the standing skeleton like fallheavy/getup do.
+  if (key === 'crumpled') {
+    const t = Math.min(1, Math.max(0, (f.f - CFG.FLATLINER_FREEZE) / CFG.FLATLINER_CRUMPLE));   // 0 frozen → 1 collapsed
+    ctx.rotate(t * Math.PI / 2 * 0.95);                  // tip toward the floor
+    const sag = 1 - t * 0.5;                             // legs buckle under
+    capsule(ctx, 0, -8, 4, -76 * sag, 30, body);         // buckling legs
+    capsule(ctx, 2, -76 * sag, 6, -132 * sag, 32, body); // torso pitching down
+    ball(ctx, 8, -150 * sag, 15, skin);                  // head drops with it
+    drawFace(ctx, 8, -150 * sag, -1, dead, flash);       // hurt face (KO'd)
+    capsule(ctx, 4, -120 * sag, 26, -86 * sag, 11, body);  // arm flops forward
+    capsule(ctx, 2, -120 * sag, -18, -88 * sag, 11, dark); // far arm flops
+    ctx.restore();
+    return;
+  }
+
   // ── standing family: build a skeleton pose, then draw it ──
   // defaults: relaxed fighting stance
   const P = {
@@ -272,6 +308,21 @@ function drawFighter(ctx, f, game) {
       P.faceMood = 1;
       break;
     }
+    case 'livershot': {
+      crouchPose(P);
+      lean(P, 0.22);                              // deep forward lean — a tight, low liver hook
+      if (target) strikeTo(P, target, 'punch');   // lead hand digs into the body
+      P.faceMood = 1;
+      break;
+    }
+    case 'calfkick': {
+      lean(P, 0.22);                              // STANDING low chop — drive weight into it
+      if (target) strikeTo(P, target, 'kick');    // lead leg scythes low across the shin
+      else strikeTo(P, { x: 60, y: -30 }, 'kick');
+      P.handF = { x: -14, y: -118 }; P.handR = { x: 16, y: -130 };   // arms counterbalance the low swing
+      P.faceMood = 1;
+      break;
+    }
     case 'prejump': case 'land': squash(P, 0.85); break;
     case 'air': {
       P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 };
@@ -303,6 +354,19 @@ function drawFighter(ctx, f, game) {
     case 'gassed': {
       slump(P, f.f);
       P.faceMood = -1;
+      break;
+    }
+    case 'crumple': {
+      const t = Math.min(1, f.f / Math.max(1, f.stunFrames || 1));
+      if (f.crumpleKind === 'kneel') {       // buckle — drop to one knee
+        crouchPose(P); P.hip.y = -40; P.footR = { x: -18, y: 0 }; P.legBendR = -1;
+        P.head.y += 16; P.faceMood = -1;
+      } else {                                // doubled-over stand-stun (body shot)
+        lean(P, 0.3); P.hip.y = -76 + 14 * t;
+        P.head.y += 16; P.head.x += 6;
+        P.handF = { x: 20, y: -90 }; P.handR = { x: 10, y: -84 };
+        P.armBendF = -1; P.armBendR = -1; P.faceMood = -1;
+      }
       break;
     }
     case 'superstart': lean(P, 0.12); guardUp(P); P.faceMood = 1; break;
@@ -379,6 +443,52 @@ function drawFighter(ctx, f, game) {
       P.faceMood = -1;
       break;
     }
+    // SUPLEX thrower: arching BACKWARD into the bridge — hips thrust, shoulders drop
+    // back, both hands locked overhead gripping the victim's waist as they go over the
+    // top. Arch hardest at the apex (sin), recover into the spike.
+    case 'suplexthrow': {
+      const a = Math.min(1, f.f / CFG.SUPLEX_FRAMES);
+      lean(P, -0.1 - 0.4 * Math.sin(a * Math.PI));   // arch back hardest at the apex
+      P.hip.y += 6 * Math.sin(a * Math.PI);          // hip thrust through the bridge
+      P.handF = { x: -8 - 18 * a, y: -188 - 14 * Math.sin(a * Math.PI) };   // gripping overhead/back
+      P.handR = { x: 6 - 16 * a, y: -196 - 14 * Math.sin(a * Math.PI) };
+      P.armBendF = -1; P.armBendR = -1;
+      P.head.y += 10 * Math.sin(a * Math.PI);        // head tips back with the arch
+      P.footF.x = 26; P.footR.x = -22;               // wide base for the bridge
+      P.faceMood = 1;
+      break;
+    }
+    // ATTACKER — mounted, raining hammerfists down onto the floored body in front,
+    // body pitched forward over them, knees planted wide. Fists piston down/cock back.
+    case 'gpmount': {
+      lean(P, 0.34);                                   // hunched forward over the body
+      P.hip.y = -54; P.sho.y += 26; P.head.y += 30; P.head.x += 8;   // dropped low, mounting
+      const alt = f.f % 8 < 4;                          // fists piston down, rapid hammerfists
+      const down = { x: 40, y: -44 };                   // low & out front — onto the downed torso
+      P.handF = alt ? down : { x: 24, y: -96 };         // lead fist hammers / cocks back
+      P.handR = alt ? { x: 28, y: -92 } : down;         // rear fist hammers / cocks back
+      P.armBendF = 1; P.armBendR = 1;
+      P.footF = { x: 30, y: 0 }; P.footR = { x: -22, y: 0 };   // knees planted wide
+      P.faceMood = 1;
+      P.trail = (f.f > CFG.GP_MOUNT) ? { to: down, isLeg: false } : null;   // swing ghost on the hammers
+      break;
+    }
+    // VICTIM — pinned flat under the mount, taking it. Laid out flat with arms thrown
+    // up defensively and a hurt face (its own case, NOT the early-return 'downed' block,
+    // so it lives in the standing-family path the sequencer animates).
+    case 'gpmounted': {
+      P.hip.y = -30; P.sho = { x: -8, y: -40 }; P.head = { x: -28, y: -44 };   // flat on the floor
+      const flinch = Math.sin(f.f * 0.6) * 3;
+      P.head.x += flinch;
+      P.handF = { x: -34, y: -58 }; P.handR = { x: -20, y: -64 };   // arms up, covering
+      P.armBendF = -1; P.armBendR = -1;
+      P.footF = { x: 30, y: -18 }; P.footR = { x: 52, y: -10 };      // legs sprawled out
+      P.legBendF = -1; P.legBendR = -1;
+      P.faceMood = -1;
+      break;
+    }
+    // (Flatliner victim 'crumpled' is handled by an EARLY-RETURN fold block above the
+    //  standing-family skeleton — it folds straight to the floor, leaving this stance.)
     case 'slipcounter': {
       if (f.f <= CFG.COUNTER_SLIP) {
         // the slip: weave back and off the centerline, coiling
@@ -422,11 +532,36 @@ function drawFighter(ctx, f, game) {
       P.faceMood = 1;
       break;
     }
+    case 'elbowdrop': {
+      lean(P, 0.4);                                                // pitched forward into the dive
+      P.footF = { x: 12, y: -34 }; P.footR = { x: -8, y: -28 };     // legs tucked, airborne
+      P.legBendF = -1; P.legBendR = -1;                            // knees bow forward
+      if (target) {                                                // rear elbow drives the point down-forward
+        P.handR = { x: target.x, y: target.y };
+        P.armBendR = 1;                                            // elbow bent INTO the strike — a point, not a straight
+        P.handF = { x: 18, y: -118 };                             // lead hand braces across
+        P.trail = { to: target, isLeg: false };
+      }
+      P.faceMood = 1;
+      break;
+    }
     case 'jumpkick': case 'flyknee': {
       lean(P, key === 'flyknee' ? 0.35 : 0.2);
       P.footR = { x: -8, y: -36 }; P.legBendR = -1;         // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');
       P.handF = { x: 26, y: -120 }; P.handR = { x: 6, y: -130 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'superman': {
+      lean(P, 0.5);                                              // SUPERMAN: body fully pitched forward, flying
+      P.footF = { x: -10, y: -30 }; P.footR = { x: -30, y: -22 };// both legs trailing behind, airborne dive
+      P.legBendF = -1; P.legBendR = -1;
+      const o = target ? { x: target.x, y: target.y } : { x: 60, y: -96 };
+      P.handR = o; P.armBendR = 1;                               // rear fist drives the overhand down-forward
+      P.handF = { x: 24, y: -118 };                              // lead arm thrown back for the dive line
+      P.head.x += 8;                                             // head leads the dive
+      P.trail = target ? { to: o, isLeg: false } : null;         // overhand swing ghost
       P.faceMood = 1;
       break;
     }
@@ -464,6 +599,20 @@ function drawFighter(ctx, f, game) {
       }
       strikeTo(P, { x: fx, y: fy }, 'kick');
       P.handF = { x: -12, y: -152 }; P.handR = { x: 14, y: -134 };   // arms thrown up & over for the swing
+      P.faceMood = 1;
+      break;
+    }
+    case 'tornado': {
+      // a HIGH spinning heel hook: the lead leg whips out front to head height
+      // while the body counter-rotates (the scale-flip above spins the 360).
+      lean(P, 0.3);                                   // torque into the spin
+      const su = mv ? mv.startup : 11, ac = mv ? mv.active : 5;
+      const c = mv ? Math.max(0, Math.min(1, (f.f - su) / ac)) : 1;   // 0 wind → 1 extended
+      const fx = 26 + 60 * c;                         // sweeps forward (26 → 86)
+      const fy = -150 - 26 * c;                       // rises to head height (-150 → -176)
+      strikeTo(P, { x: fx, y: fy }, 'kick');          // sets footF + leg trail
+      P.legBendF = 1;                                 // knee cocked high for the hook
+      P.handF = { x: -14, y: -150 }; P.handR = { x: 18, y: -134 };   // arms flung out for the whip
       P.faceMood = 1;
       break;
     }
@@ -513,12 +662,34 @@ function drawFighter(ctx, f, game) {
       P.faceMood = 1;
       break;
     }
+    case 'spinelbow': {
+      // the Buzzsaw: rear ELBOW leads — fist tucked high & in, the joint is the
+      // weapon. Shoulder whips across with the spin (the scale-flip above does the 360).
+      lean(P, 0.3);
+      const e = ext;
+      P.handR = { x: 8 + 30 * e, y: -150 }; P.armBendR = -1;   // folded arm — elbow points OUT front
+      P.handF = { x: 22 - 10 * e, y: -120 };                   // lead hand cross-guards the turn
+      P.sho.x += 14 * e; P.head.x += 8 * e;                    // shoulder + head whip across
+      P.footF.x = 26; P.footR.x = -22;                         // wide base for the pivot
+      P.trail = { to: { x: 70 * e, y: -150 }, isLeg: false };  // swing ghost off the shoulder
+      P.faceMood = 1;
+      break;
+    }
     case 'slidetackle': {
       crouchPose(P);                              // body dropped to the floor
       P.sho.y += 30; P.head.y += 34; P.head.x += 8;
       P.footF = { x: 78, y: -10 }; P.legBendF = -1;   // lead leg scythes out front along the ground
       P.footR = { x: -16, y: -2 }; P.legBendR = -1;
       P.handF = { x: 12, y: -64 }; P.handR = { x: -20, y: -52 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'gazelle': {
+      lean(P, 0.34);                                   // committed, leaping in
+      P.footR = { x: -10, y: -30 }; P.legBendR = -1;   // trailing leg tucked up (gazelle-step)
+      P.footF = { x: 18, y: -16 }; P.legBendF = -1;    // lead leg lifted off the floor
+      if (target) strikeTo(P, target, 'punch');        // lead-hand hook (NOT in REAR_HAND_PUNCH → stays lead hand)
+      P.handR = { x: 12, y: -132 };                    // rear hand guards high
       P.faceMood = 1;
       break;
     }
@@ -802,9 +973,20 @@ function render(ctx, game) {
     drawFighter(ctx, game.counter.att, game);
   }
 
-  // counter-hit white flash — slammed on at the read, decays fast
+  // canned cinematic (suplex / ground&pound / flatliner): ONE overlay, dim by kind.
+  // Victim first, attacker on top — the sequencer owns both bodies' poses.
+  if (game.cine) {
+    const dim = game.cine.kind === 'groundpound' ? 0.35 : 0.5;
+    ctx.fillStyle = `rgba(0,0,0,${dim})`;
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+    drawFighter(ctx, game.cine.vic, game);
+    drawFighter(ctx, game.cine.att, game);
+  }
+
+  // white flash — counter-hit read OR any KO. Divides by whichever seed fired
+  // (game.flashMax), so the longer KO flash fades correctly, not by COUNTER_FLASH.
   if (game.flash > 0) {
-    ctx.fillStyle = `rgba(255,255,255,${0.85 * game.flash / CFG.COUNTER_FLASH})`;
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, 0.85 * game.flash / (game.flashMax || CFG.COUNTER_FLASH))})`;
     ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
   }
 

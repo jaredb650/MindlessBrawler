@@ -26,7 +26,10 @@ const game = {
   execution: null,        // { att, vic, f, startHp } while the finisher cinematic runs
   executionKill: false,   // KO banner reads EXECUTED instead of K.O.
   counter: null,          // { att, vic, move, f } while the counter-hit cinematic runs
-  flash: 0,               // white screen-flash countdown (counter-hit), decays with shake
+  flash: 0,               // white screen-flash countdown (counter-hit / KO), decays each frame
+  flashMax: 0,            // the seed the live flash started from — render divides by it
+  cine: null,             // ONE canned-cinematic slot: { kind:'suplex'|'groundpound'|'flatliner', att, vic, f, data }
+  flatlinerKill: false,   // KO banner reads FLATLINED instead of K.O./EXECUTED
   feed: [],               // strike feed (newest first), drawn by ui.js
 };
 
@@ -86,7 +89,7 @@ function runExecution(game) {
 // the sequencer drives both bodies, exactly like the execution above.
 function startCounter(att, vic, move, game) {
   game.counter = { att, vic, move, f: 0 };
-  game.flash = CFG.COUNTER_FLASH;
+  game.flash = CFG.COUNTER_FLASH; game.flashMax = CFG.COUNTER_FLASH;
   att.facing = Math.sign(vic.x - att.x) || att.facing;
   vic.facing = -att.facing;
   att.counterKind = move.kind;       // render.js strikeTo reads this on the blow
@@ -127,6 +130,157 @@ function runCounter(game) {
   }
 }
 
+// ── Cinematic harness (ONE slot for ALL canned moves) ──────────
+// Modeled on execution/counter above. Each canned move (suplex / ground&pound /
+// flatliner) registers a per-kind run callback in CINE_RUN; the harness drives
+// both fighters' anim clocks and the body of the move clears game.cine when done.
+function startCine(kind, att, vic, game, data) {
+  game.cine = { kind, att, vic, f: 0, data: data || {} };
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  vic.facing = -att.facing;
+}
+
+// Empty per-kind run stubs — filled in by the canned-move steps (suplex / G&P /
+// flatliner). Each MUST eventually set both bodies' states and clear game.cine.
+// The fallback clear here keeps a half-built kind from soft-locking the game.
+// GERMAN SUPLEX: backward over-the-head bridge that SPIKES the victim head-first
+// on the FAR side (side switch), hard untechable knockdown, big damage. Owns BOTH
+// bodies AND the throw-tech read (the fighters' update() is skipped under the cine
+// gate). The lethal spike leaves vic.hp possibly 0 → logicStep's KO block fires the
+// shared slow-mo + flash next frame, once game.cine is cleared.
+function runSuplexCine(game, ex) {
+  const { att, vic } = ex;
+  // THROW TECH: mash P+K in the opening frames → break the bridge, both reset.
+  if (vic.techWindow > 0) {
+    vic.techWindow--;
+    if (vic.pad.pressed.punch && vic.pad.pressed.kick) {
+      vic.pad.consume('punch'); vic.pad.consume('kick');
+      const away = Math.sign(vic.x - att.x) || -vic.facing;
+      vic.pushVel = away * CFG.THROW_TECH_PUSHBACK; att.pushVel = -away * CFG.THROW_TECH_PUSHBACK;
+      vic.y = CFG.FLOOR_Y; vic.thrower = null;
+      vic.setState(vic.stamina <= 0 ? 'gassed' : 'idle');
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      game.cine = null; game.hitstop = Math.max(game.hitstop, 6);
+      spawnDust(vic.x, CFG.FLOOR_Y, 8); playSfx('throw_grab');
+      pushFeed('SUPLEX TECH!', vic.color);
+      return;
+    }
+  }
+  // backward over-the-head BRIDGE: interp from→to, sin arc up & over, spike behind.
+  const t = Math.min(1, ex.f / CFG.SUPLEX_FRAMES);
+  vic.x = vic.thrownFrom + (vic.thrownTo - vic.thrownFrom) * t;
+  vic.y = CFG.FLOOR_Y - Math.sin(Math.pow(t, 0.85) * Math.PI) * CFG.SUPLEX_ARC_H;
+  // the thrower side-switches with the bridge: flip to the OPPOSITE side at the apex
+  if (ex.f === Math.round(CFG.SUPLEX_FRAMES * 0.5)) att.facing = -att.facing;
+  if (ex.f >= CFG.SUPLEX_FRAMES) {
+    vic.y = CFG.FLOOR_Y;
+    vic.hp = Math.max(0, vic.hp - CFG.SUPLEX_DMG);
+    vic.setState('fallheavy'); vic.noTech = true; vic.thrower = null;   // spiked — untechable hard knockdown
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    game.cine = null;
+    game.hitstop = Math.max(game.hitstop, 14);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 24, 'hit'); spawnDust(vic.x, CFG.FLOOR_Y, 16);
+    playSfx('throw_slam'); playSfx('body_slam');
+    // lethal spike → logicStep's existing KO block fires slow-mo + flash next frame
+  }
+}
+// GROUND & POUND entry: mount a DOWNED opponent and hand BOTH bodies to the shared
+// canned-cinematic harness (kind:'groundpound'). NON-lethal — the flurry drains the
+// victim's STAMINA only (hp is never touched). Sets the attacker's re-mount cooldown.
+function startGroundPound(att, vic, game) {
+  att.groundpoundCD = CFG.GROUNDPOUND_COOLDOWN;
+  att.setState('gpmount');
+  vic.setState('gpmounted');
+  vic.invuln = 0;            // pinned + owned by the sequencer — no stray hits reach them anyway
+  startCine('groundpound', att, vic, game);   // the harness owns both bodies + faces them from here
+  playSfx('throw_grab');
+  pushFeed('MOUNT!', att.color);
+}
+
+// Ground & Pound: mount → 4 hammerfists that DRAIN STAMINA (never HP — non-lethal),
+// then dismount and re-seat the victim DOWNED on the floor for oki (true okizeme).
+function runGroundPoundCine(game, ex) {
+  const { att, vic } = ex;
+  if (ex.f <= CFG.GP_MOUNT) {
+    // seat onto the body, slow menace (no damage)
+    vic.x += (att.x + att.facing * 40 - vic.x) * 0.2;
+  } else if (ex.f <= CFG.GP_MOUNT + CFG.GP_FLURRY) {
+    const t = ex.f - CFG.GP_MOUNT;
+    if (t % CFG.GP_BEAT === 1) {   // 4 hammerfists across the flurry
+      vic.stamina = Math.max(0, vic.stamina - CFG.GROUNDPOUND_DRAIN_PER_HIT);   // NON-lethal: stamina only
+      spawnSpark(vic.x, CFG.FLOOR_Y - 36 - Math.random() * 14, 'hit');
+      game.shake = Math.max(game.shake, 4);
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_LIGHT);
+      playSfx('hit_med');
+      playSfx('body_blow');
+    }
+  } else if (ex.f >= CFG.GP_MOUNT + CFG.GP_FLURRY + CFG.GP_OUT) {
+    // dismount → attacker recovers; victim re-seated DOWNED with a fresh floor timer
+    // so the knockdown game continues (true oki). NON-lethal: hp untouched.
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    vic.setState(vic.stamina <= 0 ? 'gassed' : 'downed');
+    spawnDust(vic.x, CFG.FLOOR_Y, 8);
+    game.cine = null;
+    pushFeed('GROUND & POUND!', att.color);
+  }
+}
+// THE FLATLINER entry: a just-frame overhand connected clean (combat.js diverted here
+// out of the blast branch). Hand BOTH bodies to the shared cine harness (kind:'flatliner').
+// White flash + a SMALL impact hitstop ONLY — runFlatlinerCine OWNS the full freeze via
+// its own ex.f<=FLATLINER_FREEZE branch (setting game.hitstop=FLATLINER_FREEZE here too
+// would double-count: logicStep returns early while hitstop>0, so ex.f wouldn't advance).
+function beginFlatliner(att, vic, game) {
+  game.flash = CFG.FLATLINER_FLASH; game.flashMax = CFG.FLATLINER_FLASH;
+  vic.noTech = true;
+  game.hitstop = Math.max(game.hitstop, 6);   // small impact pop — NOT the full freeze (that's runFlatlinerCine's job)
+  game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+  spawnSpark(vic.x - att.facing * 10, CFG.FLOOR_Y - 150, 'hit');
+  spawnSpark(vic.x - att.facing * 2, CFG.FLOOR_Y - 130, 'parry');   // gold accent — it's special
+  spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'FLATLINE!', '#fff59d');
+  startCine('flatliner', att, vic, game);   // faces both bodies; sets att/vic states below
+  att.setState('attack'); att.move = MOVES.overhand; att.moveName = 'overhand';   // hold the overhand connect; sequencer drives att.f
+  vic.setState('crumpled');                                                       // shared crumple-down victim pose
+  playSfx('flatliner_freeze');
+  pushFeed('THE FLATLINER!!', att.color);
+}
+
+// THE FLATLINER cinematic: dead-still freeze on the connected fist, then the body
+// folds straight down into a heap — one-punch KO. The release drops vic.hp to 0 and
+// re-seats both bodies; logicStep's KO block fires the shared slow-mo + flash next frame.
+function runFlatlinerCine(game, ex) {
+  const { att, vic } = ex;
+  if (ex.f === 1) playSfx('flatliner_hit');
+  if (ex.f <= CFG.FLATLINER_FREEZE) {
+    // frozen on the connected fist — keep the victim pinned where the punch met them
+    vic.x += (att.x + att.facing * 60 - vic.x) * 0.12;
+  } else if (ex.f === CFG.FLATLINER_FREEZE + 1) {
+    playSfx('flatliner_drop');
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+    spawnDust(vic.x, CFG.FLOOR_Y, 12);
+  } else if (ex.f >= CFG.FLATLINER_END) {
+    // the release — body is a heap, round ends next frame in logicStep's KO block
+    vic.hp = 0;
+    vic.setState('downed'); vic.noTech = true;
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    game.flatlinerKill = true;                // KO banner reads 'FLATLINED.'
+    game.cine = null;
+    game.slowmo = CFG.FLATLINER_SLOWMO;       // ride out into the KO slow-mo
+    game.hitstop = Math.max(game.hitstop, 6);
+    playSfx('flatliner_ko');
+  }
+  // (the crumple fold itself is animated by the 'crumpled' render pose off vic.f)
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine };
+
+function runCine(game) {
+  const ex = game.cine;
+  ex.f++;
+  ex.att.f = ex.f; ex.vic.f = ex.f;   // drive both anim clocks from the sequencer
+  CINE_RUN[ex.kind](game, ex);        // per-kind body sets states/dmg + clears game.cine when done
+}
+
 function resetMatch() {
   for (const f of game.fighters) f.reset();
   Projectiles.length = 0;
@@ -142,6 +296,9 @@ function resetMatch() {
   game.executionKill = false;
   game.counter = null;
   game.flash = 0;
+  game.flashMax = 0;
+  game.cine = null;
+  game.flatlinerKill = false;
   game.feed = [];
   cpu = new CPU();
   game.matchState = 'fight';
@@ -212,6 +369,13 @@ function logicStep() {
     runCounter(game);
     return;
   }
+  // canned cinematic (suplex / ground&pound / flatliner): one gate, the harness
+  // drives both bodies. MUST sit after the freeze/execution/counter gates and
+  // before f1/f2.update so the fighters' own update() can't fight the sequencer.
+  if (game.cine) {
+    runCine(game);
+    return;
+  }
 
   const [f1, f2] = game.fighters;
   f1.update(f2, game);
@@ -234,9 +398,10 @@ function logicStep() {
   if (game.matchState === 'fight' && (f1.hp <= 0 || f2.hp <= 0)) {
     game.matchState = 'ko';
     game.slowmo = CFG.KO_SLOWMO_FRAMES;
+    game.flash = CFG.KO_FLASH; game.flashMax = CFG.KO_FLASH;   // EVERY KO flashes — shared KO juice, zero per-move wiring
     const winner = f1.hp <= 0 ? (f2.hp <= 0 ? null : f2) : f1;
     game.banner = {
-      text: game.executionKill ? 'EXECUTED.' : 'K.O.',
+      text: game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
       sub: winner ? `${winner.name} WINS — press jump to rematch` : 'DOUBLE K.O. — press jump to rematch',
       timer: 999999,
     };

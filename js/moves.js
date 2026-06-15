@@ -29,14 +29,14 @@ const MOVES = {
     damage: 30, hitstun: 16, blockstun: 9, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — just stun
     hitbox: { x: 22, y: -152, w: 84, h: 34 },   // reaches ~106px — further than the cross (92)
-    cancels: ['jab', 'cross', 'axekick', 'legkick', 'sweep', 'machinegun'],
+    cancels: ['jab', 'cross', 'axekick', 'legkick', 'sweep', 'machinegun', 'gazelle'],
   },
   cross: {
     anim: 'cross', startup: 4, active: 3, recovery: 9,
     damage: 55, hitstun: 19, blockstun: 11, stamina: 4,
     guard: 'mid', kind: 'punch', kbx: 3.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 22, y: -150, w: 70, h: 40 },
-    cancels: ['hook', 'axekick', 'legkick'],
+    cancels: ['hook', 'axekick', 'legkick', 'spinelbow'],   // forward+P=hook; spinelbow takes the back+P alternate route
   },
   // Ender: cross → forward+P again. Drops them like a sack of potatoes.
   hook: {
@@ -45,6 +45,19 @@ const MOVES = {
     guard: 'mid', kind: 'punch', kbx: 4.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 14, y: -160, w: 72, h: 45 },
     knockdown: true, chainOnly: true, heavy: true, popsGround: true,
+  },
+  // Chains off TWO connected jabs + forward+P (see fighter.js tryCancel remap).
+  // A LEAPING lead hook: gazelle-steps in (gazelleHop seeds attackDrift + a grounded-leap
+  // arc) and LAUNCHES on hit for an air juggle. Reuses combat.js's grounded-launcher branch
+  // verbatim (launcher+launchVy). chainOnly — never a raw neutral option; blooms out of the jab string.
+  gazelle: {
+    anim: 'gazelle', startup: 7, active: 4, recovery: 17,
+    damage: 78, hitstun: 0, blockstun: 13, stamina: 8,
+    guard: 'mid', kind: 'punch', kbx: 3.5, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 18, y: -172, w: 80, h: 54 },   // swings high — the leaping hook arcs over the guard line
+    launcher: true, launchVy: CFG.GAZELLE_LAUNCH_VY,
+    gazelleHop: { vx: CFG.GAZELLE_HOP_VX, apex: CFG.GAZELLE_HOP_APEX },   // grounded-leap arc (read in startMove + attack case)
+    heavy: true, popsGround: true, chainOnly: true,
   },
   // Ender: up+P. Launches → ground bounce → knockdown.
   uppercut: {
@@ -60,7 +73,20 @@ const MOVES = {
     damage: 70, hitstun: 24, blockstun: 13, stamina: 9,
     guard: 'mid', kind: 'punch', kbx: 5.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 26, y: -160, w: 85, h: 40 },
+    cancels: ['spinelbow', 'legkick', 'sweep'],   // forward+P off backfist → spinelbow (primary route)
     lungeVx: 5, heavy: true, popsGround: true,
+  },
+  // back+P chain ender — the Buzzsaw. A 360 back-elbow off a CONNECTED punch.
+  //   PRIMARY:  backfist → forward+P · ALTERNATE: cross → back+P (both tryCancel remaps).
+  // On a clean grounded hit it CRUMPLES (shared stand-stun): they stand frozen wide
+  // open for a guaranteed follow-up. Spin plays to completion (noFlowCancel).
+  spinelbow: {
+    anim: 'spinelbow', startup: 8, active: 4, recovery: 20,
+    damage: 75, hitstun: 0, blockstun: 14, stamina: 9,
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER,   // kbx only matters for the popsGround OTG pop
+    hitbox: { x: 18, y: -158, w: 88, h: 46 },   // wide elbow arc out front, reaches ~106px like the backfist
+    lungeVx: 4,                                  // small step-in on the spin (less than backfist's 5)
+    crumple: 'stand', chainOnly: true, heavy: true, popsGround: true, noFlowCancel: true,
   },
   // run+P: dash punch — a committed leaping straight. More reach + damage than
   // cross, long recovery: whiff it and you're punished. Carries the run's momentum.
@@ -86,7 +112,21 @@ const MOVES = {
     damage: 22, hitstun: 14, blockstun: 8, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_LIGHT, crouching: true,
     hitbox: { x: 16, y: -110, w: 55, h: 30 },
-    cancels: ['crouchjab', 'axekick', 'sweep', 'legkick'],
+    cancels: ['crouchjab', 'livershot', 'axekick', 'sweep', 'legkick'],
+  },
+  // crouchjab (connected) → down+P AGAIN: LIVER SHOT. The gas-out setup — 0 knockback,
+  // NO knockdown, STAYS GROUNDED. A clean hit folds them into a LONG doubled-over
+  // crumple-STAND and rips ~30 stamina off the tank. Chains only off a connected
+  // crouchjab; its own cancels are enders ONLY (no crouchjab/livershot → no re-loop).
+  livershot: {
+    anim: 'livershot', startup: 5, active: 3, recovery: 13,
+    damage: 45, hitstun: 14, blockstun: 10, stamina: 4,
+    guard: 'low', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_ENDER,   // kbx 0: NO push — they fold in place
+    crouching: true,
+    hitbox: { x: 14, y: -100, w: 58, h: 30 },   // tight, low, to the liver (just under crouchjab's box)
+    crumple: 'stand', crumpleFrames: CFG.LIVERSHOT_CRUMPLE_FRAMES, staminaDrain: CFG.LIVERSHOT_DRAIN,
+    chainOnly: true, heavy: true,
+    cancels: ['axekick', 'sweep', 'soccer'],   // ender outs ONLY — no crouchjab/livershot
   },
   // neutral K: front kick — longest-range poke, makes a little space.
   frontkick: {
@@ -94,7 +134,18 @@ const MOVES = {
     damage: 45, hitstun: 17, blockstun: 10, stamina: 3,
     guard: 'mid', kind: 'kick', kbx: 4.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 30, y: -140, w: 80, h: 35 },
-    cancels: ['axekick', 'legkick'], popsGround: true,
+    cancels: ['axekick', 'legkick', 'superman', 'tornado'], popsGround: true,   // superman=fwd+P, tornado=back+K (orthogonal)
+  },
+  // ←+K out of a connected FRONT KICK: the TORNADO KICK — a 360 spinning heel
+  // hook to the HEAD that BLASTS them across the stage (blast, like backkick).
+  // chainOnly (only off frontkick) + noFlowCancel: the spin plays out, it ENDS
+  // the string. Reuses the back-kick spin visual. KO ⇒ shared slow-mo + flash.
+  tornado: {
+    anim: 'tornado', startup: 11, active: 5, recovery: 24,
+    damage: 105, hitstun: 0, blockstun: 16, stamina: 13,
+    guard: 'high', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 22, y: -172, w: 92, h: 50 },   // HIGH (head height) + long reach, like a head-hunting hook kick
+    lungeVx: 6, blast: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
   },
   // ↑+K: clinch knee to the body — body shots break the will to fight:
   // drains opponent STAMINA on hit (half even through block). Chains in from
@@ -170,7 +221,20 @@ const MOVES = {
     damage: 40, hitstun: 26, blockstun: 8, stamina: 4,
     guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 20, y: -95, w: 70, h: 35 },
-    popsGround: true,
+    cancels: ['legkick', 'sweep'], popsGround: true,   // neutral K off legkick → calfkick (via remap); down+K → sweep
+  },
+  // legkick (connected) → NEUTRAL K again → CALF KICK COLLAPSE: a chopping low that
+  // buckles the leg. On a clean grounded hit it doesn't knock down — it CRUMPLES the
+  // victim to one knee (shared crumple, KNEELING variant): a frozen, fully-hittable
+  // guaranteed follow-up. chainOnly (only out of the leg-kick string); blocked LOW.
+  // No cancels → a hard ender (the chain dead-ends here, no loop back to legkick).
+  calfkick: {
+    anim: 'calfkick', startup: 6, active: 4, recovery: 18,
+    damage: 55, hitstun: 22, blockstun: 10, stamina: 7,
+    guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 18, y: -70, w: 78, h: 40 },   // low chop at the lead leg — below the knee
+    crumple: 'kneel',   // clean grounded hit → shared CRUMPLE state, KNEELING variant (combat.js router)
+    chainOnly: true, heavy: true, popsGround: true,
   },
   // down+K: sweep — low ender, knocks down, very punishable on whiff.
   sweep: {
@@ -209,6 +273,20 @@ const MOVES = {
     dive: { vx: CFG.DIVEKICK_VX, vy: CFG.DIVEKICK_VY },
     knockdown: true, heavy: true, popsGround: true,
   },
+  // down+P in the air: DIVING ELBOW — the juggle spike. Redirects your arc steeply
+  // down-forward on start (dive:{vx,vy}, read in startMove), like divekick but the
+  // ELBOW point. On an AIRBORNE victim it SPIKES — drives their vy hard DOWN, slams
+  // them to the floor (untechable), ground-bounce → OTG. On a grounded body it's a
+  // committed dive-bomb knockdown; whiffed, it's a long, punishable plant.
+  elbowdrop: {
+    anim: 'elbowdrop', startup: 3, active: 999, recovery: 0,   // active until landing
+    damage: 75, hitstun: 24, blockstun: 13, stamina: 6,
+    guard: 'high', kbx: 2.5, hitstop: CFG.HITSTOP_ENDER, air: true, kind: 'punch',
+    hitbox: { x: 12, y: -44, w: 60, h: 58 },   // relative to airborne feet — steep down-forward elbow point
+    dive: { vx: CFG.ELBOWDROP_VX, vy: CFG.ELBOWDROP_VY },
+    spike: CFG.ELBOWDROP_SPIKE_VY,             // airborne-victim hit → drive their vy DOWN this hard (the spike)
+    knockdown: true, heavy: true, popsGround: true,
+  },
   // forward+K near a downed opponent: the PREMIUM ground hit — biggest pop,
   // biggest damage. Vs a standing opponent it's just a big slow kick.
   soccer: {
@@ -235,6 +313,19 @@ const MOVES = {
     hitbox: { x: 18, y: -112, w: 84, h: 54 },   // reaches the pinned victim (CLINCH_DIST)
     staminaDrain: 18, clinchHit: true, kind: 'kick',
   },
+  // GERMAN SUPLEX — clinch up+P+K: a canned THROW, not a hitbox move. NO live
+  // hitbox (damage is dealt by the cine sequencer on the spike frame, like THROW_DMG
+  // in the 'thrown' arc). This entry exists ONLY so animKey()/render resolves a pose
+  // key and the kill-feed label looks up. startup/active/recovery are dummy — it never
+  // runs in the 'attack' state (the state is 'suplexthrow', not in MOVE_STATES, so
+  // activeHitbox() returns null and combat.js never resolves it as a strike).
+  suplex: {
+    anim: 'suplex', startup: 0, active: 0, recovery: 0,
+    damage: 0, hitstun: 0, blockstun: 0, stamina: CFG.SUPLEX_STAMINA,
+    guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 0, y: 0, w: 0, h: 0 },   // never live — the sequencer owns the hit
+    isThrow: true, noFlowCancel: true,
+  },
   // jab → jab → jab (3 connect) → 4th becomes MACHINE-GUN BLOWS: a 4-hit rapid
   // flurry. Cancel it into a cross → OVERHAND that blasts them away.
   machinegun: {
@@ -246,12 +337,28 @@ const MOVES = {
   },
   // the punctuation after the machine-gun: a rear-hand OVERHAND that smacks them
   // clear across the stage (blast, like the back kick). chains only off machinegun.
+  // THE FLATLINER (just-frame): cancelled within CFG.FLATLINER_JF_WINDOW frames of the
+  // machine-gun's FINAL (4th) hit, a CLEAN hit diverts to the one-punch-KO cinematic
+  // instead of the blast (see fighter.tryCancel just-frame prime + combat.landAttack divert).
   overhand: {
     anim: 'overhand', startup: 7, active: 4, recovery: 18,
     damage: 80, hitstun: 0, blockstun: 14, stamina: 9,
     guard: 'mid', kind: 'punch', kbx: 9, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 18, y: -168, w: 80, h: 58 },
     blast: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
+    canFlatline: true,   // eligible for the just-frame one-punch-KO divert (combat.js reads the prime)
+  },
+  // frontkick (connected) → forward+P: SUPERMAN PUNCH. A flying diving overhand
+  // that LEAPS forward on a flat flyknee-style arc (real air state) and crashes a
+  // rear-hand overhand down. On a grounded hit it GROUND-BOUNCES them (hard
+  // knockdown that pops off the slam). String-only ender, huge commitment on whiff.
+  superman: {
+    anim: 'superman', startup: 4, active: 999, recovery: 0,   // active-until-landing, like the other flight moves
+    damage: 105, hitstun: 0, blockstun: 16, stamina: 12,
+    guard: 'high', kind: 'punch', kbx: 4.0, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 10, y: -120, w: 70, h: 64 },   // relative to airborne feet — big overhand box angled down-forward
+    air: true, flight: { vx: CFG.SUPERMAN_VX, vy: CFG.SUPERMAN_VY },   // flat, FAST leap (flyknee-modeled), travels a big chunk of screen
+    knockdown: true, groundBounce: true, heavy: true, popsGround: true, chainOnly: true,
   },
   // run + DOWN: a low SLIDE TACKLE that takes the legs out and POPS them airborne.
   slidetackle: {
@@ -290,10 +397,10 @@ function resolveNeutralMove(btn, dirCat, oppDowned, closeToOpp) {
 }
 
 // In-air button+direction → aerial move name. One attack per jump (the caller
-// gates with usedAirAttack). down+K is the dive bomb; everything else is the
-// standard jump-in (P punch / K kick).
+// gates with usedAirAttack). down = the DIVE for both buttons (down+K=divekick,
+// down+P=elbowdrop spike); everything else is the standard jump-in (P / K).
 function resolveAirMove(btn, dirCat) {
-  if (btn === 'punch') return 'airpunch';
+  if (btn === 'punch') return dirCat === 'down' ? 'elbowdrop' : 'airpunch';   // down+P = diving elbow spike; else the standard air poke
   if (btn === 'kick') return dirCat === 'down' ? 'divekick' : 'jumpkick';
   return null;
 }
