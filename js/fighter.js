@@ -490,6 +490,8 @@ class Fighter {
     // NaN the body's position and make it vanish off-screen. Default to a gentle float.
     if (!Number.isFinite(vx)) vx = 0;
     if (!Number.isFinite(vy)) vy = -9;
+    // KO blows hit 1.5x harder — a corpse gets BLASTED off its feet (cinematic).
+    if (freshLaunch && this.hp <= 0) { vx *= CFG.KO_KNOCKBACK_MULT; vy *= CFG.KO_KNOCKBACK_MULT; }
     // Directional influence: on a fresh launch, holding a way bends the arc a hair
     // (clamped to ±DI_NUDGE — never reverses it). Pairs with choosing where to tech.
     // `held` is live through the wrapping hitstop; only the press buffers freeze.

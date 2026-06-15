@@ -31,6 +31,7 @@ const game = {
   cine: null,             // ONE canned-cinematic slot: { kind:'suplex'|'groundpound'|'flatliner', att, vic, f, data }
   flatlinerKill: false,   // KO banner reads FLATLINED instead of K.O./EXECUTED
   feed: [],               // strike feed (newest first), drawn by ui.js
+  koFreeze: 0,            // KO cinematic: frames the world holds on black + white silhouettes before the launch
   scene: 'title',         // front-end scene: title | mode | movelist | fight | paused (driven by menu.js)
   menu: { sel: 0, scroll: 0, t: 0, returnTo: 'mode' },
 };
@@ -306,6 +307,7 @@ function resetMatch() {
   game.flashMax = 0;
   game.cine = null;
   game.flatlinerKill = false;
+  game.koFreeze = 0;
   game.feed = [];
   cpu = new CPU();
   game.matchState = 'fight';
@@ -343,6 +345,9 @@ function logicStep() {
 
   game.frame++;
   handleSystemKeys();
+  // KO FREEZE-FRAME: the whole world holds on black with white silhouettes (render.js)
+  // for a beat, THEN releases into the launch. Nothing updates — a hard freeze.
+  if (game.koFreeze > 0) { game.koFreeze--; return; }
   if (game.banner && game.banner.timer > 0 && game.matchState !== 'ko') game.banner.timer--;
   game.shake = Math.max(0, game.shake - 0.6);
   if (game.flash > 0) game.flash--;
@@ -410,6 +415,9 @@ function logicStep() {
 
   if (game.matchState === 'fight' && (f1.hp <= 0 || f2.hp <= 0)) {
     game.matchState = 'ko';
+    // the freeze-frame beat — but the bespoke finishers (execution / flatliner) already
+    // have their own dramatic freeze, so only normal KOs + super get this one.
+    if (!game.executionKill && !game.flatlinerKill) game.koFreeze = CFG.KO_FREEZE;
     game.slowmo = CFG.KO_SLOWMO_FRAMES;
     game.flash = CFG.KO_FLASH; game.flashMax = CFG.KO_FLASH;   // EVERY KO flashes — shared KO juice, zero per-move wiring
     // blood on EVERY kill — a gout from each downed fighter, in their launch direction
@@ -450,7 +458,7 @@ function frame(now) {
     drawMenu(ctx, game);
   } else {
     render(ctx, game);
-    drawUI(ctx, game);
+    if (game.koFreeze <= 0) drawUI(ctx, game);   // hide the HUD during the KO silhouette freeze
     if (game.scene === 'paused') drawPauseOverlay(ctx, game);   // freeze the fight, overlay the menu
   }
   requestAnimationFrame(frame);

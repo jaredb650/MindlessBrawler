@@ -177,7 +177,8 @@ function drawFighter(ctx, f, game) {
   const key = f.animKey();
   const flash = ((f.state === 'hitstun' || f.state === 'launched' || f.state === 'fallheavy') && f.f <= 2)
     || (f.state === 'wallsplat' && f.f <= 2)
-    || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2);
+    || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2)
+    || game.koFreeze > 0;   // KO freeze-frame → solid white silhouette
 
   const body = flash ? '#ffffff' : f.color;
   const dark = flash ? '#dddddd' : shade(f.color, 0.62);
@@ -204,7 +205,7 @@ function drawFighter(ctx, f, game) {
     ctx.scale(sx, 1);
   }
   // HARD RULE: unhittable ⇔ flashing transparent. Solid body = fair game.
-  if (f.invuln > 0 || f.state === 'fallheavy') ctx.globalAlpha = game.frame % 6 < 3 ? 0.25 : 0.6;
+  if ((f.invuln > 0 || f.state === 'fallheavy') && game.koFreeze <= 0) ctx.globalAlpha = game.frame % 6 < 3 ? 0.25 : 0.6;
 
   const dead = f.hp <= 0;
 
@@ -959,6 +960,27 @@ function render(ctx, game) {
   if (game.shake > 0) {
     ctx.translate((Math.random() - 0.5) * game.shake * 2, (Math.random() - 0.5) * game.shake * 2);
   }
+  // KO FREEZE-FRAME: the world drops to black, a white impact burst fans out, and the
+  // two fighters render as stark white silhouettes — held a beat, then the launch resumes.
+  if (game.koFreeze > 0) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+    const loser = game.fighters.find(f => f.hp <= 0) || game.fighters[0];
+    const bx = loser.x, by = CFG.FLOOR_Y - CFG.BODY_H * 0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2 + 0.15;
+      const r1 = 55, r2 = 90 + 230 * (0.6 + 0.4 * Math.abs(Math.sin(i * 1.7)));
+      ctx.beginPath();
+      ctx.moveTo(bx + Math.cos(a) * r1, by + Math.sin(a) * r1);
+      ctx.lineTo(bx + Math.cos(a) * r2, by + Math.sin(a) * r2);
+      ctx.stroke();
+    }
+    for (const f of game.fighters) drawFighter(ctx, f, game);   // forced-white silhouettes (see drawFighter)
+    ctx.restore();
+    return;
+  }
+
   drawStage(ctx);
   drawStains(ctx);   // blood decals on the floor/walls, under the fighters
 

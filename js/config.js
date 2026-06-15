@@ -130,6 +130,8 @@ const CFG = {
   SHAKE_HEAVY: 7,
   KO_SLOWMO_FRAMES: 90,
   KO_FLASH: 12,                 // screen-flash frames on EVERY KO (shared KO-juice helper)
+  KO_FREEZE: 20,                // KO cinematic: world freezes on black, just white silhouettes, before the launch
+  KO_KNOCKBACK_MULT: 1.5,       // KO blows launch 1.5x harder — sends the loser flying, cinematic
 
   // Crumple stun (shared: liver shot / spinning elbow / calf kick). One state,
   // one router, one timer. Stand = doubled-over body-shot freeze; kneel = buckle.
