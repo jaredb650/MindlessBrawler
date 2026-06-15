@@ -32,6 +32,11 @@ class CPU {
     const away = dx >= 0 ? 'left' : 'right';
     if (this.cool > 0) this.cool--;
 
+    // throw-tech mash (it's not a free escape — only sometimes commits)
+    if (self.state === 'thrown' && self.techWindow > 0) { if (Math.random() < 0.5) { synth.punch = true; synth.kick = true; } return synth; }
+    // occasionally roll on wakeup to reposition out of the corner
+    if (self.state === 'downed' && self.f === 3 && Math.random() < 0.3) { synth[away] = true; return synth; }
+
     // run the queued plan (one step at a time)
     if (this.queue.length) {
       const step = this.queue[0];

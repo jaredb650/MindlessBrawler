@@ -25,6 +25,8 @@ const game = {
   debug: false,
   execution: null,        // { att, vic, f, startHp } while the finisher cinematic runs
   executionKill: false,   // KO banner reads EXECUTED instead of K.O.
+  counter: null,          // { att, vic, move, f } while the counter-hit cinematic runs
+  flash: 0,               // white screen-flash countdown (counter-hit), decays with shake
   feed: [],               // strike feed (newest first), drawn by ui.js
 };
 
@@ -68,6 +70,7 @@ function runExecution(game) {
     // the release
     vic.hp = 0;
     vic.setLaunched(att.facing * 16, -11, true);
+    vic.noTech = true;                       // the finisher launch is un-techable (set after setLaunched)
     att.setState('idle');
     game.execution = null;
     game.hitstop = 14;
@@ -75,6 +78,52 @@ function runExecution(game) {
     spawnSpark(vic.x, CFG.FLOOR_Y - 120, 'hit');
     playSfx('exec_blast');
     pushFeed('EXECUTED.', '#ff5252');
+  }
+}
+
+// The Counter: catch them mid-startup → flash, slip the shot, then one hard
+// blow (their weapon's kind decides punch/kick) into a knockdown. Pre-baked;
+// the sequencer drives both bodies, exactly like the execution above.
+function startCounter(att, vic, move, game) {
+  game.counter = { att, vic, move, f: 0 };
+  game.flash = CFG.COUNTER_FLASH;
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  vic.facing = -att.facing;
+  att.counterKind = move.kind;       // render.js strikeTo reads this on the blow
+  att.counterCD = CFG.COUNTER_COOLDOWN;
+  att.setState('slipcounter');
+  vic.setState('countered');
+  spawnFloatText(att.x, att.y - CFG.BODY_H - 30, 'COUNTER!', '#ffe082');
+  pushFeed('COUNTER!', att.color);
+  playSfx('counter_slip');
+}
+
+function runCounter(game) {
+  const ex = game.counter;
+  ex.f++;
+  const { att, vic, move } = ex;
+  att.f = ex.f;   // drive both anim clocks from the sequencer
+  vic.f = ex.f;
+  if (ex.f <= CFG.COUNTER_SLIP) {
+    // hold the victim pinned in front through the slip windup
+    vic.x += (att.x + att.facing * 70 - vic.x) * 0.2;
+  } else if (ex.f === CFG.COUNTER_IMPACT) {
+    // the blow: a scaled-up version of the move they got caught throwing
+    const dmg = Math.round(move.damage * CFG.COUNTER_DMG_MULT + CFG.COUNTER_BONUS);
+    vic.hp = Math.max(0, vic.hp - dmg);
+    game.hitstop = 12;
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 3);
+    spawnSpark(vic.x - att.facing * 16, CFG.FLOOR_Y - 110, 'hit');
+    spawnSpark(vic.x - att.facing * 4, CFG.FLOOR_Y - 130, 'parry');   // gold accent — it's special
+    playSfx('counter_hit');
+    playSfx('hit_heavy');
+    pushFeed(`COUNTER ${MOVE_LABELS[move.anim] || move.anim} — ${dmg}!`, '#ffe082');
+    vic.setLaunched(att.facing * CFG.COUNTER_LAUNCH_VX, CFG.COUNTER_LAUNCH_VY, true);
+    vic.noTech = true;                       // a counter knockdown is un-techable (set AFTER setLaunched clears it)
+  } else if (ex.f >= CFG.COUNTER_END) {
+    // the release — attacker recovers, KO (if any) resolves next frame in logicStep
+    att.setState('idle');
+    game.counter = null;
   }
 }
 
@@ -91,6 +140,8 @@ function resetMatch() {
   game.slowmo = 0;
   game.execution = null;
   game.executionKill = false;
+  game.counter = null;
+  game.flash = 0;
   game.feed = [];
   cpu = new CPU();
   game.matchState = 'fight';
@@ -124,6 +175,7 @@ function logicStep() {
   handleSystemKeys();
   if (game.banner && game.banner.timer > 0 && game.matchState !== 'ko') game.banner.timer--;
   game.shake = Math.max(0, game.shake - 0.6);
+  if (game.flash > 0) game.flash--;
   updateFx();
 
   // Pads sample EVERY logic frame — taps during freezes get buffered, not eaten.
@@ -153,6 +205,11 @@ function logicStep() {
   // execution cinematic: the world stops for the kill
   if (game.execution) {
     runExecution(game);
+    return;
+  }
+  // counter-hit cinematic: same deal — the slip and the blow own both bodies
+  if (game.counter) {
+    runCounter(game);
     return;
   }
 

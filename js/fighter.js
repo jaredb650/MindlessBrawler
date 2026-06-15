@@ -11,10 +11,16 @@
 //   idle walk run backdash crouch prejump air airattack land
 //   attack blockstun hitstun parried launched fallheavy downed getup
 //   gassed superstart
+//   clinchgrab clinch clinched
+//   backroll kipup
+//   slipcounter countered
+//   wakeuproll
+//   wallsplat slip
+// (dashpunch/dashkick are moves that run in the 'attack' state — see moves.js)
 // ─────────────────────────────────────────────────────────────
 
 // Entering any of these means the defender escaped — combo bookkeeping resets.
-const NEUTRAL_RESET = new Set(['idle', 'walk', 'crouch', 'run', 'blockstun', 'getup', 'downed']);
+const NEUTRAL_RESET = new Set(['idle', 'walk', 'crouch', 'run', 'blockstun', 'getup', 'downed', 'backroll', 'kipup', 'wakeuproll']);
 
 // States where this.move stays live (everything else clears it on entry).
 const MOVE_STATES = new Set(['attack', 'airattack', 'flyattack']);
@@ -53,17 +59,30 @@ class Fighter {
     this.backHeldFrames = 0;
     this.comboHits = 0; this.comboMoves = {}; this.airHits = 0;
     this.bounced = false;
+    this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
     this.attackDrift = 0;      // momentum carried into/through strikes
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
     this.thrownTo = 0;
+    this.thrower = null;       // set while thrown — the body to reset on a throw tech
+    this.techWindow = 0;       // frames left to tech out of the current throw/clinch
+    this.rollDir = 0;          // wakeup-roll travel direction
+    this.pendingRoll = 0;      // direction captured the frame a wakeup roll is requested
+    this.reversalWhiff = false;// a reversal in progress: whiff = death-on-whiff recovery tax
+    this.getupDelay = 0;       // frames of delayed-getup extension banked while downed
     this.usedAirAttack = false;
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
     this.spawnShot = false;    // combat consumes → spawns the cannon round
+    this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
+    this.counterCD = 0;        // frames until this fighter can trigger another counter
+    this.clinchTimer = 0;      // frames held in 'clinch' (auto-release at CLINCH_MAX_FRAMES)
+    this.clinchMash = 0;       // victim's escape progress while 'clinched'
+    this.inClinch = false;     // a clinch strike is live → endMove returns to 'clinch', not idle
+    this.clinchBroke = false;  // victim sets this when mash escapes → clincher reads it next frame
   }
 
   // ── bookkeeping ────────────────────────────────────────────
@@ -74,9 +93,19 @@ class Fighter {
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
     if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; }
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }
+    if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
+    if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
+    // wakeup roll: grant its (shorter-than-the-roll) invuln + capture the travel dir; reuse getup sfx
+    if (name === 'wakeuproll') { this.invuln = Math.max(this.invuln, CFG.WAKEUPROLL_INVULN); this.groundHits = 0; this.rollDir = this.pendingRoll || this.facing; playSfx('getup'); }
+    // any get-up route clears banked delayed-getup, so it can't leak into a later knockdown this round
+    if (name === 'getup' || name === 'backroll' || name === 'kipup' || name === 'wakeuproll') this.getupDelay = 0;
     if (name === 'downed') { this.vx = 0; this.bounced = false; }   // groundHits PERSISTS across pops within one knockdown
     if (name === 'gassed') playSfx('gassed');
     if (name === 'backdash' || name === 'run') playSfx('dash');
+    // clinch timer is owned by beginClinch (it zeroes it on a FRESH lock) so it
+    // survives looping back to 'clinch' from a clinch strike — only the broke flag clears here
+    if (name === 'clinch') this.clinchBroke = false;
+    if (name === 'clinched') { this.clinchMash = 0; this.clinchBroke = false; }
     // Leaving gassed by ANY route (including getting hit) grants the recovery
     // refill — otherwise hitting a gassed fighter denies it and re-gas loops.
     if (prev === 'gassed' && name !== 'gassed') this.stamina = Math.max(this.stamina, CFG.GASSED_RECOVER_STAMINA);
@@ -99,7 +128,8 @@ class Fighter {
   }
 
   pushbox() {
-    if (['downed', 'fallheavy', 'getup', 'thrown'].includes(this.state)) return null;
+    // clinch/clinched are pinned bodies — null pushbox so a stray push-apart can't shove them
+    if (['downed', 'fallheavy', 'getup', 'thrown', 'clinch', 'clinched'].includes(this.state)) return null;
     return { x: this.x - CFG.PUSHBOX_W / 2, y: this.y - CFG.BODY_H, w: CFG.PUSHBOX_W, h: CFG.BODY_H };
   }
 
@@ -148,7 +178,11 @@ class Fighter {
     this.madeContact = false;
     this.hitCount = 0;
     this.lastHitF = -99;
+    // Dive bomb: a `dive` field redirects the jump arc steeply down-forward on
+    // start (e.g. divekick). vy is positive = downward; vx is signed by facing.
+    if (mv.dive) { this.vx = this.facing * mv.dive.vx; this.vy = mv.dive.vy; }
     playSfx(mv.heavy ? 'whoosh_heavy' : 'whoosh_light');
+    this.reversalWhiff = false;   // set true only by the wakeup-reversal path, right after this returns
   }
 
   endMove() {
@@ -156,6 +190,8 @@ class Fighter {
     // Whiff tax: HEAVIES only. A whiffed jab is a shrug; a whiffed raw
     // backfist/uppercut/sweep is how you gas out and die.
     if (mv && mv.heavy && !this.madeContact) this.stamina = Math.max(0, this.stamina - mv.stamina * CFG.WHIFF_STAMINA_PENALTY);
+    // a clinch strike loops back into the hold — keep working the body until auto-release
+    if (this.inClinch && this.clinchTimer < CFG.CLINCH_MAX_FRAMES) { this.setState('clinch'); return; }
     this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
   }
 
@@ -173,6 +209,16 @@ class Fighter {
       this.meter = 0;
       this.setState('superstart');
       this.superFlash = true;
+      return true;
+    }
+    // Neutral P+K (idle/walk/crouch only) → the clinch grab. Mid-string P+K is
+    // handled in the 'attack' case (→ throwgrab) and is intentionally untouched.
+    if (p.pressed.punch && p.pressed.kick && this.stamina > 0
+        && ['idle', 'walk', 'crouch'].includes(this.state)
+        && !opp.isAirborne() && !['downed', 'fallheavy', 'clinched'].includes(opp.state)) {
+      p.consume('punch');
+      p.consume('kick');
+      this.setState('clinchgrab');
       return true;
     }
     const btn = p.pressed.punch ? 'punch' : p.pressed.kick ? 'kick' : null;
@@ -219,12 +265,54 @@ class Fighter {
     this.thrownFrom = this.x;
     const to = thrower.x - thrower.facing * 85;
     this.thrownTo = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, to));
+    this.thrower = thrower;            // who's holding us — needed to reset them on a tech
+    this.techWindow = CFG.THROW_TECH_WINDOW;   // mash P+K within this to break free
     playSfx('throw_grab');
     pushFeed('JUDO TOSS!', thrower.color);
   }
 
+  beginClinch(opp) {
+    // the lock: both bodies couple, the way throwgrab→throwanim does
+    this.setState('clinch');
+    this.clinchTimer = 0;        // fresh lock — start the auto-release clock (setState won't zero it)
+    this.inClinch = true;
+    this.invuln = Math.max(this.invuln, 4);   // committed — brief ghost on the lock
+    opp.enterClinched(this);
+    playSfx('throw_grab');
+    pushFeed('CLINCH!', this.color);
+  }
+
+  enterClinched(clincher) {
+    this.setState('clinched');
+    this.inClinch = true;
+    this.invuln = Math.max(this.invuln, 4);
+    this.facing = Math.sign(clincher.x - this.x) || -clincher.facing;
+  }
+
+  breakClinch(opp, game) {
+    // mutual separation: both shove apart, both drop the hold
+    const away = Math.sign(this.x - opp.x) || -this.facing;
+    this.pushVel = away * CFG.CLINCH_BREAK_PUSHBACK;
+    opp.pushVel = -away * CFG.CLINCH_BREAK_PUSHBACK;
+    this.inClinch = false; opp.inClinch = false;
+    this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
+    opp.setState(opp.stamina <= 0 ? 'gassed' : 'idle');
+    playSfx('clinch_break');
+  }
+
   setLaunched(vx, vy, freshLaunch) {
-    if (freshLaunch) this.bounced = false;
+    if (freshLaunch) { this.bounced = false; this.noTech = false; }
+    // Directional influence: on a fresh launch, holding a way bends the arc a hair
+    // (clamped to ±DI_NUDGE — never reverses it). Pairs with choosing where to tech.
+    // `held` is live through the wrapping hitstop; only the press buffers freeze.
+    // Juggle re-pops (freshLaunch=false) keep their intended trajectory — no DI.
+    if (freshLaunch) {
+      const h = this.pad.held;
+      const dx = h.right ? 1 : h.left ? -1 : 0;
+      const dy = h.up ? -1 : h.down ? 1 : 0;
+      vx += dx * CFG.DI_NUDGE;
+      vy += dy * CFG.DI_NUDGE;
+    }
     this.setState('launched');
     this.vx = vx;
     this.vy = vy;
@@ -235,8 +323,9 @@ class Fighter {
   update(opp, game) {
     this.f++;
     if (this.invuln > 0) this.invuln--;
+    if (this.counterCD > 0) this.counterCD--;
 
-    const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed']);
+    const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip']);
     if (!NO_REGEN.has(this.state)) this.stamina = Math.min(CFG.MAX_STAMINA, this.stamina + CFG.STAMINA_REGEN);
 
     // Parry timing: how *fresh* is the block? Holding back forever never parries.
@@ -270,6 +359,13 @@ class Fighter {
         break;
       }
       case 'run': {
+        // run + P/K → a committed dash attack (resolved BEFORE tryActions so the run
+        // commits into the lunge instead of a plain cross/legkick).
+        const dbtn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
+        if (dbtn && this.stamina > 0) {
+          const dn = resolveDashMove(dbtn);
+          if (dn) { this.pad.consume(dbtn); this.startMove(dn); break; }
+        }
         if (this.tryActions(opp, game)) break;
         const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
         if (heldDir !== this.runDir) { this.setState('idle'); break; }
@@ -294,10 +390,11 @@ class Fighter {
         break;
       }
       case 'air': {
-        if (!this.usedAirAttack && (this.pad.pressed.punch || this.pad.pressed.kick) && this.stamina > 0) {
-          this.pad.consume(this.pad.pressed.punch ? 'punch' : 'kick');
+        const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
+        if (!this.usedAirAttack && btn && this.stamina > 0) {
+          this.pad.consume(btn);
           this.usedAirAttack = true;
-          this.startMove('jumpkick', true);
+          this.startMove(resolveAirMove(btn, this.dirCategory(opp, this.pad.snap[btn])), true);
         }
         break;
       }
@@ -309,8 +406,23 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // FEINT: cancel a NON-convertible move's startup back into neutral for a
+        // stamina cost — bait a parry, then whiff-punish. BACK + JUMP during startup.
+        // (flyConvert moves keep JUMP for their conversion, so they can't feint.)
+        if (!mv.clinchHit && !mv.flyConvert && !this.madeContact && this.f <= mv.startup + CFG.FEINT_WINDOW_PAD
+            && this.pad.pressed.jump && this.stamina >= CFG.FEINT_COST) {
+          const back = (this.pad.held.right && opp.x < this.x) || (this.pad.held.left && opp.x > this.x);
+          if (back) {
+            this.pad.consume('jump');
+            this.stamina -= CFG.FEINT_COST;
+            this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
+            playSfx('whoosh_light');
+            pushFeed('FEINT', this.color);
+            break;
+          }
+        }
         // P+K mid-string: execution if available, otherwise the clinch throw
-        if (this.madeContact && this.pad.pressed.punch && this.pad.pressed.kick
+        if (!mv.clinchHit && this.madeContact && this.pad.pressed.punch && this.pad.pressed.kick
             && this.f >= mv.startup && this.f <= mv.startup + mv.active + 8) {
           this.pad.consume('punch');
           this.pad.consume('kick');
@@ -343,21 +455,26 @@ class Fighter {
             break;
           }
         }
-        if (mv.lungeVx && this.f <= mv.startup) this.x += this.facing * mv.lungeVx;
-        // momentum glides through the strike…
-        this.x += this.attackDrift;
-        this.attackDrift *= 0.92;
-        // …and holding toward keeps you advancing — pressing the attack sips stamina
-        const toward = Math.sign(opp.x - this.x) || this.facing;
-        const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
-        if (heldDir === toward && this.stamina > 0) {
-          this.x += toward * CFG.PRESS_DRIFT;
-          this.stamina = Math.max(0, this.stamina - CFG.PRESS_DRIFT_STAMINA);
+        // Pinned clinch strikes impart no locomotion — the locked pair stays put.
+        if (!this.inClinch) {
+          if (mv.lungeVx && this.f <= mv.startup) this.x += this.facing * mv.lungeVx;
+          // momentum glides through the strike…
+          this.x += this.attackDrift;
+          this.attackDrift *= 0.92;
+          // …and holding toward keeps you advancing — pressing the attack sips stamina
+          const toward = Math.sign(opp.x - this.x) || this.facing;
+          const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
+          if (heldDir === toward && this.stamina > 0) {
+            this.x += toward * CFG.PRESS_DRIFT;
+            this.stamina = Math.max(0, this.stamina - CFG.PRESS_DRIFT_STAMINA);
+          }
         }
         this.tryCancel(opp);   // may swap this.move mid-string
         if (this.state === 'attack') {
           const m = this.move;
-          const total = m.startup + m.active + m.recovery;
+          let total = m.startup + m.active + m.recovery;
+          // Death on whiff: a WHIFFED wakeup reversal eats bonus recovery — a read on it is a free punish.
+          if (this.reversalWhiff && !this.madeContact) total += CFG.WAKEUP_REVERSAL_RECOVERY;
           // FLOW CANCEL: contact (hit OR block) caps recovery — land something
           // and you're moving again. Whiff and you eat every recovery frame.
           const flowEnd = m.startup + m.active + CFG.FLOW_CANCEL_RECOVERY;
@@ -365,7 +482,23 @@ class Fighter {
         }
         break;
       }
-      case 'blockstun':
+      case 'blockstun': {
+        // PUSHBLOCK: P+K while holding back → spend stamina to shove the attacker
+        // out. A panic button to relieve corner pressure — never free.
+        const back = (this.pad.held.right && opp.x < this.x) || (this.pad.held.left && opp.x > this.x);
+        if (this.pad.pressed.punch && this.pad.pressed.kick && back && this.stamina >= CFG.PUSHBLOCK_COST) {
+          this.pad.consume('punch');
+          this.pad.consume('kick');
+          this.stamina -= CFG.PUSHBLOCK_COST;
+          const away = Math.sign(opp.x - this.x) || this.facing;
+          applyPush(this, opp, CFG.PUSHBLOCK_PUSH, away);   // shove THEM outward (att=this,vic=opp,away from me)
+          spawnSpark(this.x + this.facing * 30, this.y - CFG.BODY_H * 0.6, 'block');
+          playSfx('block');
+          pushFeed('PUSHBLOCK', this.color);
+        }
+        if (this.f >= this.stunFrames) this.setState('idle');
+        break;
+      }
       case 'hitstun':
       case 'parried': {
         if (this.f >= this.stunFrames) this.setState('idle');
@@ -374,6 +507,20 @@ class Fighter {
       case 'flyattack':
       case 'launched':
         break;   // physics + landing logic below
+      case 'wallsplat': {
+        // Pinned to the wall, fully hittable — the corner-carry juggle window.
+        // Any strike that connects re-launches normally (combat.js sees a grounded,
+        // non-downed body). Holds position; gravity is suppressed (not airborne).
+        this.vx = 0; this.vy = 0;
+        if (this.f >= CFG.WALLSPLAT_FRAMES) {
+          // peel off the wall and slide down into the bounce/fall path
+          this.setLaunched(-this.facing * 2, CFG.WALLSPLAT_DROP_VY, false);
+          playSfx('body_slam');
+        }
+        break;
+      }
+      case 'slip':
+        break;   // Phase 3's counter sequencer (runCounter in main.js) drives this body
       case 'throwgrab': {
         // the grab reaches on frame 5; miss = long, punishable whiff
         if (this.f === 5) {
@@ -395,6 +542,26 @@ class Fighter {
         break;
       }
       case 'thrown': {
+        // THROW TECH: mash P+K in the opening frames → break the grab, both reset to neutral.
+        if (this.techWindow > 0) {
+          this.techWindow--;
+          if (this.pad.pressed.punch && this.pad.pressed.kick) {
+            this.pad.consume('punch');
+            this.pad.consume('kick');
+            const thr = this.thrower;
+            this.y = CFG.FLOOR_Y;
+            const away = Math.sign(this.x - (thr ? thr.x : this.x)) || -this.facing;
+            this.pushVel = away * CFG.THROW_TECH_PUSHBACK;
+            if (thr) { thr.pushVel = -away * CFG.THROW_TECH_PUSHBACK; if (['throwanim', 'throwgrab'].includes(thr.state)) thr.setState('idle'); }
+            this.thrower = null;
+            this.setState('idle');
+            spawnDust(this.x, CFG.FLOOR_Y, 8);
+            game.hitstop = Math.max(game.hitstop, 6);
+            playSfx('throw_grab');
+            pushFeed('THROW TECH!', this.color);
+            break;
+          }
+        }
         // canned judo arc over the thrower's head, slam behind them
         const t = Math.min(1, this.f / CFG.THROW_FRAMES);
         this.x = this.thrownFrom + (this.thrownTo - this.thrownFrom) * t;
@@ -411,21 +578,134 @@ class Fighter {
         }
         break;
       }
+      case 'clinchgrab': {
+        // mirrors throwgrab: the reach lands on CLINCH_REACH_FRAME or it's a whiff
+        if (this.f === CFG.CLINCH_REACH_FRAME) {
+          const ok = !opp.isAirborne() && opp.invuln <= 0
+            && !['downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)
+            && Math.abs(opp.x - this.x) <= CFG.CLINCH_GRAB_RANGE;
+          if (ok) { this.beginClinch(opp); break; }
+        }
+        if (this.f >= CFG.CLINCH_WHIFF_RECOVERY) this.setState('idle');
+        break;
+      }
+      case 'clinch': {
+        this.facing = Math.sign(opp.x - this.x) || this.facing;
+        // victim mashed out last frame? let go.
+        if (this.clinchBroke) { this.breakClinch(opp, game); break; }
+        // auto-release: nobody clinches forever
+        if (this.clinchTimer >= CFG.CLINCH_MAX_FRAMES) { this.breakClinch(opp, game); break; }
+        this.clinchTimer++;
+        const p = this.pad;
+        if (p.pressed.punch && this.stamina > 0) { p.consume('punch'); this.startMove('clinchpunch'); break; }
+        if (p.pressed.kick && this.stamina > 0) { p.consume('kick'); this.startMove('clinchknee'); break; }
+        // BACK (held away from the opponent) → judo throw, ends the clinch.
+        // (read from pad.held — snap.jump carries no direction for a non-jump press)
+        const back = (opp.x > this.x && p.held.left) || (opp.x < this.x && p.held.right);
+        if (back) {
+          this.inClinch = false; opp.inClinch = false;
+          opp.beginThrown(this);
+          this.setState('throwanim');
+          this.invuln = CFG.THROW_FRAMES + 8;
+          break;
+        }
+        if (p.pressed.jump) { p.consume('jump'); this.inClinch = false; opp.inClinch = false; opp.setState(opp.stamina <= 0 ? 'gassed' : 'idle'); this.setState('prejump'); break; }
+        const fwd = (opp.x > this.x && p.held.right) || (opp.x < this.x && p.held.left);
+        if (fwd || p.held.up) { this.breakClinch(opp, game); break; }
+        break;
+      }
+      case 'clinched': {
+        // pinned to the clincher every frame — authoritative even while the
+        // clincher is mid clinchpunch/clinchknee (its state is 'attack' then)
+        const clincherHolding = opp.state === 'clinch'
+          || (opp.state === 'attack' && opp.move && opp.move.clinchHit);
+        if (!clincherHolding) { this.inClinch = false; this.setState(this.stamina <= 0 ? 'gassed' : 'idle'); break; }
+        this.facing = Math.sign(opp.x - this.x) || -opp.facing;
+        this.x = opp.x - opp.facing * CFG.CLINCH_DIST;
+        // MASH: every fresh press (any button or a direction tap) builds escape
+        const p = this.pad;
+        let pressed = 0;
+        for (const b of ['punch', 'kick', 'jump', 'super']) if (p.pressed[b]) { p.consume(b); pressed++; }
+        if (p.tapDir !== 0) pressed++;
+        if (pressed > 0) this.clinchMash += CFG.CLINCH_MASH_PER_PRESS * pressed;
+        if (this.clinchMash >= CFG.CLINCH_ESCAPE_THRESHOLD) {
+          opp.clinchBroke = true;   // clincher reads it next frame and separates us
+          // separate immediately too, in case the clincher is mid-strike
+          this.inClinch = false; opp.inClinch = false;
+          const away = Math.sign(this.x - opp.x) || -this.facing;
+          this.pushVel = away * CFG.CLINCH_BREAK_PUSHBACK;
+          opp.pushVel = -away * CFG.CLINCH_BREAK_PUSHBACK;
+          this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
+          playSfx('clinch_break');
+          pushFeed('CLINCH BREAK!', this.color);
+        }
+        break;
+      }
       case 'execute':
       case 'executed':
         break;   // the execution sequencer in main.js drives both bodies
+      case 'slipcounter':
+      case 'countered':
+        break;   // the counter sequencer in main.js drives both bodies
       case 'fallheavy': {
         if (this.f >= CFG.FALL_FRAMES) this.setState('downed');
         break;
       }
       case 'downed': {
-        // Dead fighters stay down. Live ones get a FAST invulnerable get-up —
-        // immediately once they've eaten their ground-hit budget.
-        if (this.hp > 0 && (this.groundHits >= CFG.MAX_GROUND_HITS || this.f >= CFG.KNOCKDOWN_FRAMES)) this.setState('getup');
+        // Dead fighters stay down.
+        if (this.hp <= 0) break;
+        // Wakeup ROLL: a fresh L/R press off the floor → short invulnerable reposition.
+        // (Lenient single-press, not a double-tap — the knockdown is a deliberate beat.)
+        const rollPress = this.pad.pressed.left ? -1 : this.pad.pressed.right ? 1 : 0;
+        if (rollPress !== 0) {
+          this.pad.consume(this.pad.pressed.left ? 'left' : 'right');
+          this.pendingRoll = rollPress;
+          this.setState('wakeuproll');
+          break;
+        }
+        // DELAYED getup: hold DOWN to bank extension and stay floored longer (control your wakeup).
+        if (this.pad.held.down && this.getupDelay < CFG.DELAYED_GETUP_MAX) this.getupDelay++;
+        // Eat your ground-hit budget OR the (possibly extended) floor timer → fast invuln getup.
+        if (this.groundHits >= CFG.MAX_GROUND_HITS || this.f >= CFG.KNOCKDOWN_FRAMES + this.getupDelay) {
+          this.setState('getup');   // setState zeroes getupDelay
+        }
         break;
       }
       case 'getup': {
+        if (this.f <= CFG.WAKEUP_REVERSAL_WINDOW) {
+          // Reversal: a buffered strike fires AS you rise (getup invuln covers the startup).
+          const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
+          if (btn && this.stamina > 0) {
+            const name = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), false, false);
+            if (name) { this.pad.consume(btn); this.startMove(name); this.reversalWhiff = true; break; }
+          }
+          // Late wakeup roll (a roll input buffered a hair past the floor).
+          const rollPress = this.pad.pressed.left ? -1 : this.pad.pressed.right ? 1 : 0;
+          if (rollPress !== 0) {
+            this.pad.consume(this.pad.pressed.left ? 'left' : 'right');
+            this.pendingRoll = rollPress;
+            this.setState('wakeuproll');
+            break;
+          }
+        }
         if (this.f >= CFG.GETUP_FRAMES) this.setState('idle');
+        break;
+      }
+      case 'wakeuproll': {
+        // Eased reposition (decelerates like the backdash). Reuses the backroll look.
+        this.x += this.rollDir * CFG.WAKEUPROLL_SPEED * Math.max(0, 1 - this.f / CFG.WAKEUPROLL_FRAMES);
+        if (this.f >= CFG.WAKEUPROLL_FRAMES) this.setState('idle');
+        break;
+      }
+      case 'backroll': {
+        // invuln roll AWAY — eased out like the backdash, ends standing
+        this.x += this.bdDir * CFG.BACKROLL_SPEED * Math.max(0, 1 - this.f / CFG.BACKROLL_FRAMES);
+        if (this.f >= CFG.BACKROLL_FRAMES) this.setState('idle');
+        break;
+      }
+      case 'kipup': {
+        // fast spring to the feet in place — brief invuln, then actionable
+        if (this.f >= CFG.KIPUP_FRAMES) this.setState('idle');
         break;
       }
       case 'gassed': {
@@ -455,7 +735,25 @@ class Fighter {
         const impact = this.vy;
         this.vy = 0;
         if (this.state === 'launched') {
-          if (!this.bounced && impact >= CFG.BOUNCE_MIN_VY) {
+          // ── GROUND TECH (first contact only, techable launches only) ──
+          // Tight buffered window: a good read denies the OTG/soccer juggle. We gate
+          // on !this.bounced (first floor contact) + the press buffer's own freshness
+          // (pad.pressed already encodes the 8f INPUT_BUFFER) — NOT on this.f, which is
+          // already large here (the body was airborne many frames). JUMP wins over BACK.
+          const techJump = this.pad.pressed.jump;
+          const techBack = (away === 1 && this.pad.pressed.right) || (away === -1 && this.pad.pressed.left);
+          if (!this.bounced && !this.noTech && (techJump || techBack)) {
+            this.y = CFG.FLOOR_Y;
+            this.vx = 0; this.vy = 0;
+            if (techBack && !techJump) {       // BACK takes priority only when JUMP isn't held
+              this.pad.consume(this.pad.held.right ? 'right' : 'left');
+              this.bdDir = away;
+              this.setState('backroll');
+            } else {
+              this.pad.consume('jump');
+              this.setState('kipup');
+            }
+          } else if (!this.bounced && impact >= CFG.BOUNCE_MIN_VY) {
             // Hit the ground HARD and bounce — never a flat no-impact landing.
             this.bounced = true;
             this.vy = -impact * CFG.GROUND_BOUNCE;
@@ -476,6 +774,8 @@ class Fighter {
           }
           this.landFrames = this.state === 'flyattack'
             ? (this.madeContact ? CFG.FLY_LAND_RECOVERY_HIT : CFG.FLY_LAND_RECOVERY)
+            : this.moveName === 'divekick' ? CFG.DIVEKICK_LAND_RECOVERY
+            : this.moveName === 'airpunch' ? CFG.AIRPUNCH_LAND_RECOVERY
             : this.state === 'airattack' ? CFG.LAND_FRAMES + 4 : CFG.LAND_FRAMES;
           this.setState('land');
         }
@@ -491,18 +791,36 @@ class Fighter {
 
     // Safety net: no grounded-only state may persist in midair (e.g. parried out
     // of a jump). 'thrown' is exempt — its arc is driven directly, not by physics.
-    if (!this.isAirborne() && this.state !== 'thrown' && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
+    // 'wallsplat' is exempt too — a mid-air splat must HOLD at impact height, not
+    // get yanked to the floor before the pin renders (it pops down on timeout).
+    if (!this.isAirborne() && this.state !== 'thrown' && this.state !== 'wallsplat' && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
 
     // Walls — the phone booth has hard edges. Launched bodies splat and rebound.
     const minX = CFG.WALL_L + 30, maxX = CFG.WALL_R - 30;
     if (this.x < minX) {
       this.x = minX;
-      if (this.state === 'launched' && this.vx < -4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) {
+        this.vx = 0; this.facing = 1;   // face away from the wall, into the stage
+        this.setState('wallsplat');
+        game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
+        spawnDust(minX, this.y, 12);
+        spawnSpark(minX + 20, this.y - CFG.BODY_H * 0.6, 'hit');
+        playSfx('wall_splat');
+        pushFeed('WALL SPLAT!', this.color);
+      } else if (this.state === 'launched' && this.vx < -4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx < 0) this.vx = 0;
     }
     if (this.x > maxX) {
       this.x = maxX;
-      if (this.state === 'launched' && this.vx > 4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) {
+        this.vx = 0; this.facing = -1;   // face away from the wall, into the stage
+        this.setState('wallsplat');
+        game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
+        spawnDust(maxX, this.y, 12);
+        spawnSpark(maxX - 20, this.y - CFG.BODY_H * 0.6, 'hit');
+        playSfx('wall_splat');
+        pushFeed('WALL SPLAT!', this.color);
+      } else if (this.state === 'launched' && this.vx > 4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx > 0) this.vx = 0;
     }
   }

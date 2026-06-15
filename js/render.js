@@ -123,6 +123,7 @@ function attackExt(f) {
 function drawFighter(ctx, f, game) {
   const key = f.animKey();
   const flash = ((f.state === 'hitstun' || f.state === 'launched' || f.state === 'fallheavy') && f.f <= 2)
+    || (f.state === 'wallsplat' && f.f <= 2)
     || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2);
 
   const body = flash ? '#ffffff' : f.color;
@@ -187,6 +188,33 @@ function drawFighter(ctx, f, game) {
     return;
   }
 
+  // ── ground tech: rolling tuck / spring-up (wakeup roll shares the backroll look) ──
+  if (key === 'backroll' || key === 'wakeuproll') {
+    ctx.translate(0, -34);
+    ctx.rotate(-f.facing * f.f * 0.34);                 // tumble in the roll direction
+    capsule(ctx, -16, 14, -34, 28, 13, dark);           // tucked rear leg
+    capsule(ctx, -18, -8, -34, 6, 11, dark);            // tucked rear arm
+    capsule(ctx, -12, 8, 14, -6, 28, body);             // curled torso
+    capsule(ctx, 12, 12, 28, 24, 13, body);             // tucked front leg
+    ball(ctx, 26, -14, 15, skin);                        // head tucked in
+    drawFace(ctx, 26, -14, 0.6, dead, flash);
+    capsule(ctx, 8, -12, 24, 2, 11, body);              // tucked front arm
+    ctx.restore();
+    return;
+  }
+  if (key === 'kipup') {
+    const t = 1 - Math.min(1, f.f / CFG.KIPUP_FRAMES);  // 1 = still down, 0 = upright
+    ctx.rotate(t * Math.PI / 2 * 0.8);
+    capsule(ctx, 0, -6, 6, -70, 30, body);              // legs kicking under
+    capsule(ctx, 4, -70, 8, -128, 32, body);            // torso springing up
+    ball(ctx, 12, -146, 15, skin);
+    drawFace(ctx, 12, -146, 1, dead, flash);            // fierce — fighting back up
+    capsule(ctx, 6, -110, 30, -76, 11, body);           // arms thrown for the spring
+    capsule(ctx, 4, -110, -16, -78, 11, dark);
+    ctx.restore();
+    return;
+  }
+
   // ── standing family: build a skeleton pose, then draw it ──
   // defaults: relaxed fighting stance
   const P = {
@@ -205,8 +233,10 @@ function drawFighter(ctx, f, game) {
   const ext = attackExt(f);
   const mv = f.move;
   const target = mv ? { x: (mv.hitbox.x + mv.hitbox.w * 0.72) * ext, y: (mv.hitbox.y + mv.hitbox.h / 2) + (1 - ext) * 18 } : null;
-  const isPunch = ['jab', 'cross', 'hook', 'uppercut', 'backfist', 'crouchjab', 'flyuppercut'].includes(key);
-  const isKick = ['frontkick', 'legkick', 'sweep', 'soccer', 'jumpkick', 'knee', 'backkick', 'flyknee'].includes(key);
+  // every striking move now carries `kind` (moves.js) — derive the swing pose
+  // straight off the live move; no live move ⇒ neither (relaxed stance).
+  const isPunch = !!mv && mv.kind === 'punch';
+  const isKick = !!mv && mv.kind === 'kick';
 
   switch (key) {
     case 'walk': {
@@ -278,6 +308,51 @@ function drawFighter(ctx, f, game) {
       P.faceMood = 1;
       break;
     }
+    case 'clinchgrab': {
+      lean(P, 0.34);
+      P.handF = { x: 58, y: -120 }; P.handR = { x: 50, y: -108 };
+      P.armBendF = 1; P.armBendR = 1;
+      P.footF.x = 30;
+      P.faceMood = 1;
+      break;
+    }
+    case 'clinch': {
+      lean(P, 0.22);
+      P.handF = { x: 46, y: -128 }; P.handR = { x: 42, y: -116 };
+      P.armBendF = 1; P.armBendR = 1;
+      P.head.x += 6; P.head.y += 4;
+      P.footF.x = 26; P.footR.x = -20;
+      P.faceMood = 1;
+      break;
+    }
+    case 'clinched': {
+      lean(P, 0.12);
+      const j = Math.sin(f.f * 0.6) * 3;
+      P.head.x += 4 + j; P.head.y += 8;
+      P.handF = { x: 26, y: -96 }; P.handR = { x: 14, y: -88 };
+      P.armBendF = -1; P.armBendR = -1;
+      P.footF.x = 24;
+      P.faceMood = -1;
+      break;
+    }
+    case 'clinchpunch': {
+      lean(P, 0.2);
+      if (target) { P.handF = { x: target.x, y: target.y }; }
+      P.handR = { x: 40, y: -118 };   // rear hand still gripping
+      P.armBendR = 1;
+      P.faceMood = 1;
+      P.trail = target ? { to: target, isLeg: false } : null;
+      break;
+    }
+    case 'clinchknee': {
+      lean(P, 0.18);
+      if (target) { P.footF = { x: target.x, y: target.y }; P.legBendF = 1; }
+      P.handF = { x: 40, y: -150 }; P.handR = { x: 30, y: -142 };   // pulling the head down
+      P.armBendF = -1; P.armBendR = -1;
+      P.faceMood = 1;
+      P.trail = target ? { to: target, isLeg: true } : null;
+      break;
+    }
     case 'execute': {
       lean(P, 0.2);
       const alt = f.f % 12 < 6;
@@ -293,6 +368,49 @@ function drawFighter(ctx, f, game) {
       P.faceMood = -1;
       break;
     }
+    case 'slipcounter': {
+      if (f.f <= CFG.COUNTER_SLIP) {
+        // the slip: weave back and off the centerline, coiling
+        lean(P, -0.22);
+        const w = Math.sin(f.f * 0.5) * 6;
+        P.head.x -= 10; P.head.y += 6; P.sho.x += w;
+        P.handF = { x: 18, y: -120 }; P.handR = { x: 8, y: -108 };
+        P.armBendF = -1;
+      } else {
+        // the blow: hard strike, weapon by the caught move's kind
+        lean(P, 0.3);
+        const kick = f.counterKind === 'kick';
+        strikeTo(P, kick ? { x: 74, y: -96 } : { x: 70, y: -150 }, kick ? 'kick' : 'punch');
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'countered': {
+      // caught cold — head snaps back, arms fly open
+      lean(P, -0.4);
+      P.handF = { x: -28, y: -96 }; P.handR = { x: -16, y: -120 };
+      P.armBendF = -1; P.armBendR = -1;
+      P.head.x -= 8; P.head.y += 4;
+      P.footF.x = 32;
+      P.faceMood = -1;
+      break;
+    }
+    case 'airpunch': {
+      lean(P, 0.18);
+      P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 };   // legs tucked, airborne
+      P.legBendF = 1; P.legBendR = 1;
+      if (target) strikeTo(P, target, 'punch');
+      P.faceMood = 1;
+      break;
+    }
+    case 'divekick': {
+      lean(P, 0.42);                                                // pitched forward into the dive
+      P.footR = { x: -6, y: -30 }; P.legBendR = 1;                  // trailing leg tucked
+      if (target) strikeTo(P, target, 'kick');                     // lead leg spears down-forward
+      P.handF = { x: 24, y: -120 }; P.handR = { x: 4, y: -132 };
+      P.faceMood = 1;
+      break;
+    }
     case 'jumpkick': case 'flyknee': {
       lean(P, key === 'flyknee' ? 0.35 : 0.2);
       P.footR = { x: -8, y: -36 }; P.legBendR = 1;          // trailing leg tucked
@@ -306,6 +424,42 @@ function drawFighter(ctx, f, game) {
       P.footF = { x: 10, y: -26 }; P.footR = { x: -12, y: -18 };
       P.legBendF = 1; P.legBendR = 1;
       if (target) strikeTo(P, target, 'punch');
+      P.faceMood = 1;
+      break;
+    }
+    case 'axekick': {
+      lean(P, 0.18);
+      // overhead arc: heel cocked HIGH overhead on the wind-up, then chops
+      // straight down through the head/torso to the floor. phase 0→1 = startup→recovery.
+      const phase = mv ? Math.min(1, f.f / (mv.startup + mv.active)) : 1;
+      const arc = { x: 30 - phase * 16, y: -210 + phase * 210 };   // -210 (overhead) → 0 (floor)
+      strikeTo(P, arc, 'kick');
+      P.legBendF = phase < 0.5 ? 1 : -1;   // knee up on the lift, snaps straight on the chop
+      P.handF = { x: -8, y: -150 }; P.handR = { x: 16, y: -132 };   // arms thrown up for the swing
+      P.faceMood = 1;
+      break;
+    }
+    case 'dashpunch': case 'dashkick': {
+      lean(P, 0.42);   // committed — leaning hard into the lunge
+      if (target) strikeTo(P, target, key === 'dashpunch' ? 'punch' : 'kick');
+      P.faceMood = 1;
+      break;
+    }
+    case 'wallsplat': {
+      // crushed flat against the wall: arms splayed, head snapped back, sliding
+      lean(P, -0.34);
+      P.sho.y += 10; P.head.x -= 4; P.head.y += 14;
+      P.handF = { x: -30, y: -150 }; P.handR = { x: -34, y: -120 };
+      P.armBendF = -1; P.armBendR = -1;
+      P.footF.x = 24; P.footR.x = -22;
+      P.faceMood = -1;
+      break;
+    }
+    case 'slip': {
+      // deep weave under the whiffed high — the read before the counter lands
+      crouchPose(P);
+      lean(P, 0.22);
+      P.head.x += 10; P.head.y += 10;
       P.faceMood = 1;
       break;
     }
@@ -574,6 +728,20 @@ function render(ctx, game) {
     ctx.font = 'bold 64px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('MECH CANNON', CFG.STAGE_W / 2, 200);
+  }
+
+  // counter-hit cinematic: dim the room, the two of them on top of the slip
+  if (game.counter) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+    drawFighter(ctx, game.counter.vic, game);
+    drawFighter(ctx, game.counter.att, game);
+  }
+
+  // counter-hit white flash — slammed on at the read, decays fast
+  if (game.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${0.85 * game.flash / CFG.COUNTER_FLASH})`;
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
   }
 
   if (game.debug) drawDebugBoxes(ctx, game.fighters);

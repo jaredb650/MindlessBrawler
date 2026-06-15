@@ -12,7 +12,11 @@ const MOVE_LABELS = {
   backfist: 'BACKFIST', crouchjab: 'BODY JAB', frontkick: 'FRONT KICK',
   legkick: 'LEG KICK', sweep: 'SWEEP!', soccer: 'SOCCER KICK!',
   jumpkick: 'JUMP KICK', knee: 'KNEE', backkick: 'SPINNING BACK KICK!',
+  axekick: 'AXE KICK!',
+  airpunch: 'AIR PUNCH', divekick: 'DIVE KICK!',
+  clinchpunch: 'DIRTY BOXING', clinchknee: 'BODY KNEE!',
   flyknee: 'FLYING KNEE!', flyuppercut: 'FLYING UPPERCUT!', cannon: 'MECH CANNON!!',
+  dashpunch: 'DASH PUNCH!', dashkick: 'DASH KICK!',
 };
 
 function pushFeed(text, color) {
@@ -66,6 +70,47 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // round landing later must not corrupt whatever its owner is doing by then.
   const live = att.move === move;
 
+  // Clinch strike: damage + drain + juice, but the victim NEVER leaves 'clinched'.
+  // No block/parry, no combo scaling, no knockback — the bodies stay pinned.
+  if (move.clinchHit) {
+    const dmg = Math.max(1, move.damage);
+    vic.hp -= dmg;
+    if (move.staminaDrain) vic.stamina = Math.max(0, vic.stamina - move.staminaDrain);
+    att.meter = Math.min(CFG.MAX_METER, att.meter + dmg * CFG.METER_PER_DAMAGE);
+    if (live) { att.moveHitDone = true; att.madeContact = true; }
+    game.hitstop = Math.max(game.hitstop, move.hitstop);
+    if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+    spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+    hitSfx(move);
+    pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
+    if (vic.hp <= 0) { vic.hp = 0; vic.inClinch = false; att.inClinch = false; vic.setLaunched(away * 5, -10, true); }
+    return;
+  }
+
+  // SLIP → COUNTER (Phase 5): a FRESH (parry-timed) crouch-block-back UNDER a HIGH
+  // overhead ducks it and feeds Phase 3's counter sequencer. This MUST run BEFORE
+  // canBlock(), which by design rejects a crouched blocker vs a high (overheads/jump-ins
+  // must be blocked standing) — so inside that gate the slip would be dead code. A
+  // PASSIVE (non-fresh) crouch still eats the overhead clean, as intended.
+  if (live && move.guard === 'high' && !att.isAirborne() && !vic.isAirborne()
+      && vic.pad.held.down && vic.backHeldFrames > 0 && vic.backHeldFrames <= CFG.PARRY_WINDOW
+      && vic.counterCD <= 0 && !game.counter
+      && ['idle', 'walk', 'crouch', 'blockstun'].includes(vic.state)) {
+    const slipAway = Math.sign(vic.x - sourceX) || -vic.facing;
+    const holdingAway = (slipAway === 1 && vic.pad.held.right) || (slipAway === -1 && vic.pad.held.left);
+    if (holdingAway) {
+      att.moveHitDone = true; att.madeContact = true;
+      vic.counterKind = 'punch';   // the slip's signature blow (a hard cross)
+      const slipBlow = { kind: 'punch', damage: move.damage, anim: move.anim };
+      startCounter(vic, att, slipBlow, game);   // vic slips → counters att
+      game.hitstop = Math.max(game.hitstop, CFG.PARRY_HITSTOP);
+      spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'SLIP!', '#ffe082');
+      playSfx('counter_slip');
+      pushFeed('SLIP COUNTER!', vic.color);
+      return;
+    }
+  }
+
   if (canBlock(vic, sourceX, move)) {
     // Fresh block = parry. Holding back forever doesn't count — you must time it.
     if (vic.backHeldFrames > 0 && vic.backHeldFrames <= CFG.PARRY_WINDOW) {
@@ -100,6 +145,16 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   }
 
   // ── clean hit ──
+  // COUNTER-HIT: catch them in their own move's STARTUP (grounded, off cooldown)
+  // → hand both bodies to the cinematic sequencer in main.js. The cannon round
+  // (no `kind`) and airborne exchanges are excluded on purpose. (Clinch strikes
+  // never reach here — the clinchHit early-out above returns first.)
+  const vicCommitting = MOVE_STATES.has(vic.state) && vic.move && vic.f <= vic.move.startup;
+  if (live && move.kind && !att.isAirborne() && !vic.isAirborne()
+      && vicCommitting && att.counterCD <= 0 && !game.counter) {
+    startCounter(att, vic, move, game);
+    return;
+  }
   if (vic.inHitState()) vic.comboHits++;
   else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; }
   const hits = vic.comboHits;
@@ -124,6 +179,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   if (vic.hp <= 0) {
     vic.hp = 0;
     vic.setLaunched(away * 7, -12, true);   // KO: dramatic launch, main takes it from here
+    vic.noTech = true;                       // can't tech your own death — set AFTER setLaunched clears it
     return;
   }
 
@@ -143,8 +199,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       spawnFloatText(vic.x, vic.y - CFG.BODY_H - 40, 'POINT BLANK!', '#ffe082');
       pushFeed(`POINT BLANK KNEE — ${dmg + bonus}!`, '#ffe082');
       playSfx('explosion');
-      if (vic.hp <= 0) { vic.hp = 0; vic.setLaunched(away * 8, -12, true); return; }
+      if (vic.hp <= 0) { vic.hp = 0; vic.setLaunched(away * 8, -12, true); vic.noTech = true; return; }
       vic.setLaunched(away * 8, -12, true);   // violent pop, more up than away
+      vic.noTech = true;                       // the point-blank knee is un-techable (set after setLaunched)
     } else if (att.vy < -1 || vic.isAirborne()) {
       vic.setLaunched(away * 14, -7, true);
     } else {
@@ -267,6 +324,9 @@ function updateProjectiles(f1, f2, game) {
 // Grounded bodies can't overlap; airborne fighters may cross over (jump-over is legal).
 function separateBodies(f1, f2) {
   if (f1.isAirborne() || f2.isAirborne()) return;
+  // Clinched bodies are pinned by the fighter logic — don't push them apart.
+  const clinchStates = ['clinchgrab', 'clinch', 'clinched'];
+  if (clinchStates.includes(f1.state) || clinchStates.includes(f2.state)) return;
   const b1 = f1.pushbox(), b2 = f2.pushbox();
   if (!b1 || !b2 || !rectsOverlap(b1, b2)) return;
   const overlap = Math.min(b1.x + b1.w, b2.x + b2.w) - Math.max(b1.x, b2.x);

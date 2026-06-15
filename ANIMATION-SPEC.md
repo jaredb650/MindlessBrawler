@@ -86,9 +86,30 @@ glowing detail, is welcome but optional.)
 | 37 | `execute` | 6–8 | finisher (attacker): collar grab → rapid alternating body flurry (loopable 4) → huge wind-up → mega haymaker |
 | 38 | `executed` | 3 loop | finisher (victim): held up, rag-dolling under the flurry |
 
-**Totals:** Tier 1 ≈ 40 frames · Tier 2 ≈ +65 · Tier 3 ≈ +35 → **~140 drawn
-frames for everything.** Commission Tier 1 first to validate the pipeline, then
-2 and 3.
+### Tier 4 — the v0.3 combat update (clinch, aerials, teching, counters)
+
+| # | Name | Frames | Notes |
+|---|---|---|---|
+| 39 | `axekick` | 6 | overhead axe kick: leg raises STRAIGHT UP overhead → heel chops down through the body to the floor. Slow, heavy, telegraphed (replaces the standalone `knee` on up+K) |
+| 40 | `airpunch` | 3 | aerial straight punch, angled down-forward (held until landing) |
+| 41 | `divekick` | 3 | steep dive: body angled, leg extended down-forward, driving toward the floor (held until landing) |
+| 42 | `clinchgrab` | 3 | reach into the clinch — two hands snatching the collar/neck |
+| 43 | `clinch` | 2–4 loop | the clinch hold: hunched, hands behind the opponent's head, controlling. Readable as "locked up" |
+| 44 | `clinched` | 2–4 loop | being held in the clinch: bent, struggling to break free (mirror energy to `clinch`) |
+| 45 | `clinchpunch` | 3 | short dirty-boxing uppercut/hook from inside the clinch |
+| 46 | `clinchknee` | 3 | driving knee to the body from inside the clinch |
+| 47 | `backroll` | 4 | knockdown tech: backward shoulder roll → up to feet (tucked tumble). Also reused for `wakeuproll` |
+| 48 | `kipup` | 4 | knockdown tech: lying flat → kick legs up → spring upright in place. Explosive |
+| 49 | `wakeuproll` | 4 | wakeup roll (shares the `backroll` tucked-tumble look; engine routes here) |
+| 50 | `slipcounter` | 5 | the counter highlight: slip/weave off-axis (duck the incoming) → explode into a hard cross or kick. Cocky, decisive |
+| 51 | `countered` | 3 | getting countered: caught mid-windup, head snapping back as the slip-counter lands |
+| 52 | `wallsplat` | 3 | pinned flat against the wall on impact, then peeling off (stunned, spread-eagled) |
+| 53 | `dashpunch` | 4 | lunging running straight — committed forward drive behind it |
+| 54 | `dashkick` | 4 | lunging running kick — committed forward drive behind it |
+
+**Totals:** Tier 1 ≈ 40 frames · Tier 2 ≈ +65 · Tier 3 ≈ +35 · Tier 4 ≈ +55 →
+**~195 drawn frames for everything.** Commission Tier 1 first to validate the
+pipeline, then 2, 3, and 4.
 
 ## Timing reference (authoritative)
 

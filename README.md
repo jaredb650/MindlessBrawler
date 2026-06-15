@@ -28,6 +28,15 @@ Open `index.html` in a browser. That's it. (Or `python3 -m http.server` and hit
 - **Hold away** = block. **Hold down+away** = low block (sweeps/leg kicks are lows).
 - **Tap away just before impact** (≤7 frames) = **parry** → attacker staggered, you get the opening + meter.
 
+**New in the v0.3 combat update:**
+- **Clinch** — `P+K` in range ties them up: dirty punches, a stamina-draining body knee, a judo throw on back, or break out. They mash to escape; it auto-releases.
+- **Knockdown teching** — at the **first ground bounce**, tap **away** = back-roll tech (roll clear, invuln) or **JUMP** = kip-up tech (spring up in place). Tight window; denies the ground juggle.
+- **Okizeme** — on wakeup: tap a direction = roll · hold **down** = delay your getup · attack = wakeup reversal (death on whiff). Being thrown? **mash P+K** to tech it.
+- **Counter-hits** — catch them in a move's **startup** and the screen flashes: you slip it and answer with a hard counter blow (big damage, hard knockdown).
+- **Feint** — **back + JUMP** during a normal's startup cancels it (stamina) — bait the parry, then whiff-punish.
+- **Pushblock** — **P+K while blocking** shoves the attacker off (stamina) — a corner-pressure escape valve.
+- **Slip** — **crouch-block + tap back** under an overhead/jump-in ducks it straight into a counter.
+
 System keys: `1` P2 human · `2` P2 idle dummy · `3` P2 auto-block dummy ·
 `4` **P2 CPU (it fights back)** · `5` fill both meters · `0` toggle hitbox/debug view.
 
@@ -67,13 +76,17 @@ Nice-to-haves (not wired yet): footsteps, crowd loop, music, announcer.
 | → + K            | Leg kick    | THE pressure glue: big stun, no pushback, must block low |
 | ↓ + K            | Sweep       | low **ender**: knockdown |
 | → + K (opp. downed) | Soccer kick | the premium ground hit: biggest pop, biggest damage |
-| ↑ + K            | Knee        | body shot: drains opponent STAMINA (half through block), chains in from all lights |
+| ↑ + K            | **Axe kick** | overhead **ender** — must be blocked STANDING; slow, heavy, hard knockdown (the knee moved to the clinch). Tap JUMP in startup → flying knee, as before |
 | ← + K            | Spinning back kick | huge telegraph, huge lunge, 100 dmg, blasts them ACROSS the stage — no flow cancel, ends exchanges |
 | ↑ + K, tap JUMP  | **Flying knee** | the skill shot: POINT-BLANK = 130 dmg (hardest strike in the game) · rising = blast away · TIP of arc = instant full gas-out |
 | ↑ + P, tap JUMP  | **Flying uppercut** | invuln rise, 3 hits, launches sky-high — the pop-out-of-pressure reversal, death on whiff |
-| P+K (mid-string) | **Clinch throw** | judo toss BEHIND you: side switch, corner escape, knockdown |
+| **P+K (neutral)** | **CLINCH** | tie them up → **P** dirty punches · **K** body knee (drains stamina) · **←** judo throw · **forward/jump** break. They mash to escape; auto-releases on a timer |
+| P+K (mid-string) | **Clinch throw** | judo toss BEHIND you: side switch, corner escape, knockdown (skips the clinch) |
+| Run + P / K      | **Dash attack** | committed lunging straight / kick off a run |
 | P+K (opp. gassed + <10% HP, close) | **EXECUTION** | grab → 12-hit flurry → wind-up → haymaker wall splat. Match over. |
-| P or K in air    | Jump kick   | must be blocked standing |
+| P in air         | Air punch   | quick aerial straight |
+| K in air         | Air kick    | the jump-in (must be blocked standing) |
+| ↓ + K in air     | **Divekick** | steep dive — changes your jump arc, drives them down |
 | Super (full meter) | Mech Cannon | cinematic freeze → 20mm shell, ~45% HP, blockable/jumpable |
 
 Flying conversions are range-gated (knee ~500px, uppercut ~260px) — they're
