@@ -12,6 +12,7 @@ function spawnSpark(x, y, kind) {
     hit:   ['#ffffff', '#ffb74d', '#ff7043'],
     block: ['#80deea', '#4dd0e1'],
     parry: ['#fff59d', '#ffe082', '#ffffff'],
+    blood: ['#c0392b', '#e74c3c', '#7b241c'],
   };
   const colors = palettes[kind] || palettes.hit;
   const n = kind === 'parry' ? 14 : kind === 'hit' ? 10 : 6;
@@ -23,6 +24,23 @@ function spawnSpark(x, y, kind) {
       life: 14 + Math.random() * 10, maxLife: 24,
       color: colors[(Math.random() * colors.length) | 0],
       size: 2 + Math.random() * 3, grav: 0.15,
+    });
+  }
+}
+
+// Blood gout — a directional spray (mostly along `dir`) that arcs and falls fast.
+// The Flatliner's money shot; also a light spurt on the connecting blow.
+function spawnBlood(x, y, dir, n) {
+  const reds = ['#c0392b', '#e74c3c', '#a93226', '#922b21', '#7b241c'];
+  for (let i = 0; i < n; i++) {
+    const sp = 3 + Math.random() * 10;
+    Particles.push({
+      x, y: y + (Math.random() - 0.5) * 36,
+      vx: dir * sp * (0.5 + Math.random()) + (Math.random() - 0.5) * 4,
+      vy: -Math.random() * 8 - 1,                      // sprays up, then gravity drags it down
+      life: 22 + Math.random() * 20, maxLife: 42,
+      color: reds[(Math.random() * reds.length) | 0],
+      size: 2 + Math.random() * 4.5, grav: 0.34,       // heavier than sparks — blood drops
     });
   }
 }

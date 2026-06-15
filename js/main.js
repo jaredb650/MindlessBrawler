@@ -242,7 +242,7 @@ function beginFlatliner(att, vic, game) {
   spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'FLATLINE!', '#fff59d');
   startCine('flatliner', att, vic, game);   // faces both bodies; sets att/vic states below
   att.setState('attack'); att.move = MOVES.overhand; att.moveName = 'overhand';   // hold the overhand connect; sequencer drives att.f
-  vic.setState('crumpled');                                                       // shared crumple-down victim pose
+  vic.setState('hitstun');                                                        // snapped-back recoil, frozen on the fist — then BLASTED flying on release
   playSfx('flatliner_freeze');
   pushFeed('THE FLATLINER!!', att.color);
 }
@@ -252,26 +252,30 @@ function beginFlatliner(att, vic, game) {
 // re-seats both bodies; logicStep's KO block fires the shared slow-mo + flash next frame.
 function runFlatlinerCine(game, ex) {
   const { att, vic } = ex;
-  if (ex.f === 1) playSfx('flatliner_hit');
+  if (ex.f === 1) { playSfx('flatliner_hit'); spawnBlood(vic.x, CFG.FLOOR_Y - 150, att.facing, 16); }   // spurt on the connect
   if (ex.f <= CFG.FLATLINER_FREEZE) {
     // frozen on the connected fist — keep the victim pinned where the punch met them
     vic.x += (att.x + att.facing * 60 - vic.x) * 0.12;
   } else if (ex.f === CFG.FLATLINER_FREEZE + 1) {
     playSfx('flatliner_drop');
     game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
-    spawnDust(vic.x, CFG.FLOOR_Y, 12);
   } else if (ex.f >= CFG.FLATLINER_END) {
-    // the release — body is a heap, round ends next frame in logicStep's KO block
+    // the release — one-punch KO: the body is BLASTED clean off its feet in a spray
+    // of blood and flies. Un-techable; logicStep's KO block fires the slow-mo + flash.
     vic.hp = 0;
-    vic.setState('downed'); vic.noTech = true;
+    const away = att.facing;
+    vic.setLaunched(away * 18, -13.5, true); vic.noTech = true;   // sent FLYING, can't tech death
+    spawnBlood(vic.x, CFG.FLOOR_Y - 130, away, 48);               // the money gout, trails behind the body
+    spawnBlood(vic.x, CFG.FLOOR_Y - 80, away, 20);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 130, 'blood');
     att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
     game.flatlinerKill = true;                // KO banner reads 'FLATLINED.'
     game.cine = null;
     game.slowmo = CFG.FLATLINER_SLOWMO;       // ride out into the KO slow-mo
-    game.hitstop = Math.max(game.hitstop, 6);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5);
+    game.hitstop = Math.max(game.hitstop, 8);
     playSfx('flatliner_ko');
   }
-  // (the crumple fold itself is animated by the 'crumpled' render pose off vic.f)
 }
 
 const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine };
