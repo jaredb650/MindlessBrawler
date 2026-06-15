@@ -411,6 +411,12 @@ function logicStep() {
     game.matchState = 'ko';
     game.slowmo = CFG.KO_SLOWMO_FRAMES;
     game.flash = CFG.KO_FLASH; game.flashMax = CFG.KO_FLASH;   // EVERY KO flashes — shared KO juice, zero per-move wiring
+    // blood on EVERY kill — a gout from each downed fighter, in their launch direction
+    for (const f of [f1, f2]) if (f.hp <= 0) {
+      const dir = Math.sign(f.vx) || f.facing;
+      spawnBlood(f.x, CFG.FLOOR_Y - 110, dir, 42);
+      spawnSpark(f.x, CFG.FLOOR_Y - 110, 'blood');
+    }
     const winner = f1.hp <= 0 ? (f2.hp <= 0 ? null : f2) : f1;
     game.banner = {
       text: game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
