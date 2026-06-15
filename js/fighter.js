@@ -1009,8 +1009,10 @@ class Fighter {
             this.y = CFG.FLOOR_Y - 1;
             game.shake = Math.max(game.shake, 5);
             spawnDust(this.x, CFG.FLOOR_Y, 10);
+            if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 22, Math.sign(this.vx) || this.facing, 16);   // a corpse squirts on every bounce
             playSfx('bounce');
           } else {
+            if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 18, this.facing, 12);   // ...and on the final slam
             this.vx = 0;
             this.setState('fallheavy');
             playSfx('body_slam');
@@ -1055,9 +1057,10 @@ class Fighter {
         game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
         spawnDust(minX, this.y, 12);
         spawnSpark(minX + 20, this.y - CFG.BODY_H * 0.6, 'hit');
+        if (this.hp <= 0) spawnBlood(minX + 8, this.y - CFG.BODY_H * 0.55, 1, 24);   // corpse splats the wall
         playSfx('wall_splat');
         pushFeed('WALL SPLAT!', this.color);
-      } else if (this.state === 'launched' && this.vx < -4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      } else if (this.state === 'launched' && this.vx < -4) { if (this.hp <= 0) spawnBlood(minX + 6, this.y - CFG.BODY_H * 0.5, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx < 0) this.vx = 0;
     }
     if (this.x > maxX) {
@@ -1068,9 +1071,10 @@ class Fighter {
         game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
         spawnDust(maxX, this.y, 12);
         spawnSpark(maxX - 20, this.y - CFG.BODY_H * 0.6, 'hit');
+        if (this.hp <= 0) spawnBlood(maxX - 8, this.y - CFG.BODY_H * 0.55, -1, 24);   // corpse splats the wall
         playSfx('wall_splat');
         pushFeed('WALL SPLAT!', this.color);
-      } else if (this.state === 'launched' && this.vx > 4) { this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      } else if (this.state === 'launched' && this.vx > 4) { if (this.hp <= 0) spawnBlood(maxX - 6, this.y - CFG.BODY_H * 0.5, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx > 0) this.vx = 0;
     }
   }

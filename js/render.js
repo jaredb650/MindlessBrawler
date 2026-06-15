@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 const Particles = [];
 const FloatTexts = [];
+const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
 
 function spawnSpark(x, y, kind) {
   const palettes = {
@@ -24,6 +25,7 @@ function spawnSpark(x, y, kind) {
       life: 14 + Math.random() * 10, maxLife: 24,
       color: colors[(Math.random() * colors.length) | 0],
       size: 2 + Math.random() * 3, grav: 0.15,
+      blood: kind === 'blood',
     });
   }
 }
@@ -41,8 +43,31 @@ function spawnBlood(x, y, dir, n) {
       life: 22 + Math.random() * 20, maxLife: 42,
       color: reds[(Math.random() * reds.length) | 0],
       size: 2 + Math.random() * 4.5, grav: 0.34,       // heavier than sparks — blood drops
+      blood: true,                                     // stains the floor/wall where it lands
     });
   }
+}
+
+// A persistent blood decal where a drop hit the floor (pool) or a wall (drip).
+function spawnStain(x, y, vertical) {
+  Stains.push({
+    x, y, r: 3 + Math.random() * 7, vertical: !!vertical,
+    color: ['#7b241c', '#922b21', '#641e16'][(Math.random() * 3) | 0],
+    a: 0.4 + Math.random() * 0.4,
+  });
+  if (Stains.length > 240) Stains.shift();   // cap — the arena can only hold so much
+}
+
+function drawStains(ctx) {
+  for (const s of Stains) {
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    if (s.vertical) ctx.ellipse(s.x, s.y, s.r * 0.6, s.r * 1.4, 0, 0, Math.PI * 2);   // wall drip
+    else ctx.ellipse(s.x, s.y, s.r * 1.5, s.r * 0.45, 0, 0, Math.PI * 2);             // floor pool
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function spawnDust(x, y, n) {
@@ -65,6 +90,13 @@ function updateFx() {
   for (let i = Particles.length - 1; i >= 0; i--) {
     const p = Particles[i];
     p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--;
+    // blood that reaches a surface leaves a permanent stain, then pools out
+    if (p.blood) {
+      if (p.y >= CFG.FLOOR_Y) { spawnStain(p.x, CFG.FLOOR_Y + 1, false); Particles.splice(i, 1); continue; }
+      if (p.x <= CFG.WALL_L + 2 || p.x >= CFG.WALL_R - 2) {
+        spawnStain(Math.max(CFG.WALL_L + 2, Math.min(CFG.WALL_R - 2, p.x)), p.y, true); Particles.splice(i, 1); continue;
+      }
+    }
     if (p.life <= 0) Particles.splice(i, 1);
   }
   for (let i = FloatTexts.length - 1; i >= 0; i--) {
@@ -928,6 +960,7 @@ function render(ctx, game) {
     ctx.translate((Math.random() - 0.5) * game.shake * 2, (Math.random() - 0.5) * game.shake * 2);
   }
   drawStage(ctx);
+  drawStains(ctx);   // blood decals on the floor/walls, under the fighters
 
   for (const f of game.fighters) if (f.state === 'superstart') drawMech(ctx, f);
   for (const p of Projectiles) drawProjectile(ctx, p);

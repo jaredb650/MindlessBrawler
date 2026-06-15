@@ -292,6 +292,7 @@ function resetMatch() {
   Projectiles.length = 0;
   Particles.length = 0;
   FloatTexts.length = 0;
+  Stains.length = 0;   // fresh arena each fight
   UIState.trail = [CFG.MAX_HP, CFG.MAX_HP];
   game.hitstop = 0;
   game.superFreeze = 0;
