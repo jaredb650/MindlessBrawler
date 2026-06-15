@@ -58,6 +58,8 @@ class Fighter {
     this.invuln = 0;
     this.backHeldFrames = 0;
     this.comboHits = 0; this.comboMoves = {}; this.airHits = 0;
+    this.jabChain = 0;         // consecutive CONNECTED jabs → the 3rd auto-bursts into machine-gun blows
+    this.jabCounted = false;   // whether the current jab has been tallied into jabChain
     this.bounced = false;
     this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
@@ -91,7 +93,7 @@ class Fighter {
     this.state = name;
     this.f = 0;
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; }
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }
     if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
     if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
@@ -138,8 +140,20 @@ class Fighter {
       const mv = this.move;
       // flying uppercut only strikes on the way UP — the fall is the commitment
       if (this.moveName === 'flyuppercut' && this.vy > 2) return null;
+      const hb = mv.hitbox;
+      // PHASED hitbox: an array of {t0,t1,x,y,w,h} segments, each live for its own
+      // frame window (the axe kick's heel-square → chop-box). Single boxes still
+      // use the startup/active gate below.
+      if (Array.isArray(hb)) {
+        for (const seg of hb) {
+          if (this.f > seg.t0 && this.f <= seg.t1) {
+            const x = this.facing === 1 ? this.x + seg.x : this.x - seg.x - seg.w;
+            return { x, y: this.y + seg.y, w: seg.w, h: seg.h };
+          }
+        }
+        return null;
+      }
       if (this.f > mv.startup && this.f <= mv.startup + mv.active) {
-        const hb = mv.hitbox;
         const x = this.facing === 1 ? this.x + hb.x : this.x - hb.x - hb.w;
         return { x, y: this.y + hb.y, w: hb.w, h: hb.h };
       }
@@ -170,6 +184,7 @@ class Fighter {
       if (this.state === 'run') this.attackDrift = this.runDir * CFG.RUN_SPEED * CFG.MOMENTUM_KEEP;
       else if (this.state === 'walk') this.attackDrift = heldDir * CFG.WALK_SPEED * CFG.MOMENTUM_KEEP;
       else if (this.state !== 'attack') this.attackDrift = 0;
+      if (mv.slide) this.attackDrift = (this.runDir || this.facing) * CFG.SLIDE_TACKLE_SPEED;   // the slide tackle glides hard
     }
     this.setState(isAir ? 'airattack' : 'attack');
     this.move = mv;
@@ -178,6 +193,8 @@ class Fighter {
     this.madeContact = false;
     this.hitCount = 0;
     this.lastHitF = -99;
+    this.jabCounted = false;                 // this move's connecting-jab tally (machine-gun chain)
+    if (name !== 'jab') this.jabChain = 0;   // only a jab→jab→jab string builds the burst
     // Dive bomb: a `dive` field redirects the jump arc steeply down-forward on
     // start (e.g. divekick). vy is positive = downward; vx is signed by facing.
     if (mv.dive) { this.vx = this.facing * mv.dive.vx; this.vy = mv.dive.vy; }
@@ -251,6 +268,12 @@ class Fighter {
     let cand = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160);
     // "Cross, then forward+punch again → hook": inside a chain, forward+P resolves to hook.
     if (cand === 'cross' && mv.cancels.includes('hook')) cand = 'hook';
+    // MACHINE-GUN BLOWS comes out AUTOMATICALLY off the 3rd connected jab (the
+    // attack-state auto-convert below). A jab pressed DURING that 3rd jab just
+    // triggers the same burst a hair early — jabChain is counted in the attack case.
+    if (cand === 'jab' && this.moveName === 'jab' && this.jabChain >= 3 && mv.cancels.includes('machinegun')) cand = 'machinegun';
+    // OVERHAND: a cross thrown straight out of the machine-gun blows.
+    if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) cand = 'overhand';
     if (cand && mv.cancels.includes(cand)) { this.pad.consume(btn); this.startMove(cand); }
   }
 
@@ -273,6 +296,7 @@ class Fighter {
 
   beginClinch(opp) {
     // the lock: both bodies couple, the way throwgrab→throwanim does
+    this.facing = Math.sign(opp.x - this.x) || this.facing;   // face the victim ONCE; held the whole clinch
     this.setState('clinch');
     this.clinchTimer = 0;        // fresh lock — start the auto-release clock (setState won't zero it)
     this.inClinch = true;
@@ -302,6 +326,10 @@ class Fighter {
 
   setLaunched(vx, vy, freshLaunch) {
     if (freshLaunch) { this.bounced = false; this.noTech = false; }
+    // Hard guard: a missing/NaN launch velocity must never reach physics — it would
+    // NaN the body's position and make it vanish off-screen. Default to a gentle float.
+    if (!Number.isFinite(vx)) vx = 0;
+    if (!Number.isFinite(vy)) vy = -9;
     // Directional influence: on a fresh launch, holding a way bends the arc a hair
     // (clamped to ±DI_NUDGE — never reverses it). Pairs with choosing where to tech.
     // `held` is live through the wrapping hitstop; only the press buffers freeze.
@@ -359,6 +387,8 @@ class Fighter {
         break;
       }
       case 'run': {
+        // run + DOWN → SLIDE TACKLE: take the legs out and pop them airborne.
+        if (this.pad.held.down && this.stamina > 0) { this.startMove('slidetackle'); break; }
         // run + P/K → a committed dash attack (resolved BEFORE tryActions so the run
         // commits into the lunge instead of a plain cross/legkick).
         const dbtn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
@@ -406,6 +436,12 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // AUTO machine-gun: count each CONNECTING jab once (the auto-convert below
+        // turns the 3rd into the burst on its own — no extra press).
+        if (this.moveName === 'jab' && this.madeContact && !this.jabCounted) {
+          this.jabCounted = true;
+          this.jabChain = (this.jabChain || 0) + 1;
+        }
         // FEINT: cancel a NON-convertible move's startup back into neutral for a
         // stamina cost — bait a parry, then whiff-punish. BACK + JUMP during startup.
         // (flyConvert moves keep JUMP for their conversion, so they can't feint.)
@@ -472,13 +508,22 @@ class Fighter {
         this.tryCancel(opp);   // may swap this.move mid-string
         if (this.state === 'attack') {
           const m = this.move;
+          // AUTO machine-gun blows: the 3rd connected jab flows into the flurry by
+          // itself the moment its active frames finish — no 4th press needed.
+          if (this.moveName === 'jab' && this.jabChain >= 3 && this.f >= m.startup + m.active && this.stamina > 0) {
+            this.startMove('machinegun');
+            break;
+          }
           let total = m.startup + m.active + m.recovery;
           // Death on whiff: a WHIFFED wakeup reversal eats bonus recovery — a read on it is a free punish.
           if (this.reversalWhiff && !this.madeContact) total += CFG.WAKEUP_REVERSAL_RECOVERY;
           // FLOW CANCEL: contact (hit OR block) caps recovery — land something
           // and you're moving again. Whiff and you eat every recovery frame.
           const flowEnd = m.startup + m.active + CFG.FLOW_CANCEL_RECOVERY;
-          if (this.f >= total || (this.madeContact && this.f >= flowEnd)) this.endMove();
+          // noFlowCancel moves (backkick, axe kick) ride out their FULL recovery
+          // even on contact — the spin/chop plays to completion, never snapped short.
+          const flowCancelable = this.madeContact && !m.noFlowCancel;
+          if (this.f >= total || (flowCancelable && this.f >= flowEnd)) this.endMove();
         }
         break;
       }
@@ -590,7 +635,9 @@ class Fighter {
         break;
       }
       case 'clinch': {
-        this.facing = Math.sign(opp.x - this.x) || this.facing;
+        // facing was locked in beginClinch — do NOT recompute it here. If it
+        // chases the pinned victim it flip-flops every frame and teleports the
+        // whole pair side to side (the clinch oscillation bug).
         // victim mashed out last frame? let go.
         if (this.clinchBroke) { this.breakClinch(opp, game); break; }
         // auto-release: nobody clinches forever
@@ -620,8 +667,8 @@ class Fighter {
         const clincherHolding = opp.state === 'clinch'
           || (opp.state === 'attack' && opp.move && opp.move.clinchHit);
         if (!clincherHolding) { this.inClinch = false; this.setState(this.stamina <= 0 ? 'gassed' : 'idle'); break; }
-        this.facing = Math.sign(opp.x - this.x) || -opp.facing;
-        this.x = opp.x - opp.facing * CFG.CLINCH_DIST;
+        this.x = opp.x + opp.facing * CFG.CLINCH_DIST;   // pinned IN FRONT of the clincher (it faces us)
+        this.facing = -opp.facing;                        // always face the clincher — no recompute, no wobble
         // MASH: every fresh press (any button or a direction tap) builds escape
         const p = this.pad;
         let pressed = 0;

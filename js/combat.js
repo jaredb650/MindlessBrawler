@@ -17,6 +17,7 @@ const MOVE_LABELS = {
   clinchpunch: 'DIRTY BOXING', clinchknee: 'BODY KNEE!',
   flyknee: 'FLYING KNEE!', flyuppercut: 'FLYING UPPERCUT!', cannon: 'MECH CANNON!!',
   dashpunch: 'DASH PUNCH!', dashkick: 'DASH KICK!',
+  machinegun: 'MACHINE-GUN BLOWS!', overhand: 'OVERHAND!', slidetackle: 'SLIDE TACKLE!',
 };
 
 function pushFeed(text, color) {
@@ -149,8 +150,13 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // → hand both bodies to the cinematic sequencer in main.js. The cannon round
   // (no `kind`) and airborne exchanges are excluded on purpose. (Clinch strikes
   // never reach here — the clinchHit early-out above returns first.)
+  // INTENTIONAL: the counter only fires when the attacker is holding AWAY (the
+  // block/retreat direction) as they land it — a deliberate defensive read, not
+  // a freebie off every startup trade.
   const vicCommitting = MOVE_STATES.has(vic.state) && vic.move && vic.f <= vic.move.startup;
-  if (live && move.kind && !att.isAirborne() && !vic.isAirborne()
+  const attAway = Math.sign(att.x - vic.x) || att.facing;
+  const attHoldingBack = (attAway === 1 && att.pad.held.right) || (attAway === -1 && att.pad.held.left);
+  if (live && move.kind && attHoldingBack && !att.isAirborne() && !vic.isAirborne()
       && vicCommitting && att.counterCD <= 0 && !game.counter) {
     startCounter(att, vic, move, game);
     return;
@@ -221,9 +227,12 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
 
   if (vic.isAirborne()) {
     if (move.multihit) {
-      // rising multihit carries them up with you; the FINAL hit launches high
+      // rising multihit carries them up with you; the FINAL hit launches high —
+      // but ONLY if the move actually launches (machine-gun blows has no launchVy,
+      // so its final airborne hit must NOT pass undefined → NaN → vanished body).
       const finalHit = (att.hitCount || 0) + 1 >= move.multihit.times;
-      vic.setLaunched(away * move.kbx, finalHit ? move.launchVy : -9, false);
+      const lv = finalHit && move.launchVy != null ? move.launchVy : -9;
+      vic.setLaunched(away * move.kbx, lv, false);
       return;
     }
     // Juggle — limited lifts, then the body gets heavy and falls.
@@ -260,9 +269,11 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
 
   // Standard hit: hitstun with soft decay — long strings slowly leak frames,
   // same-move repeats leak fast. No hard cap: parry/stamina are the real outs.
-  const stunScale = Math.max(CFG.MIN_HITSTUN_SCALE, 1 - CFG.HITSTUN_DECAY_PER_HIT * (hits - 1) - CFG.SAME_MOVE_EXTRA_DECAY * sameCount);
+  // noStunDecay (machine-gun blows): every rapid hit keeps FULL hitstun so the flurry
+  // HOLDS them in place straight through to the overhand, instead of decay freeing them.
+  const stunScale = move.noStunDecay ? 1 : Math.max(CFG.MIN_HITSTUN_SCALE, 1 - CFG.HITSTUN_DECAY_PER_HIT * (hits - 1) - CFG.SAME_MOVE_EXTRA_DECAY * sameCount);
   vic.receiveHitstun(Math.round(move.hitstun * stunScale));
-  applyPush(att, vic, move.kbx, away);
+  applyPush(att, vic, move.kbx, away);   // kbx 0 ⇒ no push (machine-gun freezes them in place)
 }
 
 // `move` is snapshotted by the caller: on a trade frame the first resolution

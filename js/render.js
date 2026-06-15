@@ -119,6 +119,9 @@ function attackExt(f) {
 }
 
 // ── the fighter ──────────────────────────────────────────────
+// Cross / uppercut / overhand are REAR-hand straights; jab / hook stay lead-hand.
+const REAR_HAND_PUNCH = new Set(['cross', 'uppercut', 'overhand']);
+
 // Skeleton in local space: feet at y=0, +x = forward.
 function drawFighter(ctx, f, game) {
   const key = f.animKey();
@@ -142,6 +145,14 @@ function drawFighter(ctx, f, game) {
   ctx.save();
   ctx.translate(f.x, f.y);
   if (f.facing === -1) ctx.scale(-1, 1);
+  // Spinning moves (back kick / backfist): a VISUAL 360 — flip away during the
+  // wind-up, whip back around as the strike extends. Gameplay facing is untouched.
+  if ((key === 'backkick' || key === 'backfist') && f.move) {
+    const sm = f.move, a = Math.min(1, f.f / (sm.startup + sm.active));
+    let sx = Math.cos(a * Math.PI * 2);
+    sx = sx >= 0 ? Math.max(0.12, sx) : Math.min(-0.12, sx);
+    ctx.scale(sx, 1);
+  }
   // HARD RULE: unhittable ⇔ flashing transparent. Solid body = fair game.
   if (f.invuln > 0 || f.state === 'fallheavy') ctx.globalAlpha = game.frame % 6 < 3 ? 0.25 : 0.6;
 
@@ -232,7 +243,7 @@ function drawFighter(ctx, f, game) {
 
   const ext = attackExt(f);
   const mv = f.move;
-  const target = mv ? { x: (mv.hitbox.x + mv.hitbox.w * 0.72) * ext, y: (mv.hitbox.y + mv.hitbox.h / 2) + (1 - ext) * 18 } : null;
+  const target = mv && !Array.isArray(mv.hitbox) ? { x: (mv.hitbox.x + mv.hitbox.w * 0.72) * ext, y: (mv.hitbox.y + mv.hitbox.h / 2) + (1 - ext) * 18 } : null;
   // every striking move now carries `kind` (moves.js) — derive the swing pose
   // straight off the live move; no live move ⇒ neither (relaxed stance).
   const isPunch = !!mv && mv.kind === 'punch';
@@ -264,7 +275,7 @@ function drawFighter(ctx, f, game) {
     case 'prejump': case 'land': squash(P, 0.85); break;
     case 'air': {
       P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 };
-      P.legBendF = 1; P.legBendR = 1;
+      P.legBendF = -1; P.legBendR = -1;   // knees bow FORWARD with the feet tucked (was +1 = backward/bird-knee)
       break;
     }
     case 'blockstun': {
@@ -398,14 +409,14 @@ function drawFighter(ctx, f, game) {
     case 'airpunch': {
       lean(P, 0.18);
       P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 };   // legs tucked, airborne
-      P.legBendF = 1; P.legBendR = 1;
+      P.legBendF = -1; P.legBendR = -1;   // knees bow forward (was backward)
       if (target) strikeTo(P, target, 'punch');
       P.faceMood = 1;
       break;
     }
     case 'divekick': {
       lean(P, 0.42);                                                // pitched forward into the dive
-      P.footR = { x: -6, y: -30 }; P.legBendR = 1;                  // trailing leg tucked
+      P.footR = { x: -6, y: -30 }; P.legBendR = -1;                 // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');                     // lead leg spears down-forward
       P.handF = { x: 24, y: -120 }; P.handR = { x: 4, y: -132 };
       P.faceMood = 1;
@@ -413,7 +424,7 @@ function drawFighter(ctx, f, game) {
     }
     case 'jumpkick': case 'flyknee': {
       lean(P, key === 'flyknee' ? 0.35 : 0.2);
-      P.footR = { x: -8, y: -36 }; P.legBendR = 1;          // trailing leg tucked
+      P.footR = { x: -8, y: -36 }; P.legBendR = -1;         // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');
       P.handF = { x: 26, y: -120 }; P.handR = { x: 6, y: -130 };
       P.faceMood = 1;
@@ -422,20 +433,37 @@ function drawFighter(ctx, f, game) {
     case 'flyuppercut': {
       lean(P, -0.1);
       P.footF = { x: 10, y: -26 }; P.footR = { x: -12, y: -18 };
-      P.legBendF = 1; P.legBendR = 1;
+      P.legBendF = -1; P.legBendR = -1;   // knees bow forward (was backward)
       if (target) strikeTo(P, target, 'punch');
       P.faceMood = 1;
       break;
     }
     case 'axekick': {
-      lean(P, 0.18);
-      // overhead arc: heel cocked HIGH overhead on the wind-up, then chops
-      // straight down through the head/torso to the floor. phase 0→1 = startup→recovery.
-      const phase = mv ? Math.min(1, f.f / (mv.startup + mv.active)) : 1;
-      const arc = { x: 30 - phase * 16, y: -210 + phase * 210 };   // -210 (overhead) → 0 (floor)
-      strikeTo(P, arc, 'kick');
-      P.legBendF = phase < 0.5 ? 1 : -1;   // knee up on the lift, snaps straight on the chop
-      P.handF = { x: -8, y: -150 }; P.handR = { x: 16, y: -132 };   // arms thrown up for the swing
+      lean(P, 0.26);
+      // CRESCENT axe kick: the leg swings UP and OVER on the wind-up, then the
+      // heel arcs DOWN and FORWARD, chopping well out in front. Two beats:
+      //   startup  = raise the leg up the front into the cocked-overhead position
+      //   active+  = sweep it down-and-forward, heel landing low out front
+      const su = mv ? mv.startup : 14, ac = mv ? mv.active : 8, rec = mv ? mv.recovery : 16;
+      let fx, fy;
+      if (mv && f.f <= su) {                 // RAISE: draw the foot up & over the top
+        const u = f.f / su;                  // 0 → 1
+        fx = -10 + 32 * u;                   // sweeps up the front (-10 → 22)
+        fy = -36 - 188 * u;                  // rises overhead (-36 → -224)
+        P.legBendF = 1;                      // knee cocked on the lift
+      } else if (mv && f.f <= su + ac) {     // CHOP: arc DOWN and FORWARD, heel out front
+        const c = (f.f - su) / ac;           // 0 → 1
+        fx = 22 + 48 * c;                    // reaches well forward (22 → 70)
+        fy = -224 + 196 * c;                 // chops down near the floor (-224 → -28)
+        P.legBendF = -1;                     // leg snaps straight through the chop
+      } else {                               // RECOVER: pull the leg back under into stance (no frozen hang)
+        const r = mv ? Math.min(1, (f.f - su - ac) / Math.max(1, rec)) : 1;   // 0 → 1
+        fx = 70 + (18 - 70) * r;             // slide the foot back under (70 → 18)
+        fy = -28 + (0 - (-28)) * r;          // and settle it to the floor (-28 → 0)
+        P.legBendF = -1 + 1.6 * r;           // straighten → re-bend into the planted stance
+      }
+      strikeTo(P, { x: fx, y: fy }, 'kick');
+      P.handF = { x: -12, y: -152 }; P.handR = { x: 14, y: -134 };   // arms thrown up & over for the swing
       P.faceMood = 1;
       break;
     }
@@ -463,10 +491,41 @@ function drawFighter(ctx, f, game) {
       P.faceMood = 1;
       break;
     }
+    case 'machinegun': {
+      lean(P, 0.18);
+      const alt = f.f % 4 < 2;                    // hands piston in and out, rapid-fire
+      P.handF = alt ? { x: 60, y: -128 } : { x: 22, y: -118 };
+      P.handR = alt ? { x: 20, y: -116 } : { x: 58, y: -130 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'overhand': {
+      lean(P, 0.42);                               // commit hard into the haymaker
+      // rear fist cocked HIGH & back → loops OVER THE TOP → drops down onto their head.
+      // y dips up over the peak (the -40·sin bump) then lands high (~head height), so it
+      // reads as an overhand right, not a straight body shot.
+      const e = ext;
+      const o = { x: -14 + 80 * e, y: (-198 + 50 * e) - 40 * Math.sin(e * Math.PI) };
+      P.handR = o; P.armBendR = 1;                 // rear elbow up & over
+      P.handF = { x: 18, y: -120 };                // lead hand guards
+      P.head.x += 6 * e;                           // head follows the punch over
+      P.trail = { to: o, isLeg: false };
+      P.faceMood = 1;
+      break;
+    }
+    case 'slidetackle': {
+      crouchPose(P);                              // body dropped to the floor
+      P.sho.y += 30; P.head.y += 34; P.head.x += 8;
+      P.footF = { x: 78, y: -10 }; P.legBendF = -1;   // lead leg scythes out front along the ground
+      P.footR = { x: -16, y: -2 }; P.legBendR = -1;
+      P.handF = { x: 12, y: -64 }; P.handR = { x: -20, y: -52 };
+      P.faceMood = 1;
+      break;
+    }
     default: {
       if ((isPunch || isKick) && target) {
         lean(P, 0.16);
-        strikeTo(P, target, isPunch ? 'punch' : 'kick');
+        strikeTo(P, target, isPunch ? 'punch' : 'kick', isPunch && REAR_HAND_PUNCH.has(key));
         P.faceMood = 1;
       }
     }
@@ -502,10 +561,15 @@ function slump(P, f) {
 function guardUp(P) {
   P.handF = { x: 26, y: -132 }; P.handR = { x: 30, y: -114 };
 }
-function strikeTo(P, target, kind) {
+function strikeTo(P, target, kind, rear) {
   if (kind === 'punch') {
-    P.handF = { x: target.x, y: target.y };
-    P.handR = { x: 14, y: -124 };   // other hand guards
+    if (rear) {                                  // rear-hand straight (cross / uppercut / overhand)
+      P.handR = { x: target.x, y: target.y };
+      P.handF = { x: 20, y: -120 };              // lead hand guards
+    } else {                                     // lead-hand straight (jab / hook)
+      P.handF = { x: target.x, y: target.y };
+      P.handR = { x: 14, y: -124 };
+    }
   } else {
     P.footF = { x: target.x, y: target.y };
     P.legBendF = target.y < -70 ? 1 : -1;   // high kicks bend the knee up

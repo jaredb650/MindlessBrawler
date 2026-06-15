@@ -119,7 +119,7 @@ function runCounter(game) {
     playSfx('hit_heavy');
     pushFeed(`COUNTER ${MOVE_LABELS[move.anim] || move.anim} — ${dmg}!`, '#ffe082');
     vic.setLaunched(att.facing * CFG.COUNTER_LAUNCH_VX, CFG.COUNTER_LAUNCH_VY, true);
-    vic.noTech = true;                       // a counter knockdown is un-techable (set AFTER setLaunched clears it)
+    vic.noTech = vic.hp <= 0;                 // a non-lethal counter IS techable (back-roll/kip-up on landing); only a LETHAL counter can't be teched out of
   } else if (ex.f >= CFG.COUNTER_END) {
     // the release — attacker recovers, KO (if any) resolves next frame in logicStep
     att.setState('idle');

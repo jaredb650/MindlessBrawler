@@ -21,12 +21,15 @@
 //                   soccer kick is the premium pop
 // ─────────────────────────────────────────────────────────────
 const MOVES = {
+  // The range-finder: longest PUNCH in the game (out-reaches the cross), 0 knockback —
+  // pure stun. Probe distance with it, and because it doesn't shove them away you can
+  // walk them into a heavier short-range follow-up or roll the 3-jab → machine-gun chain.
   jab: {
     anim: 'jab', startup: 2, active: 3, recovery: 5,
     damage: 30, hitstun: 16, blockstun: 9, stamina: 2,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_LIGHT,
-    hitbox: { x: 18, y: -155, w: 58, h: 35 },
-    cancels: ['jab', 'cross', 'axekick', 'legkick', 'sweep'],
+    guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — just stun
+    hitbox: { x: 22, y: -152, w: 84, h: 34 },   // reaches ~106px — further than the cross (92)
+    cancels: ['jab', 'cross', 'axekick', 'legkick', 'sweep', 'machinegun'],
   },
   cross: {
     anim: 'cross', startup: 4, active: 3, recovery: 9,
@@ -110,11 +113,20 @@ const MOVES = {
   // Caps the light strings (Fork A) and — like the knee before it — tap JUMP
   // during its startup (in range) still converts to the FLYING KNEE (Fork B).
   axekick: {
-    anim: 'axekick', startup: 14, active: 4, recovery: 24,
+    anim: 'axekick', startup: 14, active: 8, recovery: 16,
     damage: 95, hitstun: 0, blockstun: 16, stamina: 11,
     guard: 'high', kind: 'kick', kbx: 3.5, hitstop: CFG.HITSTOP_ENDER,
-    hitbox: { x: 6, y: -190, w: 60, h: 190 },   // TALL: heel travels head → floor on the way down
-    knockdown: true, heavy: true, popsGround: true, flyConvert: 'flyknee',
+    // PHASED hitbox — it FOLLOWS the heel: a small square on the rising heel
+    // during the wind-up, then the big chop box out front as the heel drives
+    // down. (Each segment is live for its own [t0,t1) frame window.)
+    hitbox: [
+      { t0: 9, t1: 15, x: 2, y: -228, w: 44, h: 56 },     // RAISE: square on the cocked heel (up high)
+      { t0: 15, t1: 19, x: 20, y: -176, w: 58, h: 86 },   // SWING: heel descending through the front
+      { t0: 19, t1: 23, x: 30, y: -100, w: 86, h: 100 },  // CHOP: the big box — low & out front, only once the heel drives in
+    ],
+    // noFlowCancel: the chop rides out its FULL recovery on hit — a clean landing
+    // doesn't snap it short, so the swing reads as one committed motion.
+    knockdown: true, heavy: true, popsGround: true, noFlowCancel: true, flyConvert: 'flyknee',
   },
   // ←+K: spinning back kick — huge telegraph, huge lunge, huge damage, and the
   // ONE strike that blasts people across the stage. Exempt from flow cancel:
@@ -213,15 +225,41 @@ const MOVES = {
     anim: 'clinchpunch', startup: 3, active: 3, recovery: 8,
     damage: 20, hitstun: 0, blockstun: 0, stamina: 3,
     guard: 'mid', kbx: 0, hitstop: CFG.HITSTOP_MED,
-    hitbox: { x: 8, y: -120, w: 40, h: 36 },
+    hitbox: { x: 20, y: -130, w: 84, h: 44 },   // reaches the pinned victim (CLINCH_DIST) — dirty boxing never whiffs
     clinchHit: true, kind: 'punch',
   },
   clinchknee: {
     anim: 'clinchknee', startup: 5, active: 3, recovery: 12,
     damage: 30, hitstun: 0, blockstun: 0, stamina: 4,
     guard: 'mid', kbx: 0, hitstop: CFG.HITSTOP_ENDER,
-    hitbox: { x: 6, y: -100, w: 42, h: 46 },
+    hitbox: { x: 18, y: -112, w: 84, h: 54 },   // reaches the pinned victim (CLINCH_DIST)
     staminaDrain: 18, clinchHit: true, kind: 'kick',
+  },
+  // jab → jab → jab (3 connect) → 4th becomes MACHINE-GUN BLOWS: a 4-hit rapid
+  // flurry. Cancel it into a cross → OVERHAND that blasts them away.
+  machinegun: {
+    anim: 'machinegun', startup: 3, active: 18, recovery: 10,
+    damage: 14, hitstun: 12, blockstun: 7, stamina: 7,
+    guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — freezes them in place
+    hitbox: { x: 16, y: -150, w: 70, h: 44 },
+    multihit: { times: 4, interval: 4 }, noStunDecay: true, chainOnly: true, cancels: ['overhand'],
+  },
+  // the punctuation after the machine-gun: a rear-hand OVERHAND that smacks them
+  // clear across the stage (blast, like the back kick). chains only off machinegun.
+  overhand: {
+    anim: 'overhand', startup: 7, active: 4, recovery: 18,
+    damage: 80, hitstun: 0, blockstun: 14, stamina: 9,
+    guard: 'mid', kind: 'punch', kbx: 9, hitstop: CFG.HITSTOP_ENDER,
+    hitbox: { x: 18, y: -168, w: 80, h: 58 },
+    blast: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
+  },
+  // run + DOWN: a low SLIDE TACKLE that takes the legs out and POPS them airborne.
+  slidetackle: {
+    anim: 'slidetackle', startup: 4, active: 10, recovery: 16,
+    damage: 50, hitstun: 0, blockstun: 12, stamina: 8,
+    guard: 'low', kind: 'kick', kbx: 4, hitstop: CFG.HITSTOP_MED,
+    hitbox: { x: 18, y: -46, w: 96, h: 46 },
+    launcher: true, launchVy: -11, heavy: true, popsGround: true, slide: true,
   },
 };
 
@@ -244,8 +282,8 @@ function resolveNeutralMove(btn, dirCat, oppDowned, closeToOpp) {
       case 'up': return 'axekick';
       case 'back': return 'backkick';
       case 'down': return 'sweep';
-      case 'forward': return (oppDowned && closeToOpp) ? 'soccer' : 'legkick';
-      default: return 'frontkick';
+      case 'forward': return (oppDowned && closeToOpp) ? 'soccer' : 'frontkick';
+      default: return 'legkick';   // leg kick is the neutral poke now (a LOW); front kick moved to forward+K
     }
   }
   return null;

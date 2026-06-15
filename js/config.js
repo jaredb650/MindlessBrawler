@@ -17,6 +17,7 @@ const CFG = {
   // Locomotion — "light feet": fast, nimble movement.
   WALK_SPEED: 4.2,
   RUN_SPEED: 8.5,
+  SLIDE_TACKLE_SPEED: 15,        // initial glide speed of the run+down slide tackle (decays through the move)
   JUMP_VEL: -16.5,
   JUMP_DRIFT_FWD: 6.5,
   JUMP_DRIFT_BACK: 5,
