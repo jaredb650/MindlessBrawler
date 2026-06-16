@@ -194,6 +194,12 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   hitSfx(move);
   pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
 
+  // BLEED (Vesper's knife): a clean knife hit adds stacks + refreshes the bleed timer (DoT in fighter.update).
+  if (live && move.bleed) {
+    vic.bleed = Math.min(CFG.MAX_BLEED, vic.bleed + move.bleed);
+    vic.bleedTimer = CFG.BLEED_DURATION;
+  }
+
   // ── MAGIC PUNCH COMBO payoff ──
   // The 4th link (final cross) of the jab→cross→uppercut→cross STARTER connecting hands both bodies
   // to the automatic teleport-flurry cinematic (main.js). Fired BEFORE the KO check so it plays even

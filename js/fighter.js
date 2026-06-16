@@ -119,6 +119,8 @@ class Fighter {
     this.pendingElectric = 0;  // electrocution queued by the side spike — converts to `electrified` on landing
     this.electrified = 0;      // electrocution seize timer: locked + convulsing + passive DoT
     this.wallSpiked = false;   // a wall-spike wallsplat → slow slide down the wall + blood trail
+    this.bleed = 0;            // bleed stacks (Vesper's knife DoT)
+    this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
@@ -648,6 +650,14 @@ class Fighter {
     // arm the magnet on a much-later poke. An off-sequence move start zeroes it directly.
     if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
     if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
+    // BLEED DoT (Vesper's knife wounds): drips damage while it lasts, then clears. Can bleed out a KO.
+    if (this.bleed > 0) {
+      if (--this.bleedTimer <= 0) { this.bleed = 0; }
+      else if (this.hp > 0 && this.bleedTimer % CFG.BLEED_TICK === 0) {
+        this.hp = Math.max(0, this.hp - CFG.BLEED_DMG * this.bleed);
+        spawnBlood(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, -this.facing, 2);   // a small wound drip
+      }
+    }
 
     // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
     // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.

@@ -63,6 +63,11 @@ const CFG = {
   AIR_DASH_VX: 13,              // horizontal blink speed
   AIR_DASH_VY: -2,              // slight lift so it reads as a dash, not a fall
   AIR_DASH_COST: 8,             // stamina
+  // BLEED (Vesper's knife DoT): each knife hit adds stacks + refreshes the timer; ticks while it lasts.
+  MAX_BLEED: 6,                 // stack cap
+  BLEED_DURATION: 150,          // frames a fresh knife hit keeps them bleeding (~2.5s)
+  BLEED_TICK: 18,               // a drip every N frames
+  BLEED_DMG: 2,                 // damage per stack per tick (6 stacks = 12/tick → strong chip, not dominant)
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
   FLOW_CANCEL_RECOVERY: 4,      // on a clean HIT recovery caps at this — block rides FULL recovery (negative on block), whiffs eat it all
 
