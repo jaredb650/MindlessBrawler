@@ -229,13 +229,15 @@ class Fighter {
   startMove(name, isAir = false) {
     const mv = MOVES[name];
     this.stamina = Math.max(0, this.stamina - mv.stamina);
-    // MAGIC PUNCH COMBO chain: jab → cross → uppercut → cross. Once it connects (chain>=2)
-    // the hits go grounded/re-stun (inescapable, no launch) and the attacker latches (combat.js).
-    const pc = this.punchChain;
+    // MAGIC PUNCH COMBO chain: jab → cross → uppercut → cross. Each link must land CLEAN
+    // (this.madeHit on the move we're canceling FROM) — a blocked/whiffed link breaks it, so the
+    // string is genuinely earned. Once confirmed (chain>=2) the hits go grounded/re-stun
+    // (inescapable, no launch) and the attacker latches (combat.js).
+    const pc = this.punchChain, linked = this.madeHit;
     this.punchChain = name === 'jab' ? 1
-      : (name === 'cross' && pc === 1) ? 2
-      : (name === 'uppercut' && pc === 2) ? 3
-      : (name === 'cross' && pc === 3) ? 4
+      : (name === 'cross' && pc === 1 && linked) ? 2
+      : (name === 'uppercut' && pc === 2 && linked) ? 3
+      : (name === 'cross' && pc === 3 && linked) ? 4
       : 0;
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
@@ -723,7 +725,9 @@ class Fighter {
         // MAGIC PUNCH COMBO: once the chain has confirmed (>=2), the attacker LATCHES to the
         // opponent — glides to strike range every frame so the inescapable string never drops.
         if (this.punchChain >= 2) {
-          const want = opp.x - this.facing * CFG.MAGNET_DIST;
+          const toward = Math.sign(opp.x - this.x) || this.facing;   // re-aim each frame so a cross-up can't strand the magnet behind them
+          this.facing = toward;
+          const want = opp.x - toward * CFG.MAGNET_DIST;
           this.x += (want - this.x) * CFG.MAGNET_PULL;
           this.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, this.x));
         }
@@ -790,6 +794,7 @@ class Fighter {
             this.setState('flyattack');
             this.move = fm;
             this.moveName = mv.flyConvert;
+            this.punchChain = 0;   // jumping out of the chain (e.g. uppercut→flyuppercut) breaks the magic combo
             this.moveHitDone = false;
             this.madeContact = false;
             this.hitCount = 0;

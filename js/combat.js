@@ -208,8 +208,12 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // ── MAGIC PUNCH COMBO (jab→cross→uppercut→cross, chain>=2) ──
   // Every hit (incl. the uppercut) stays GROUNDED and RE-STUNS — no launch, so the string is
   // inescapable AND loops: after the last hit they're standing in hitstun, ready for the next combo.
-  if (live && att.punchChain >= 2) {
-    vic.y = CFG.FLOOR_Y; vic.vx = 0; vic.vy = 0;   // keep them on the floor (suppress the uppercut launch)
+  if (live && att.punchChain >= 2 && att.state === 'attack'
+      && !vic.isAirborne() && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    // grounded, normal-state victim only — airborne/downed/special bodies fall through to their
+    // own reaction branches (no teleport-snap, juggle/OTG rules intact); flyuppercut (state
+    // 'flyattack') keeps its launcher.
+    vic.vx = 0; vic.vy = 0;
     vic.receiveHitstun(CFG.MAGNET_HITSTUN);
     vic.pushVel = away * 1.5;                       // barely any push — the magnet stays glued
     return;
