@@ -102,6 +102,9 @@ class Fighter {
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
     this.attackDrift = 0;      // momentum carried into/through strikes
     this.grabSlide = 0;        // forward lunge carried into a grab's reach (walk/dash grabs reach further)
+    this.sideSpikeFrames = 0;  // electric overhand: reduced-gravity flat-flight window
+    this.pendingElectric = 0;  // electrocution queued by the side spike — converts to `electrified` on landing
+    this.electrified = 0;      // electrocution seize timer: locked + convulsing + passive DoT
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
@@ -445,6 +448,19 @@ class Fighter {
     playSfx('spike');                               // the acid/energy spike cast
   }
 
+  // SIDE SPIKE (electric overhand): the horizontal spike — launched dead-flat with great
+  // force, gravity SUPPRESSED (not zero) during the flight so they fly nearly straight into
+  // the wall. Arms the electrocution; it begins once they LAND (pendingElectric → electrified).
+  receiveSideSpike(away, game) {
+    if (CFG.FLOOR_Y - this.y < CFG.SIDESPIKE_LIFT) { this.y = CFG.FLOOR_Y - CFG.SIDESPIKE_LIFT; this.prevY = this.y; }
+    this.bounced = false;
+    this.setLaunched(away * CFG.SIDESPIKE_VX, 0, false);   // vy = 0 → dead flat, no DI
+    this.noTech = true;
+    this.sideSpikeFrames = CFG.SIDESPIKE_FRAMES;           // reduced-gravity flight window
+    this.pendingElectric = CFG.ELECTRIC_FRAMES;            // electrocution armed; starts on landing
+    spawnDust(this.x, CFG.FLOOR_Y, 10);
+  }
+
   beginThrown(thrower) {
     this.setState('thrown');
     this.invuln = CFG.THROW_FRAMES + 10;
@@ -553,6 +569,23 @@ class Fighter {
     if (this.invuln > 0) this.invuln--;
     if (this.hitFlash > 0) this.hitFlash--;   // universal contact-flash timer (set in the receive* funnels)
     if (this.counterCD > 0) this.counterCD--;
+
+    // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
+    // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.
+    if (this.electrified > 0) {
+      this.electrified--;
+      this.invuln = Math.max(this.invuln, 2);
+      if (this.state !== 'electrified') this.setState('electrified');
+      this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
+      if (this.hp > 0 && this.electrified % CFG.ELECTRIC_TICK === 0) {
+        this.hp -= CFG.ELECTRIC_DMG;                                  // passive damage — a jolt every tick
+        spawnElectric(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.55, 5);    // crackle on the body
+        playSfx('hit_light');
+        if (this.hp <= 0) { this.hp = 0; this.electrified = 0; }      // electrocuted to death → end the seize, let the KO resolve
+      }
+      if (this.electrified <= 0) this.setState(this.stamina <= 0 ? 'gassed' : 'downed');   // shock ends → collapse
+      return;   // the seize owns the frame
+    }
     if (this.groundpoundCD > 0) this.groundpoundCD--;
 
     const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip', 'crumple', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled']);
@@ -1043,7 +1076,9 @@ class Fighter {
 
     // ── shared physics ──
     if (this.isAirborne()) {
-      this.vy += CFG.GRAVITY;
+      // side spike: gravity SUPPRESSED (not zero) for the flat-flight window → flies straight, sags slightly
+      if (this.sideSpikeFrames > 0) { this.vy += CFG.GRAVITY * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--; }
+      else this.vy += CFG.GRAVITY;
       this.x += this.vx;
       this.y += this.vy;
       if (this.y >= CFG.FLOOR_Y && this.vy >= 0) {
@@ -1078,6 +1113,12 @@ class Fighter {
             spawnDust(this.x, CFG.FLOOR_Y, 10);
             if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 22, Math.sign(this.vx) || this.facing, 16);   // a corpse squirts on every bounce
             playSfx('bounce');
+          } else if (this.pendingElectric > 0) {
+            // the side-spiked body has LANDED → the electrocution seize begins (top-of-update handler owns it)
+            this.electrified = this.pendingElectric; this.pendingElectric = 0;
+            this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
+            this.setState('electrified');
+            playSfx('body_slam');
           } else {
             if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 18, this.facing, 12);   // ...and on the final slam
             this.vx = 0;

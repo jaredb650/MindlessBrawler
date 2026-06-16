@@ -120,6 +120,60 @@ function spawnSpike(x, dir) {
   }
 }
 
+// Blue ELECTRIC burst — fast, gravity-less crackle sparks. (charged overhand explosion + the seize.)
+function spawnElectric(x, y, n) {
+  const cols = ['#4fc3f7', '#81d4fa', '#b3e5fc', '#ffffff', '#e1f5fe'];
+  for (let i = 0; i < (n || 16); i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 3 + Math.random() * 7;
+    Particles.push({
+      x: x + (Math.random() - 0.5) * 20, y: y + (Math.random() - 0.5) * 24,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: 5 + Math.random() * 8, maxLife: 13,
+      color: cols[(Math.random() * cols.length) | 0], size: 1.5 + Math.random() * 2.5, grav: 0,
+    });
+  }
+}
+
+// Jagged lightning arcs radiating from (x,y) — drawn (not particles), flickers every frame.
+function drawElectricArcs(ctx, x, y, r, count) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.9;
+  for (let a = 0; a < (count || 3); a++) {
+    ctx.strokeStyle = ['#4fc3f7', '#81d4fa', '#ffffff'][(Math.random() * 3) | 0];
+    ctx.lineWidth = 1.4 + Math.random() * 1.6;
+    const ang = Math.random() * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    const segs = 3 + ((Math.random() * 2) | 0);
+    for (let s = 1; s <= segs; s++) {
+      const t = s / segs;
+      ctx.lineTo(x + Math.cos(ang) * r * t + (Math.random() - 0.5) * r * 0.55,
+                 y + Math.sin(ang) * r * t + (Math.random() - 0.5) * r * 0.55);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Horizontal SPEED / action lines streaking off a fast-moving fist. (machine-gun blows.)
+function drawActionLines(ctx, x, y, dir) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const oy = y + (Math.random() - 0.5) * 44;
+    const len = 26 + Math.random() * 40;
+    ctx.lineWidth = 1 + Math.random() * 2;
+    ctx.beginPath();
+    ctx.moveTo(x - dir * 6, oy);
+    ctx.lineTo(x - dir * (6 + len), oy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // FX run even during hitstop — the freeze is for bodies, not sparks.
 function updateFx() {
   for (let i = Particles.length - 1; i >= 0; i--) {
@@ -759,10 +813,21 @@ function drawFighter(ctx, f, game) {
     }
     case 'machinegun': {
       lean(P, 0.18);
-      const alt = f.f % 4 < 2;                    // hands piston in and out, rapid-fire
+      const alt = f.f % 2 < 1;                    // hands piston in and out, rapid-fire (2x = twice as fast)
       P.handF = alt ? { x: 60, y: -128 } : { x: 22, y: -118 };
       P.handR = alt ? { x: 20, y: -116 } : { x: 58, y: -130 };
       P.faceMood = 1;
+      break;
+    }
+    case 'electrified': {
+      // seizing from the shock — stiff, arms jolting open, head snapping with a high-freq jitter
+      const j = Math.sin(f.f * 1.7) * 4 + (Math.random() - 0.5) * 5;
+      lean(P, -0.12);
+      P.sho.x += j * 0.5; P.head.x += j; P.head.y += 4;
+      P.handF = { x: -24 + j, y: -150 }; P.handR = { x: 22 - j, y: -150 };
+      P.armBendF = -1; P.armBendR = -1;
+      P.footF.x = 26; P.footR.x = -24;
+      P.faceMood = -1;
       break;
     }
     case 'overhand': {
@@ -823,6 +888,14 @@ function drawFighter(ctx, f, game) {
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
   drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9) });
+
+  // ── elemental / motion overlays (drawn over the body, in local space) ──
+  if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
+  if (key === 'electrified') {                                                  // the seizing body wreathed in lightning
+    drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.5, 44, 4);
+    drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.8, 30, 3);
+  }
+  if (key === 'machinegun') { drawActionLines(ctx, P.handF.x, P.handF.y, 1); drawActionLines(ctx, P.handR.x, P.handR.y, 1); }
 
   ctx.restore();
 }

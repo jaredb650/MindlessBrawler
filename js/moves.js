@@ -335,7 +335,7 @@ const MOVES = {
     damage: 14, hitstun: 12, blockstun: 7, stamina: 7,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — freezes them in place
     hitbox: { x: 16, y: -150, w: 70, h: 44 },
-    multihit: { times: 4, interval: 4 }, noStunDecay: true, chainOnly: true, cancels: ['overhand'],
+    multihit: { times: 4, interval: 2 }, noStunDecay: true, chainOnly: true, cancels: ['overhand'],   // interval 2 = blows come out TWICE as fast
   },
   // the punctuation after the machine-gun: a rear-hand OVERHAND that smacks them
   // clear across the stage (blast, like the back kick). chains only off machinegun.
@@ -347,7 +347,8 @@ const MOVES = {
     damage: 80, hitstun: 0, blockstun: 14, stamina: 9,
     guard: 'mid', kind: 'punch', kbx: 9, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 18, y: -168, w: 80, h: 58 },
-    blast: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
+    // sideSpike: the charged overhand SIDE-SPIKES (horizontal blast) + electrocutes on hit.
+    blast: true, sideSpike: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
     canFlatline: true,   // eligible for the just-frame one-punch-KO divert (combat.js reads the prime)
   },
   // frontkick (connected) → forward+P: SUPERMAN PUNCH. A flying diving overhand

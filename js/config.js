@@ -201,6 +201,18 @@ const CFG = {
   AXEKICK_SPIKE_VY: 15,           // the axe kick chops bodies DOWN into the floor too (grounded + tumbling) → bounce
   SPIKE_LIFT: 62,                  // a STANDING spike victim is yanked this high into a mid-air tumble first, THEN rocketed down → a real slam + bounce (not a quiet thud-to-downed)
 
+  // ELECTRIC OVERHAND — the charged overhand: a horizontal SIDE SPIKE + a lingering electrocution.
+  SIDESPIKE_VX: 24,                // horizontal launch force (× away) — blasts them flat across the stage
+  SIDESPIKE_LIFT: 84,              // lifted to ~head height (where the overhand strikes) so they fly flat into the wall
+  SIDESPIKE_FRAMES: 36,            // frames of REDUCED gravity (the dead-flat flight window)
+  SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly
+  OVERHAND_FREEZE: 26,             // dramatic hit-freeze when the charged overhand lands
+  OVERHAND_FLASH: 10,              // white flash on the connect
+  ELECTRIC_BURST: 24,              // electric particles in the on-hit explosion
+  ELECTRIC_FRAMES: 168,            // electrocution duration (~2.8s) — DoT + seize, begins once they land
+  ELECTRIC_TICK: 14,               // passive-damage cadence (a jolt every ~0.23s)
+  ELECTRIC_DMG: 7,                 // HP per jolt (~12 jolts → ~84 over the shock)
+
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
   THROW_RANGE: 120,
   THROW_DMG: 50,

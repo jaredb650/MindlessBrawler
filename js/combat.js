@@ -246,6 +246,16 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       return;
     }
     if (live) att.flatlinerPrimed = false;
+    // ELECTRIC OVERHAND: a horizontal SIDE SPIKE (blasts them dead-flat across the stage)
+    // + a lingering electrocution (DoT + seize) that arms now and begins once they LAND.
+    if (move.sideSpike) {
+      vic.receiveSideSpike(away, game);
+      game.hitstop = Math.max(game.hitstop, CFG.OVERHAND_FREEZE);                 // the dramatic freeze on the connect
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
+      game.flash = Math.max(game.flash, CFG.OVERHAND_FLASH); game.flashMax = Math.max(game.flashMax, CFG.OVERHAND_FLASH);
+      spawnElectric(contactPoint.x, contactPoint.y, CFG.ELECTRIC_BURST);          // blue energy explodes off the fist
+      return;
+    }
     vic.setLaunched(away * 15, -7, true);
     return;
   }
