@@ -120,6 +120,20 @@ function spawnSpike(x, dir) {
   }
 }
 
+// RUMBLE — chunky debris blasted off the wall (into the stage, dir) by a wall-spike impact.
+function spawnRumble(x, y, dir) {
+  const cols = ['#6b6b78', '#52525e', '#7a7a86', '#42424c', '#8a8a96', '#5a5a66'];
+  for (let i = 0; i < 24; i++) {
+    const sp = 4 + Math.random() * 12;
+    Particles.push({
+      x: x + (Math.random() - 0.5) * 26, y: y - 90 + Math.random() * 170,
+      vx: dir * sp * (0.4 + Math.random()) + (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 10,
+      life: 16 + Math.random() * 18, maxLife: 34,
+      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 5.5, grav: 0.42,
+    });
+  }
+}
+
 // Horizontal SIDE-SPIKE burst — energy streaking in the launch direction (its own distinct look).
 function spawnSideSpike(x, y, dir) {
   const cols = ['#ffffff', '#ffd54f', '#ffb74d', '#fff59d'];

@@ -462,6 +462,34 @@ class Fighter {
     playSfx('sidespike');
   }
 
+  // A launched body splatting a wall. `into` = +1 (left wall) / -1 (right wall) = the way
+  // it faces, into the stage. A SIDE-SPIKE flat-flight splat (sideSpikeFrames>0) deals
+  // SIGNIFICANT damage + rumble debris + a heavy impact; a normal splat is the usual thud.
+  _wallSplat(wx, into, game) {
+    const sideSpiked = this.sideSpikeFrames > 0;   // captured BEFORE we clear it
+    this.vx = 0; this.facing = into;
+    this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (peel-off under normal gravity)
+    const by = this.y - CFG.BODY_H * 0.55;
+    if (sideSpiked) {
+      this.hp = Math.max(0, this.hp - CFG.SIDESPIKE_WALL_DMG);   // the wall-spike HURTS
+      if (this.hp <= 0) this.pendingElectric = 0;               // dead → no posthumous electrocution
+      game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+      spawnRumble(wx + into * 12, this.y - CFG.BODY_H * 0.5, into);   // debris blasted off the wall
+      spawnDust(wx, CFG.FLOOR_Y, 20);
+      spawnSpark(wx + into * 20, by, 'hit', 2);
+      if (this.pendingElectric > 0) spawnElectric(wx + into * 20, this.y - CFG.BODY_H * 0.5, CFG.ELECTRIC_BURST);
+      spawnFloatText(this.x, this.y - CFG.BODY_H - 20, 'WALL SPIKE!!', '#ffd54f');
+    } else {
+      game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
+      spawnDust(wx, this.y, 12);
+      spawnSpark(wx + into * 20, by, 'hit');
+    }
+    if (this.hp <= 0) spawnBlood(wx + into * 8, by, into, 24);   // corpse splats the wall
+    playSfx('wall_splat');
+    pushFeed(sideSpiked ? 'WALL SPIKE!!' : 'WALL SPLAT!', this.color);
+  }
+
   beginThrown(thrower) {
     this.setState('thrown');
     this.sideSpikeFrames = 0; this.pendingElectric = 0;   // a throw mid-side-spike cancels the flight + armed electrocution
@@ -1166,30 +1194,14 @@ class Fighter {
     const minX = CFG.WALL_L + 30, maxX = CFG.WALL_R - 30;
     if (this.x < minX) {
       this.x = minX;
-      if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) {
-        this.vx = 0; this.facing = 1;   // face away from the wall, into the stage
-        this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (so the peel-off falls under normal gravity)
-        game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
-        spawnDust(minX, this.y, 12);
-        spawnSpark(minX + 20, this.y - CFG.BODY_H * 0.6, 'hit');
-        if (this.hp <= 0) spawnBlood(minX + 8, this.y - CFG.BODY_H * 0.55, 1, 24);   // corpse splats the wall
-        playSfx('wall_splat');
-        pushFeed('WALL SPLAT!', this.color);
-      } else if (this.state === 'launched' && this.vx < -4) { if (this.hp <= 0) spawnBlood(minX + 6, this.y - CFG.BODY_H * 0.5, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) this._wallSplat(minX, 1, game);
+      else if (this.state === 'launched' && this.vx < -4) { if (this.hp <= 0) spawnBlood(minX + 6, this.y - CFG.BODY_H * 0.5, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx < 0) this.vx = 0;
     }
     if (this.x > maxX) {
       this.x = maxX;
-      if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) {
-        this.vx = 0; this.facing = -1;   // face away from the wall, into the stage
-        this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (so the peel-off falls under normal gravity)
-        game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
-        spawnDust(maxX, this.y, 12);
-        spawnSpark(maxX - 20, this.y - CFG.BODY_H * 0.6, 'hit');
-        if (this.hp <= 0) spawnBlood(maxX - 8, this.y - CFG.BODY_H * 0.55, -1, 24);   // corpse splats the wall
-        playSfx('wall_splat');
-        pushFeed('WALL SPLAT!', this.color);
-      } else if (this.state === 'launched' && this.vx > 4) { if (this.hp <= 0) spawnBlood(maxX - 6, this.y - CFG.BODY_H * 0.5, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) this._wallSplat(maxX, -1, game);
+      else if (this.state === 'launched' && this.vx > 4) { if (this.hp <= 0) spawnBlood(maxX - 6, this.y - CFG.BODY_H * 0.5, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx > 0) this.vx = 0;
     }
   }

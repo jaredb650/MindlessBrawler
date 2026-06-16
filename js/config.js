@@ -206,6 +206,8 @@ const CFG = {
   SIDESPIKE_LIFT: 84,              // lifted to ~head height (where the overhand strikes) so they fly flat into the wall
   SIDESPIKE_FRAMES: 36,            // frames of REDUCED gravity (the dead-flat flight window)
   SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly
+  SIDESPIKE_WALL_DMG: 130,         // a side-spiked body that SLAMS the wall takes SIGNIFICANT extra damage (can KO)
+  SIDESPIKE_WALL_SHAKE: 16,        // the wall-spike screen rumble (vs the normal WALLSPLAT_SHAKE 6)
   OVERHAND_FREEZE: 26,             // dramatic hit-freeze when the charged overhand lands
   OVERHAND_FLASH: 10,              // white flash on the connect
   ELECTRIC_BURST: 46,              // electric particles in the on-hit explosion (bigger blast)
