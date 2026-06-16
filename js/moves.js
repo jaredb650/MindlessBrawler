@@ -335,7 +335,7 @@ const MOVES = {
     damage: 14, hitstun: 12, blockstun: 7, stamina: 7,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — freezes them in place
     hitbox: { x: 16, y: -150, w: 70, h: 44 },
-    multihit: { times: 4, interval: 1 }, noStunDecay: true, chainOnly: true, cancels: ['overhand'], hitSound: 'gunshot',   // interval 1 = a blow EVERY frame; each fires a gunshot
+    multihit: { times: 4, interval: 1 }, noStunDecay: true, chainOnly: true, cancels: ['overhand'],   // interval 1 = a blow EVERY frame
   },
   // the punctuation after the machine-gun: a rear-hand OVERHAND that smacks them
   // clear across the stage (blast, like the back kick). chains only off machinegun.

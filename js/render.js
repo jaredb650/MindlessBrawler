@@ -346,6 +346,7 @@ function drawFighter(ctx, f, game) {
     ball(ctx, 28, -16, 15, skin);                       // head
     drawFace(ctx, 28, -16, 0.6, dead, flash);
     capsule(ctx, 8, -14, 28, 4, 11, body);             // front arm
+    if (f.pendingElectric > 0) { drawElectricArcs(ctx, 6, 4, 40, 4); drawElectricArcs(ctx, 22, -14, 26, 3); }   // electricity wreathing a side-spiked body in flight
     ctx.restore();
     return;
   }
@@ -917,7 +918,7 @@ function drawFighter(ctx, f, game) {
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
-  if (key === 'electrified') {                                                  // the seizing body wreathed in lightning
+  if (key === 'electrified' || f.pendingElectric > 0) {                         // seizing OR an armed body (e.g. wall-splatted) wreathed in lightning
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.5, 44, 4);
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.8, 30, 3);
   }

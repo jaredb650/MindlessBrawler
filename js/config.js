@@ -168,7 +168,7 @@ const CFG = {
   // THE FLATLINER — just-frame overhand off the machine-gun's FINAL hit → one-punch KO.
   // A clean primed overhand diverts into the shared cine harness (kind:'flatliner') instead
   // of the blast: small impact hitstop, white flash, freeze, body crumples, round ends.
-  FLATLINER_JF_WINDOW: 3,       // just-frame window (frames after the machine-gun's final hit) for the flatliner overhand
+  FLATLINER_JF_WINDOW: 1,       // just-frame window (frames after the machine-gun's final hit) — TIGHT: a 2-frame just-frame so most overhands are the regular (electric) one, not the flatliner
   FLATLINER_FLASH: 12,          // white-flash frames on the connect (reuses game.flash)
   FLATLINER_SLOWMO: 70,         // slow-mo frames after the release (reuses game.slowmo)
   FLATLINER_FREEZE: 26,         // beat 1: dead-still freeze on the connected fist (runFlatlinerCine OWNS this — startCine sets only a small hitstop)

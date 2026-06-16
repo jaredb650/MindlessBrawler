@@ -43,7 +43,7 @@ const SOUND_MANIFEST = {
   grapples:  ['throw_grab', 'throw_slam', 'clinch_break'],
   stamina:   ['gassed'],
   crumple:   ['crumple', 'buckle'],
-  super:     ['super_freeze', 'explosion', 'meter_ready', 'beam_activate', 'beam_fire'],
+  super:     ['super_freeze', 'explosion', 'meter_ready', 'beam_activate', 'beam_fire', 'electrocute'],
   counter:   ['counter_slip', 'counter_hit'],
   execution: ['exec_grab', 'exec_punch', 'exec_riser', 'exec_blast'],
   flatliner: ['flatliner_freeze', 'flatliner_hit', 'flatliner_drop', 'flatliner_ko'],

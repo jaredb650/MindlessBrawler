@@ -583,7 +583,6 @@ class Fighter {
       if (this.hp > 0 && this.electrified % CFG.ELECTRIC_TICK === 0) {
         this.hp -= CFG.ELECTRIC_DMG;                                  // passive damage — a jolt every tick
         spawnElectric(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.55, 5);    // crackle on the body
-        playSfx('hit_light');
         if (this.hp <= 0) { this.hp = 0; this.electrified = 0; }      // electrocuted to death → end the seize, let the KO resolve
       }
       if (this.electrified <= 0) this.setState(this.stamina <= 0 ? 'gassed' : 'downed');   // shock ends → collapse
@@ -1124,7 +1123,9 @@ class Fighter {
             this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
             this.invuln = Math.max(this.invuln, 2);   // cover the very first seize frame (before the handler runs next tick)
             this.setState('electrified');
+            spawnElectric(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, CFG.ELECTRIC_BURST);   // blue energy explosion on landing
             playSfx('body_slam');
+            playSfx('electrocute');                                                      // the electricity runs through the seize
           } else {
             if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 18, this.facing, 12);   // ...and on the final slam
             this.vx = 0;
