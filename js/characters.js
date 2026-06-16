@@ -47,6 +47,38 @@ const CHARACTERS = {
   },
 };
 
+// ── VESPER (char #2): gun-kata rushdown glass cannon. ──────────
+// Built up across Phase A: A.1 = stats only (she is selectable + feels distinct now); her body
+// lands in A.2 (drawFighterVesper) and her real knife/gun moveset in A.3. UNTIL A.3 she borrows
+// the brawler's moveset + input maps so she is immediately playable.
+CHARACTERS.vesper = {
+  id: 'vesper',
+  name: 'VESPER',
+  moves: CHARACTERS.brawler.moves,                 // TEMP placeholder until A.3 (knife/gun moves)
+  neutralMap: CHARACTERS.brawler.neutralMap,        // TEMP
+  airMap: CHARACTERS.brawler.airMap,                // TEMP
+  dashMap: CHARACTERS.brawler.dashMap,              // TEMP
+  otgKickForward: CHARACTERS.brawler.otgKickForward,
+  superMap: CHARACTERS.brawler.superMap,            // TEMP until Phase C (her own supers)
+  // physical feel — the rushdown identity: less HP, faster on the ground, snappier/less-floaty jump.
+  stats: {
+    maxHp: 820,                                     // glass cannon
+    maxStamina: CFG.MAX_STAMINA,
+    staminaRegen: CFG.STAMINA_REGEN,
+    walkSpeed: CFG.WALK_SPEED * 1.25,               // faster footsteps
+    runSpeed: CFG.RUN_SPEED * 1.2,
+    jumpVel: CFG.JUMP_VEL * 0.95,                   // slightly lower hop...
+    jumpDriftFwd: CFG.JUMP_DRIFT_FWD * 1.15,        // ...with more air control
+    jumpDriftBack: CFG.JUMP_DRIFT_BACK * 1.15,
+    gravity: CFG.GRAVITY * 1.3,                     // falls harder → far less floaty
+    backdashSpeed: CFG.BACKDASH_SPEED * 1.2,        // quick evasive slip
+    backdashFrames: CFG.BACKDASH_FRAMES,
+  },
+};
+
+// Selectable roster, in character-select order.
+const CHAR_ROSTER = ['brawler', 'vesper'];
+
 // resolve the active character for a fighter, tolerant of an id string or a def.
 function charDef(c) {
   if (!c) return CHARACTERS.brawler;

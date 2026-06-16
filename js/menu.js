@@ -84,8 +84,20 @@ function consumePauseKey() {
   return false;
 }
 
+// A fight mode was chosen → go pick the two fighters first.
+function enterSelect(game, dummyMode) {
+  const m = game.menu;
+  m.pendingMode = dummyMode;
+  m.stage = 0;                       // 0 = choosing P1's slot, 1 = P2's slot
+  if (!m.picks) m.picks = [0, 0];    // roster indices, remembered between visits
+  game.scene = 'select';
+}
+
 function startFight(game, dummyMode) {
   game.dummyMode = dummyMode;
+  const picks = (game.menu && game.menu.picks) || [0, 0];
+  game.fighters[0].setCharacter(CHAR_ROSTER[picks[0]] || 'brawler');
+  game.fighters[1].setCharacter(CHAR_ROSTER[picks[1]] || 'brawler');
   resetMatch();          // resets fighters, cpu, matchState — defined in main.js
   game.scene = 'fight';
 }
@@ -104,10 +116,21 @@ function menuStep(game) {
     if (k.back) { game.scene = 'title'; playSfx('ui_back'); }
     if (k.confirm) {
       playSfx('ui_confirm');
-      if (m.sel === 0) startFight(game, 3);        // 1P vs CPU
-      else if (m.sel === 1) startFight(game, 0);   // 2P local
-      else if (m.sel === 2) startFight(game, 1);   // training (idle dummy; 1/2/3 switch in-fight)
+      if (m.sel === 0) enterSelect(game, 3);        // 1P vs CPU
+      else if (m.sel === 1) enterSelect(game, 0);   // 2P local
+      else if (m.sel === 2) enterSelect(game, 1);   // training (idle dummy; 1/2/3 switch in-fight)
       else { m.returnTo = 'mode'; m.scroll = 0; game.scene = 'movelist'; }
+    }
+
+  } else if (game.scene === 'select') {
+    const n = CHAR_ROSTER.length;
+    if (k.up) { m.picks[m.stage] = (m.picks[m.stage] - 1 + n) % n; playSfx('ui_move'); }
+    if (k.down) { m.picks[m.stage] = (m.picks[m.stage] + 1) % n; playSfx('ui_move'); }
+    if (k.back) { playSfx('ui_back'); if (m.stage === 1) m.stage = 0; else { game.scene = 'mode'; m.sel = 0; } }
+    if (k.confirm) {
+      playSfx('ui_confirm');
+      if (m.stage === 0) m.stage = 1;               // lock P1 → choose P2
+      else startFight(game, m.pendingMode);          // both locked → fight
     }
 
   } else if (game.scene === 'movelist') {
@@ -201,6 +224,34 @@ function drawMenu(ctx, game) {
     drawOptions(ctx, MODE_OPTS, game.menu.sel, cx, 290, 72);
     ctx.fillStyle = 'rgba(220,225,235,0.4)'; ctx.font = '17px system-ui, sans-serif';
     ctx.fillText('↑ ↓  select      F/K/Enter  confirm      Esc  back', cx, CFG.STAGE_H - 50);
+
+  } else if (game.scene === 'select') {
+    const m = game.menu;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(220,225,235,0.5)'; ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.fillText('SELECT  FIGHTER', cx, 110);
+    const slots = [{ x: cx - 250, label: 'P1', col: '#4fc3f7' }, { x: cx + 250, label: 'P2', col: '#ef5350' }];
+    for (let i = 0; i < 2; i++) {
+      const s = slots[i];
+      const ch = CHARACTERS[CHAR_ROSTER[m.picks[i]]];
+      const active = m.stage === i;
+      const pulse = active ? 0.6 + 0.4 * Math.sin(t * 0.12) : 1;
+      ctx.strokeStyle = active ? `rgba(255,224,130,${pulse})` : 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = active ? 4 : 2;
+      ctx.strokeRect(s.x - 150, 190, 300, 300);
+      ctx.fillStyle = s.col; ctx.font = 'bold 22px system-ui, sans-serif';
+      ctx.fillText(s.label, s.x, 230);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 44px system-ui, sans-serif';
+      ctx.fillText(ch.name, s.x, 360);
+      const tag = ch.id === 'vesper' ? 'GUN-KATA  RUSHDOWN' : 'MMA  BRAWLER';
+      ctx.fillStyle = 'rgba(220,225,235,0.6)'; ctx.font = '17px system-ui, sans-serif';
+      ctx.fillText(tag, s.x, 408);
+      ctx.fillStyle = 'rgba(220,225,235,0.45)'; ctx.font = '15px system-ui, sans-serif';
+      ctx.fillText('HP ' + ch.stats.maxHp + (ch.id === 'vesper' ? '   (glass cannon)' : ''), s.x, 440);
+      if (active) { ctx.fillStyle = `rgba(255,224,130,${pulse})`; ctx.font = '15px system-ui, sans-serif'; ctx.fillText('▲  ▼', s.x, 478); }
+    }
+    ctx.fillStyle = 'rgba(220,225,235,0.4)'; ctx.font = '17px system-ui, sans-serif';
+    ctx.fillText('↑ ↓  change      F/K/Enter  confirm      Esc  back', cx, CFG.STAGE_H - 50);
 
   } else if (game.scene === 'movelist') {
     ctx.textAlign = 'center'; ctx.fillStyle = '#4fc3f7'; ctx.font = 'bold 40px system-ui, sans-serif';

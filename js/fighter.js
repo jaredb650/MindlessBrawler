@@ -77,6 +77,15 @@ class Fighter {
     this.reset();
   }
 
+  // Swap this fighter's character identity (used by the character-select before a fight).
+  setCharacter(char) {
+    this.char = charDef(char);
+    this.charType = this.char.id;
+    this.moveSet = this.char.moves;
+    this.stats = this.char.stats;
+    this.reset();
+  }
+
   reset() {
     this.x = this.spawnX;
     this.y = CFG.FLOOR_Y;

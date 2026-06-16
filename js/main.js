@@ -714,7 +714,7 @@ function frame(now) {
   const rctx = retroBegin(ctx);
   // how far (0..1) we are between the last logic tick and the next → render interpolation factor
   const alpha = CFG.RENDER_INTERP ? Math.max(0, Math.min(1, acc / STEP)) : 1;
-  if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'movelist') {
+  if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'select' || game.scene === 'movelist') {
     drawMenu(rctx, game);
   } else {
     render(rctx, game, alpha);
