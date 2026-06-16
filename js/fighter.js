@@ -429,6 +429,11 @@ class Fighter {
   // keeps DI off the spike AND preserves noTech (setLaunched only clears it on a fresh
   // launch); we re-assert noTech after to be explicit, matching the KO/point-blank path.
   receiveSpike(downVy, away, game) {
+    // LIFT a standing body off its feet into a mid-air tumble (right where it stands),
+    // then ROCKET it down so it SLAMS the floor and BOUNCES — not a quiet thud-to-downed.
+    // (Airborne/tumbling victims already have air; only lift them if they're low.)
+    if (CFG.FLOOR_Y - this.y < CFG.SPIKE_LIFT) { this.y = CFG.FLOOR_Y - CFG.SPIKE_LIFT; this.prevY = this.y; }
+    this.bounced = false;                          // GUARANTEE the bounce (clear any stale flag — setLaunched(false) won't)
     this.setLaunched(away * 1.5, downVy, false);   // vy positive = DOWN; no fresh-launch DI on a hard spike
     this.noTech = true;
     if (game) {
@@ -437,7 +442,7 @@ class Fighter {
     }
     spawnSpike(this.x, away);                       // downward energy lance + ground burst
     spawnDust(this.x, CFG.FLOOR_Y, 14);
-    playSfx('body_slam');                           // heavy floor-impact slam
+    playSfx('spike');                               // the acid/energy spike cast
   }
 
   beginThrown(thrower) {

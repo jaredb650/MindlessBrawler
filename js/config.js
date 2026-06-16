@@ -199,6 +199,7 @@ const CFG = {
   ELBOWDROP_VY: 13,               // downward dive speed (positive = down)
   ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into a victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
   AXEKICK_SPIKE_VY: 15,           // the axe kick chops bodies DOWN into the floor too (grounded + tumbling) → bounce
+  SPIKE_LIFT: 62,                  // a STANDING spike victim is yanked this high into a mid-air tumble first, THEN rocketed down → a real slam + bounce (not a quiet thud-to-downed)
 
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
   THROW_RANGE: 120,
