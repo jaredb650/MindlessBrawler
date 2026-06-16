@@ -364,8 +364,17 @@ function attackExt(f) {
 // Cross / uppercut / overhand are REAR-hand straights; jab / hook stay lead-hand.
 const REAR_HAND_PUNCH = new Set(['cross', 'uppercut', 'overhand']);
 
-// Skeleton in local space: feet at y=0, +x = forward.
+// Per-character body dispatch: each character draws its own silhouette + pose set.
+// The brawler (the original MMA body) is drawFighterBrawler; a 2nd character (Vesper)
+// registers its own drawFighter* and is routed here by charType. Default = brawler, so
+// nothing changes for the existing fighter.
 function drawFighter(ctx, f, game) {
+  if (f.charType === 'vesper' && typeof drawFighterVesper === 'function') return drawFighterVesper(ctx, f, game);
+  return drawFighterBrawler(ctx, f, game);
+}
+
+// Skeleton in local space: feet at y=0, +x = forward.
+function drawFighterBrawler(ctx, f, game) {
   const key = f.animKey();
   const flash = (f.hitFlash > 0)   // universal: every clean contact (hit/block/crumple/OTG/launch) flashes white, frame-locked to the hit
     || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2)
