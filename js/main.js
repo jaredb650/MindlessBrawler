@@ -12,8 +12,8 @@ const pad2 = new Pad(P2_MAP);
 
 const game = {
   fighters: [
-    new Fighter(CFG.STAGE_W * 0.35, 1, pad1, 'PLAYER 1', '#4fc3f7'),
-    new Fighter(CFG.STAGE_W * 0.65, -1, pad2, 'PLAYER 2', '#ef5350'),
+    new Fighter(CFG.STAGE_W * 0.35, 1, pad1, 'PLAYER 1', '#4fc3f7', CHARACTERS.brawler),
+    new Fighter(CFG.STAGE_W * 0.65, -1, pad2, 'PLAYER 2', '#ef5350', CHARACTERS.brawler),
   ],
   hitstop: 0,
   superFreeze: 0,

@@ -41,6 +41,9 @@ const CHARACTERS = {
       kick:  { down: 'divekick', neutral: 'jumpkick' },
     },
     dashMap: { punch: 'dashpunch', kick: 'dashkick' },
+    // directional super → kind (resolved against the press-time snap; 'neutral' is the fallback
+    // for neutral/up/down). The kind drives the superstart behavior + cinematics.
+    superMap: { forward: 'beam', back: 'combo', neutral: 'cannon' },
   },
 };
 

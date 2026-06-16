@@ -341,7 +341,8 @@ class Fighter {
       // Directional super (resolved against the PRESS-TIME snap): FORWARD = OVERDRIVE BEAM,
       // BACK = the SUPER COMBO, anything else (neutral/up/down) = the Mech Cannon.
       const sdir = this.dirCategory(opp, p.snap.super);
-      this.superKind = sdir === 'forward' ? 'beam' : sdir === 'back' ? 'combo' : 'cannon';
+      const sm = this.char.superMap || { neutral: 'cannon' };
+      this.superKind = sm[sdir] || sm.neutral;
       this.setState('superstart');
       this.superFlash = true;
       return true;
