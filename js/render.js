@@ -1042,7 +1042,7 @@ function drawFighterBrawler(ctx, f, game, look) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, weapon: f.move && f.move.weapon, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
@@ -1205,6 +1205,18 @@ function drawSkeleton(ctx, P, c) {
   }
   // front arm + glove
   limbIK(ctx, P.sho.x + 5, P.sho.y + 2, P.handF.x, P.handF.y, ARM, P.armBendF, L.armW, c.body, 8.5, c.glove);
+  // weapon in the front hand (Vesper): a knife blade or a pistol, pointing along the arm's reach.
+  if (c.weapon) {
+    const hx = P.handF.x, hy = P.handF.y;
+    let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;   // hand-pointing dir
+    if (c.weapon === 'knife') {
+      capsule(ctx, hx, hy, hx + ux * 22, hy + uy * 22, 4, c.flash ? '#ffffff' : '#d7dde6');   // blade
+      capsule(ctx, hx - uy * 5, hy + ux * 5, hx + uy * 5, hy - ux * 5, 3, c.flash ? '#ffffff' : '#3a3a44');   // crossguard
+    } else if (c.weapon === 'pistol') {
+      capsule(ctx, hx, hy, hx + ux * 15, hy + uy * 15, 5.5, c.flash ? '#ffffff' : '#24242c');   // slide/barrel
+      capsule(ctx, hx, hy, hx - ux * 4 + uy * 9, hy - uy * 4 - ux * 9, 4.5, c.flash ? '#ffffff' : '#15151b');   // grip
+    }
+  }
 }
 
 // ── the absurd ceiling: a mech materializes behind its pilot ──

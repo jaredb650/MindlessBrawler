@@ -91,7 +91,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     spawnSpark(contactPoint.x, contactPoint.y, 'hit', cpw);
     if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
     hitSfx(move);
-    pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
+    pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
     if (vic.hp <= 0) { vic.hp = 0; vic.inClinch = false; att.inClinch = false; vic.setLaunched(away * 5, -10, true); }
     return;
   }
@@ -192,7 +192,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   spawnSpark(contactPoint.x, contactPoint.y, 'hit', pw);
   if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
   hitSfx(move);
-  pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
+  pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
 
   // ── MAGIC PUNCH COMBO payoff ──
   // The 4th link (final cross) of the jab→cross→uppercut→cross STARTER connecting hands both bodies
