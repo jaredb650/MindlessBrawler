@@ -354,19 +354,22 @@ function logicStep() {
 
   game.frame++;
   handleSystemKeys();
+
+  // Pads sample EVERY logic frame — including DURING the freezes — so taps register
+  // their edges and fill the buffers instead of being eaten. `frozen` keeps the press
+  // buffers and tap windows from ticking down mid-freeze (KO freeze is a freeze too).
+  const frozen = game.superFreeze > 0 || game.hitstop > 0 || game.koFreeze > 0;
+  pad1.update(undefined, frozen);
+  pad2.update(game.dummyMode !== 0 ? dummyInputs() : undefined, frozen);
+
   // KO FREEZE-FRAME: the whole world holds on black with white silhouettes (render.js)
-  // for a beat, THEN releases into the launch. Nothing updates — a hard freeze.
+  // for a beat, THEN releases into the launch. Nothing updates — a hard freeze (but pads
+  // were already sampled above, so a tap inside the beat survives it).
   if (game.koFreeze > 0) { game.koFreeze--; return; }
   if (game.banner && game.banner.timer > 0 && game.matchState !== 'ko') game.banner.timer--;
   game.shake = Math.max(0, game.shake - 0.6);
   if (game.flash > 0) game.flash--;
   updateFx();
-
-  // Pads sample EVERY logic frame — taps during freezes get buffered, not eaten.
-  // `frozen` keeps the press buffers and tap windows from ticking down mid-freeze.
-  const frozen = game.superFreeze > 0 || game.hitstop > 0;
-  pad1.update(undefined, frozen);
-  pad2.update(game.dummyMode !== 0 ? dummyInputs() : undefined, frozen);
 
   // cinematic super flash: world holds its breath
   if (game.superFreeze > 0) {
@@ -437,7 +440,8 @@ function logicStep() {
     }
     const winner = f1.hp <= 0 ? (f2.hp <= 0 ? null : f2) : f1;
     game.banner = {
-      text: game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
+      // a double KO is a DRAW — the finisher's owner died too, so don't crown it FLATLINED/EXECUTED
+      text: !winner ? 'DOUBLE K.O.' : game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
       sub: winner ? `${winner.name} WINS — press jump to rematch` : 'DOUBLE K.O. — press jump to rematch',
       timer: 999999,
     };

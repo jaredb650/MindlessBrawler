@@ -278,7 +278,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     }
     // Juggle — limited lifts, then the body gets heavy and falls.
     vic.airHits++;
-    if (vic.airHits <= CFG.MAX_AIR_HITS) vic.setLaunched(away * Math.max(2, move.kbx), Math.min(vic.vy, -7) - 2, false);
+    // a 20mm shell ALWAYS blasts the body — exempt the super from the juggle cap so it
+    // never lands as a dud (damage but no reaction) on an already over-juggled body.
+    if (move.isSuper || vic.airHits <= CFG.MAX_AIR_HITS) vic.setLaunched(away * Math.max(2, move.kbx), Math.min(vic.vy, -7) - 2, false);
     return;
   }
 

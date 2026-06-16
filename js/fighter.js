@@ -130,7 +130,7 @@ class Fighter {
     if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
     if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
     // wakeup roll: grant its (shorter-than-the-roll) invuln + capture the travel dir; reuse getup sfx
-    if (name === 'wakeuproll') { this.invuln = Math.max(this.invuln, CFG.WAKEUPROLL_INVULN); this.groundHits = 0; this.rollDir = this.pendingRoll || this.facing; playSfx('getup'); }
+    if (name === 'wakeuproll') { this.invuln = CFG.WAKEUPROLL_INVULN; this.groundHits = 0; this.rollDir = this.pendingRoll || this.facing; playSfx('getup'); }   // OVERWRITE (not max) so the late roll's exposed tail is real — inheriting getup's longer invuln made it safer than a clean roll
     // any get-up route clears banked delayed-getup, so it can't leak into a later knockdown this round
     if (name === 'getup' || name === 'backroll' || name === 'kipup' || name === 'wakeuproll') this.getupDelay = 0;
     if (name === 'downed') { this.vx = 0; this.bounced = false; }   // groundHits PERSISTS across pops within one knockdown
@@ -242,7 +242,10 @@ class Fighter {
     // 'flyattack' so it inherits airborne physics + the FLY_LAND_RECOVERY landing. Mirrors
     // the in-line flyConvert takeoff but fires straight from startMove so a cancelled-in move launches.
     if (mv.flight && !isAir) {
-      const toward = Math.sign(this.facing) || this.facing;
+      // aim at the opponent's CURRENT side, not stale committed facing — a cross-up
+      // between the cancelled-from move and this launch must not fire backward.
+      const toward = this.opp ? (Math.sign(this.opp.x - this.x) || this.facing) : (Math.sign(this.facing) || this.facing);
+      this.facing = toward;
       this.setState('flyattack');
       this.move = mv; this.moveName = name;
       this.moveHitDone = false; this.madeContact = false;
@@ -509,6 +512,7 @@ class Fighter {
 
   // ── per-frame update (skipped during hitstop/superfreeze) ──
   update(opp, game) {
+    this.opp = opp;   // stash so startMove() can re-aim opponent-relative (flight moves) even on a cross-up
     this.f++;
     if (this.invuln > 0) this.invuln--;
     if (this.counterCD > 0) this.counterCD--;

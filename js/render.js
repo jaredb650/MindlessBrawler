@@ -49,13 +49,16 @@ function spawnBlood(x, y, dir, n) {
 }
 
 // A persistent blood decal where a drop hit the floor (pool) or a wall (drip).
+const STAIN_CAP = 240;   // the arena can only hold so much
+let stainWrite = 0;      // ring-buffer cursor — overwrite oldest in O(1) (was Array.shift, O(n) per drop)
 function spawnStain(x, y, vertical) {
-  Stains.push({
+  const s = {
     x, y, r: 3 + Math.random() * 7, vertical: !!vertical,
     color: ['#7b241c', '#922b21', '#641e16'][(Math.random() * 3) | 0],
     a: 0.4 + Math.random() * 0.4,
-  });
-  if (Stains.length > 240) Stains.shift();   // cap — the arena can only hold so much
+  };
+  if (Stains.length < STAIN_CAP) Stains.push(s);
+  else { Stains[stainWrite % STAIN_CAP] = s; stainWrite++; }   // recycle the oldest slot, no shift/reindex
 }
 
 function drawStains(ctx) {
@@ -794,7 +797,10 @@ function strikeTo(P, target, kind, rear) {
     }
   } else {
     P.footF = { x: target.x, y: target.y };
-    P.legBendF = target.y < -70 ? 1 : -1;   // high kicks bend the knee up
+    // NOTE: legBendF is NOT set here on purpose. It defaults to -1 (knee bends FORWARD,
+    // anatomically correct) and cocked kicks (axekick/tornado/clinchknee) author it
+    // explicitly. The old `target.y < -70 ? 1 : -1` flipped the knee side mid-kick as the
+    // animating foot crossed the threshold (bird-knee snap) and clobbered axekick's phases.
     P.handF = { x: -18, y: -118 };          // arms counterbalance
     P.armBendF = -1;
     P.handR = { x: 22, y: -126 };
