@@ -329,44 +329,41 @@ class Fighter {
 
   tryCancel(opp) {
     const mv = this.move;
-    if (!mv || !mv.cancels || !this.madeContact) return;
-    if (this.f < mv.startup || this.f > mv.startup + mv.active + 8) return;
+    if (!mv || !mv.cancels) return;
+    // FLOW: light normals gatling on WHIFF too — pokes keep merging into each other
+    // even when you're spacing (and buffer to catch a walk-in). HEAVIES still need
+    // contact: you commit to them. (Whiffs eat full recovery if you don't chain on.)
+    if (!this.madeContact && mv.heavy) return;
+    if (this.f < mv.startup || this.f > mv.startup + mv.active + CFG.CANCEL_WINDOW_PAD) return;
     const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
     if (!btn || this.stamina <= 0) return;
     let cand = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160);
-    // "Cross, then forward+punch again → hook": inside a chain, forward+P resolves to hook.
+    // "Cross, then forward+punch again → hook": a basic ender route — flows even on whiff (buffer it).
     if (cand === 'cross' && mv.cancels.includes('hook')) cand = 'hook';
-    // MACHINE-GUN BLOWS comes out AUTOMATICALLY off the 3rd connected jab (the
-    // attack-state auto-convert below). A jab pressed DURING that 3rd jab just
-    // triggers the same burst a hair early — jabChain is counted in the attack case.
-    if (cand === 'jab' && this.moveName === 'jab' && this.jabChain >= 3 && mv.cancels.includes('machinegun')) cand = 'machinegun';
-    // ── string-special remaps (placed AFTER cross→hook; each guarded on its cancels entry) ──
-    // SUPERMAN PUNCH: frontkick (connected) → forward+P. resolveNeutralMove gives 'cross'; upgrade to the flight punch.
-    if (cand === 'cross' && this.moveName === 'frontkick' && mv.cancels.includes('superman')) cand = 'superman';
-    // LIVER SHOT: a CONNECTED crouchjab → down+P AGAIN. The self-chain still fires at chain 0; only a connected one upgrades.
-    if (cand === 'crouchjab' && this.moveName === 'crouchjab' && this.crouchjabChain >= 1 && mv.cancels.includes('livershot')) cand = 'livershot';
-    // GAZELLE HOOK: jab→jab (jabChain===2) → forward+P. Below chain 2 a forward+P still yields a normal cross.
-    if (cand === 'cross' && this.moveName === 'jab' && this.jabChain >= 2 && mv.cancels.includes('gazelle')) cand = 'gazelle';
-    // SPINNING ELBOW (primary): backfist (connected) → forward+P resolves 'cross' → spinelbow.
-    if (cand === 'cross' && this.moveName === 'backfist' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
-    // SPINNING ELBOW (alternate): cross (connected) → back+P resolves 'backfist' → spinelbow.
-    if (cand === 'backfist' && this.moveName === 'cross' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
-    // CALF KICK COLLAPSE: legkick (connected) → NEUTRAL K resolves 'legkick' → calfkick. Rides the existing
-    // 'legkick' self-chain entry (so legkick.cancels stays untouched); gated moveName==='legkick' so knee→legkick isn't hijacked.
-    // Fires its own consume+startMove because 'calfkick' is NOT in legkick.cancels (the generic tail below would reject it).
-    if (cand === 'legkick' && this.moveName === 'legkick' && mv.cancels.includes('legkick')) {
-      this.pad.consume(btn);
-      this.startMove('calfkick');
-      return;
-    }
-    // TORNADO KICK: frontkick (connected) → back+K resolves 'backkick' → tornado.
-    if (cand === 'backkick' && this.moveName === 'frontkick' && mv.cancels.includes('tornado')) cand = 'tornado';
-    // OVERHAND / THE FLATLINER: a forward+P straight out of the machine-gun blows. If pressed on the
-    // just-frame after the burst's FINAL hit, the resulting overhand is primed into the flatliner cinematic.
     let flatline = false;
-    if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) {
-      cand = 'overhand';
-      flatline = this.justFrameAfterFinalHit(CFG.FLATLINER_JF_WINDOW);
+    // ── string-SPECIAL remaps: CONFIRMS only. They come out off a CONNECTED hit, never a whiff
+    // (a whiffed normal just gatlings into the basic normal). The chain-counter ones self-gate anyway. ──
+    if (this.madeContact) {
+      // MACHINE-GUN BLOWS — a jab during the 3rd CONNECTED jab triggers the burst a hair early.
+      if (cand === 'jab' && this.moveName === 'jab' && this.jabChain >= 3 && mv.cancels.includes('machinegun')) cand = 'machinegun';
+      // SUPERMAN PUNCH: frontkick → forward+P (resolves 'cross') → the flight punch.
+      if (cand === 'cross' && this.moveName === 'frontkick' && mv.cancels.includes('superman')) cand = 'superman';
+      // LIVER SHOT: a CONNECTED crouchjab → down+P AGAIN.
+      if (cand === 'crouchjab' && this.moveName === 'crouchjab' && this.crouchjabChain >= 1 && mv.cancels.includes('livershot')) cand = 'livershot';
+      // GAZELLE HOOK: jab→jab (jabChain===2) → forward+P.
+      if (cand === 'cross' && this.moveName === 'jab' && this.jabChain >= 2 && mv.cancels.includes('gazelle')) cand = 'gazelle';
+      // SPINNING ELBOW: backfist → forward+P, or cross → back+P.
+      if (cand === 'cross' && this.moveName === 'backfist' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
+      if (cand === 'backfist' && this.moveName === 'cross' && mv.cancels.includes('spinelbow')) cand = 'spinelbow';
+      // CALF KICK COLLAPSE: legkick → NEUTRAL K (resolves 'legkick'). Self-fires (calfkick isn't in legkick.cancels).
+      if (cand === 'legkick' && this.moveName === 'legkick' && mv.cancels.includes('legkick')) { this.pad.consume(btn); this.startMove('calfkick'); return; }
+      // TORNADO KICK: frontkick → back+K (resolves 'backkick').
+      if (cand === 'backkick' && this.moveName === 'frontkick' && mv.cancels.includes('tornado')) cand = 'tornado';
+      // OVERHAND / THE FLATLINER: forward+P out of the machine-gun blows; a just-frame press primes the cinematic.
+      if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) {
+        cand = 'overhand';
+        flatline = this.justFrameAfterFinalHit(CFG.FLATLINER_JF_WINDOW);
+      }
     }
     if (cand && mv.cancels.includes(cand)) {
       this.pad.consume(btn);

@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 const RawKeys = {};
 const KeyQueue = [];   // one-shot system keys (debug toggles etc.), drained by main
-const INPUT_BUFFER = 8;
+const INPUT_BUFFER = 10;   // flow pass: was 8 — a touch more leniency queuing the next move
 
 const GAME_CODES = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Quote', 'Semicolon', 'Enter', 'Escape']);
 

@@ -29,14 +29,14 @@ const MOVES = {
     damage: 30, hitstun: 16, blockstun: 9, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — just stun
     hitbox: { x: 22, y: -152, w: 84, h: 34 },   // reaches ~106px — further than the cross (92)
-    cancels: ['jab', 'cross', 'axekick', 'legkick', 'sweep', 'machinegun', 'gazelle'],
+    cancels: ['jab', 'cross', 'crouchjab', 'uppercut', 'axekick', 'legkick', 'sweep', 'machinegun', 'gazelle'],
   },
   cross: {
     anim: 'cross', startup: 4, active: 3, recovery: 9,
     damage: 55, hitstun: 19, blockstun: 11, stamina: 4,
     guard: 'mid', kind: 'punch', kbx: 3.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 22, y: -150, w: 70, h: 40 },
-    cancels: ['hook', 'axekick', 'legkick', 'spinelbow'],   // forward+P=hook; spinelbow takes the back+P alternate route
+    cancels: ['hook', 'uppercut', 'crouchjab', 'axekick', 'legkick', 'spinelbow'],   // forward+P=hook; up+P=uppercut (ground→air); spinelbow=back+P
   },
   // Ender: cross → forward+P again. Drops them like a sack of potatoes.
   hook: {
@@ -112,7 +112,7 @@ const MOVES = {
     damage: 22, hitstun: 14, blockstun: 8, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_LIGHT, crouching: true,
     hitbox: { x: 16, y: -110, w: 55, h: 30 },
-    cancels: ['crouchjab', 'livershot', 'axekick', 'sweep', 'legkick'],
+    cancels: ['crouchjab', 'livershot', 'cross', 'uppercut', 'axekick', 'sweep', 'legkick'],
   },
   // crouchjab (connected) → down+P AGAIN: LIVER SHOT. The gas-out setup — 0 knockback,
   // NO knockdown, STAYS GROUNDED. A clean hit folds them into a LONG doubled-over

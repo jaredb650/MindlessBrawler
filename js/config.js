@@ -50,6 +50,7 @@ const CFG = {
   PRESS_DRIFT: 1.6,             // px/frame advancing while striking (hold toward)
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
   FLOW_CANCEL_RECOVERY: 4,      // on CONTACT (hit/block) recovery caps at this — whiffs eat it all
+  CANCEL_WINDOW_PAD: 12,        // frames past a move's active window you can still chain-cancel (flow leniency)
 
   // Defense
   PARRY_WINDOW: 7,              // block held ≤ this many frames before impact = parry
@@ -76,7 +77,7 @@ const CFG = {
   DMG_SCALE_PER_HIT: 0.10,      // each combo hit scales damage down 10%
   MIN_DMG_SCALE: 0.35,
   HITSTUN_DECAY_PER_HIT: 0.06,  // gentle: long strings leak frames eventually
-  SAME_MOVE_EXTRA_DECAY: 0.22,  // repeating the SAME move decays much faster
+  SAME_MOVE_EXTRA_DECAY: 0.12,  // flow pass: was 0.22 — simple rhythmic pressure (jab jab jab) holds longer
   MIN_HITSTUN_SCALE: 0.30,
   MAX_AIR_HITS: 3,              // juggle limit — after this, hits stop lifting
   // Gazelle hook — a leaping lead hook off 2 jabs (forward+P). Launches into the air juggle.
@@ -123,8 +124,8 @@ const CFG = {
   THROW_TECH_PUSHBACK: 8,       // outward shove on BOTH bodies on a clean tech (neutral reset)
 
   // Hitstop ("time-freeze beat") & juice
-  HITSTOP_LIGHT: 4,
-  HITSTOP_MED: 7,
+  HITSTOP_LIGHT: 8,             // flow pass: was 4 (~half the genre norm) — more weight + a wider cancel window
+  HITSTOP_MED: 10,              // flow pass: was 7
   HITSTOP_ENDER: 16,
   SUPER_FREEZE: 40,
   SHAKE_HEAVY: 7,
