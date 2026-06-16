@@ -377,7 +377,7 @@ const BRAWLER_LOOK = {
 const VESPER_LOOK = {
   glove: '#17171f', skin: '#f0d2bc', bootShade: 0.32,
   torsoW: 25, headR: 13.5, armW: 9, legW: 11, armWR: 8, legWR: 10,
-  female: true, hair: '#15121b', longHair: true, shades: true,
+  female: true, hair: '#15121b', longHair: true, shades: true, dualWield: true,
 };
 
 // Per-character body dispatch: each character draws its own silhouette + pose set. Both run the
@@ -1042,7 +1042,7 @@ function drawFighterBrawler(ctx, f, game, look) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, weapon: f.move && f.move.weapon, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, weapon: f.move && f.move.weapon, gun: f.move && f.move.gun, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
@@ -1205,17 +1205,41 @@ function drawSkeleton(ctx, P, c) {
   }
   // front arm + glove
   limbIK(ctx, P.sho.x + 5, P.sho.y + 2, P.handF.x, P.handF.y, ARM, P.armBendF, L.armW, c.body, 8.5, c.glove);
-  // weapon in the front hand (Vesper): a knife blade or a pistol, pointing along the arm's reach.
-  if (c.weapon) {
+  // WEAPONS (Vesper dual-wields): the active weapon in the lead hand (+ slash line / muzzle flash
+  // on its active frames), and a sidearm resting in the off hand. dualWield → the lead hand is
+  // never empty (knife by default). Brawler: no weapon, no dualWield → nothing draws.
+  const activeW = c.weapon || (L.dualWield ? 'knife' : null);
+  if (activeW) {
     const hx = P.handF.x, hy = P.handF.y;
     let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;   // hand-pointing dir
-    if (c.weapon === 'knife') {
+    const ang = Math.atan2(uy, ux);
+    if (activeW === 'knife') {
       capsule(ctx, hx, hy, hx + ux * 22, hy + uy * 22, 4, c.flash ? '#ffffff' : '#d7dde6');   // blade
       capsule(ctx, hx - uy * 5, hy + ux * 5, hx + uy * 5, hy - ux * 5, 3, c.flash ? '#ffffff' : '#3a3a44');   // crossguard
-    } else if (c.weapon === 'pistol') {
+      if (c.mvActive) {   // SLASH LINE — bright crescent trailing the blade's sweep
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = c.flash ? '#ffffff' : 'rgba(195,242,255,0.9)'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(hx, hy, 30, ang - 0.95, ang + 0.55); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(hx, hy, 37, ang - 0.75, ang + 0.35); ctx.stroke();
+      }
+    } else if (activeW === 'pistol') {
       capsule(ctx, hx, hy, hx + ux * 15, hy + uy * 15, 5.5, c.flash ? '#ffffff' : '#24242c');   // slide/barrel
       capsule(ctx, hx, hy, hx - ux * 4 + uy * 9, hy - uy * 4 - ux * 9, 4.5, c.flash ? '#ffffff' : '#15151b');   // grip
+      if (c.mvActive && c.gun) {   // MUZZLE FLASH + tracer (point-blank shot)
+        const mx = hx + ux * 17, my = hy + uy * 17;
+        ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,233,150,0.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        for (const a of [-0.5, 0, 0.5]) { ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(ang + a) * 13, my + Math.sin(ang + a) * 13); ctx.stroke(); }
+        ctx.strokeStyle = 'rgba(255,240,180,0.55)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + ux * 72, my + uy * 72); ctx.stroke();   // tracer
+      }
     }
+  }
+  // off-hand sidearm: a small pistol resting in the rear hand (always, so she reads as armed)
+  if (L.dualWield) {
+    const hx = P.handR.x, hy = P.handR.y; let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
+    capsule(ctx, hx, hy, hx + ux * 11, hy + uy * 11, 4.5, c.flash ? '#ffffff' : shade('#24242c', 0.8));
   }
 }
 
