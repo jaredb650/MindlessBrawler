@@ -87,6 +87,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     game.hitstop = Math.max(game.hitstop, move.hitstop);
     if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
     spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+    if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
     hitSfx(move);
     pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
     if (vic.hp <= 0) { vic.hp = 0; vic.inClinch = false; att.inClinch = false; vic.setLaunched(away * 5, -10, true); }
@@ -186,6 +187,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   game.hitstop = Math.max(game.hitstop, move.hitstop);
   if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
   spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+  if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
   hitSfx(move);
   pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
 
