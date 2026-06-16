@@ -64,10 +64,13 @@ function canGroundPound(att, opp) {
 }
 
 class Fighter {
-  constructor(x, facing, pad, name, color) {
+  constructor(x, facing, pad, name, color, char) {
     this.pad = pad;
     this.name = name;
     this.color = color;
+    this.char = charDef(char);     // per-character identity (js/characters.js); default = brawler
+    this.charType = this.char.id;
+    this.moveSet = this.char.moves;
     this.spawnX = x;
     this.spawnFacing = facing;
     this.reset();
