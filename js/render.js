@@ -364,17 +364,33 @@ function attackExt(f) {
 // Cross / uppercut / overhand are REAR-hand straights; jab / hook stay lead-hand.
 const REAR_HAND_PUNCH = new Set(['cross', 'uppercut', 'overhand']);
 
-// Per-character body dispatch: each character draws its own silhouette + pose set.
-// The brawler (the original MMA body) is drawFighterBrawler; a 2nd character (Vesper)
-// registers its own drawFighter* and is routed here by charType. Default = brawler, so
-// nothing changes for the existing fighter.
+// ── per-character "look": palette + body proportions + hair. Both characters share the
+// same pose engine (drawFighterBrawler); the LOOK is what makes the silhouette read as a
+// different person. BRAWLER_LOOK reproduces the original values EXACTLY (so he is unchanged).
+const BRAWLER_LOOK = {
+  glove: '#f2f2f5', skin: '#e8c39e', bootShade: 0.45,
+  torsoW: 32, headR: 15, armW: 11, legW: 13, armWR: 10.5, legWR: 12.5,
+  female: false, hair: null,
+};
+// Vesper: leaner female frame — narrower torso, thinner limbs, smaller head, dark gloves/boots,
+// black hair (ponytail). Body color stays her player color (cyan/red), like the brawler.
+const VESPER_LOOK = {
+  glove: '#17171f', skin: '#f0d2bc', bootShade: 0.32,
+  torsoW: 25, headR: 13.5, armW: 9, legW: 11, armWR: 8, legWR: 10,
+  female: true, hair: '#15121b',
+};
+
+// Per-character body dispatch: each character draws its own silhouette + pose set. Both run the
+// same pose engine (drawFighterBrawler) but with a different LOOK; routed here by charType.
 function drawFighter(ctx, f, game) {
   if (f.charType === 'vesper' && typeof drawFighterVesper === 'function') return drawFighterVesper(ctx, f, game);
   return drawFighterBrawler(ctx, f, game);
 }
+function drawFighterVesper(ctx, f, game) { return drawFighterBrawler(ctx, f, game, VESPER_LOOK); }
 
 // Skeleton in local space: feet at y=0, +x = forward.
-function drawFighterBrawler(ctx, f, game) {
+function drawFighterBrawler(ctx, f, game, look) {
+  look = look || BRAWLER_LOOK;
   const key = f.animKey();
   const flash = (f.hitFlash > 0)   // universal: every clean contact (hit/block/crumple/OTG/launch) flashes white, frame-locked to the hit
     || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2)
@@ -382,9 +398,9 @@ function drawFighterBrawler(ctx, f, game) {
 
   const body = flash ? '#ffffff' : f.color;
   const dark = flash ? '#dddddd' : shade(f.color, 0.62);
-  const glove = flash ? '#ffffff' : '#f2f2f5';
-  const boot = flash ? '#eeeeee' : shade(f.color, 0.45);
-  const skin = flash ? '#ffffff' : '#e8c39e';
+  const glove = flash ? '#ffffff' : look.glove;
+  const boot = flash ? '#eeeeee' : shade(f.color, look.bootShade);
+  const skin = flash ? '#ffffff' : look.skin;
 
   // RENDER INTERP: glide the body between logic ticks (smooth on >60Hz). Snap (no glide)
   // on a teleport-sized jump (reset / wall-snap). Visual only — never affects logic.
@@ -1026,7 +1042,7 @@ function drawFighterBrawler(ctx, f, game) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
@@ -1108,6 +1124,8 @@ function drawFace(ctx, hx, hy, mood, dead, flash) {
 
 function drawSkeleton(ctx, P, c) {
   const ARM = 36, LEG = 44;
+  const L = c.look || BRAWLER_LOOK;
+  const hairCol = c.flash ? '#ffffff' : L.hair;
 
   // swing trail ghosts behind the live strike
   if (P.trail && c.mvActive) {
@@ -1118,24 +1136,41 @@ function drawSkeleton(ctx, P, c) {
       const gy = P.trail.isLeg ? P.hip.y : P.sho.y;
       limbIK(ctx, gx, gy, gx + (P.trail.to.x - gx) * k, gy + (P.trail.to.y - gy) * k,
         P.trail.isLeg ? LEG : ARM, P.trail.isLeg ? P.legBendF : P.armBendF,
-        P.trail.isLeg ? 13 : 11, c.body, 0);
+        P.trail.isLeg ? L.legW : L.armW, c.body, 0);
     }
     ctx.restore();
   }
 
+  // ponytail behind the head (drawn first so the head overlaps its root)
+  if (L.hair) capsule(ctx, P.head.x - L.headR * 0.5, P.head.y - 2, P.head.x - L.headR * 1.7, P.head.y + 16, 6.5, hairCol);
   // rear limbs (darker — depth)
-  limbIK(ctx, P.sho.x - 6, P.sho.y + 4, P.handR.x, P.handR.y, ARM, P.armBendR, 10.5, c.dark, 8, c.flash ? '#fff' : shade('#f2f2f5', 0.8));
-  limbIK(ctx, P.hip.x - 4, P.hip.y + 4, P.footR.x, P.footR.y, LEG, P.legBendR, 12.5, c.dark, 8.5, shade(c.boot, 0.85));
+  limbIK(ctx, P.sho.x - 6, P.sho.y + 4, P.handR.x, P.handR.y, ARM, P.armBendR, L.armWR, c.dark, 8, c.flash ? '#fff' : shade(L.glove, 0.8));
+  limbIK(ctx, P.hip.x - 4, P.hip.y + 4, P.footR.x, P.footR.y, LEG, P.legBendR, L.legWR, c.dark, 8.5, shade(c.boot, 0.85));
   // torso: pelvis → chest, trunks band
-  capsule(ctx, P.hip.x, P.hip.y, P.sho.x, P.sho.y, 32, c.body);
-  ball(ctx, P.hip.x, P.hip.y + 2, 15, c.dark);   // trunks
+  capsule(ctx, P.hip.x, P.hip.y, P.sho.x, P.sho.y, L.torsoW, c.body);
+  // female: a short skirt/coat flare at the hips
+  if (L.female) {
+    ctx.fillStyle = c.dark; ctx.beginPath();
+    ctx.moveTo(P.hip.x - L.torsoW * 0.45, P.hip.y - 2);
+    ctx.lineTo(P.hip.x + L.torsoW * 0.7, P.hip.y - 4);
+    ctx.lineTo(P.hip.x + L.torsoW * 0.5, P.hip.y + 22);
+    ctx.lineTo(P.hip.x - L.torsoW * 0.7, P.hip.y + 20);
+    ctx.closePath(); ctx.fill();
+  }
+  ball(ctx, P.hip.x, P.hip.y + 2, L.female ? 12 : 15, c.dark);   // trunks / waist
   // front leg
-  limbIK(ctx, P.hip.x + 4, P.hip.y + 2, P.footF.x, P.footF.y, LEG, P.legBendF, 13, c.body, 9, c.boot);
+  limbIK(ctx, P.hip.x + 4, P.hip.y + 2, P.footF.x, P.footF.y, LEG, P.legBendF, L.legW, c.body, 9, c.boot);
   // head + face
-  ball(ctx, P.head.x, P.head.y, 15, c.skin);
+  ball(ctx, P.head.x, P.head.y, L.headR, c.skin);
+  // female: hair crown/fringe over the top + back of the skull (not the face, which sits lower-front)
+  if (L.hair) {
+    ctx.fillStyle = hairCol;
+    ctx.beginPath(); ctx.ellipse(P.head.x - 2, P.head.y - L.headR * 0.45, L.headR * 1.05, L.headR * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(P.head.x - L.headR * 0.75, P.head.y, L.headR * 0.5, L.headR * 0.95, 0, 0, Math.PI * 2); ctx.fill();   // sideburn down the back
+  }
   drawFace(ctx, P.head.x, P.head.y, P.faceMood, c.dead, c.flash);
   // front arm + glove
-  limbIK(ctx, P.sho.x + 5, P.sho.y + 2, P.handF.x, P.handF.y, ARM, P.armBendF, 11, c.body, 8.5, c.glove);
+  limbIK(ctx, P.sho.x + 5, P.sho.y + 2, P.handF.x, P.handF.y, ARM, P.armBendF, L.armW, c.body, 8.5, c.glove);
 }
 
 // ── the absurd ceiling: a mech materializes behind its pilot ──
