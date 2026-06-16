@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+// crisp nearest-neighbor scaling ONLY when the retro filter is on; smooth otherwise
+canvas.style.imageRendering = Retro.enabled ? 'pixelated' : 'auto';
 
 const pad1 = new Pad(P1_MAP);
 const pad2 = new Pad(P2_MAP);
@@ -342,7 +344,7 @@ function logicStep() {
   // before the scene branch drains the queue so the menu doesn't eat them)
   for (let i = KeyQueue.length - 1; i >= 0; i--) {
     if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
-    else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); }
+    else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); canvas.style.imageRendering = Retro.enabled ? 'pixelated' : 'auto'; }
   }
   // SCENE layer (menu.js): the title / mode-select / move-list / pause screens run
   // their own step and never touch the fight. In the fight, a pause keypress (Esc /

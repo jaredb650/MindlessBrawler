@@ -5,8 +5,8 @@
 <title>Mindless Brawler — Prototype</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b0b10; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  /* keep the browser's canvas→viewport scale nearest-neighbor too, so the retro pixels stay crisp */
-  canvas { background: #14141c; max-width: 100vw; max-height: 100vh; aspect-ratio: 16 / 9; image-rendering: pixelated; image-rendering: crisp-edges; }
+  /* image-rendering is set from JS (main.js): pixelated only while the retro filter is on, smooth otherwise */
+  canvas { background: #14141c; max-width: 100vw; max-height: 100vh; aspect-ratio: 16 / 9; }
 </style>
 </head>
 <body>

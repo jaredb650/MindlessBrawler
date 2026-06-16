@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 
 const Retro = {
-  enabled: true,
+  enabled: false,       // OFF by default — toggle on live with V
   off: null,        // offscreen <canvas> (low-res render target)
   offCtx: null,     // its 2D context (created willReadFrequently for fast quant)
   w: 0, h: 0,       // current low-res dims
