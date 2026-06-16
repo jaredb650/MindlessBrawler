@@ -64,15 +64,15 @@ const CHARACTERS = {
 const VESPER_MOVES = {
   ...MOVES,
   // ── KNIFE (lead hand, P) — slash lines + BLEED ──
-  // i2 range-finder: fastest poke in her kit, no push, opens everything. 1 bleed.
-  slash: { anim: 'jab', startup: 2, active: 3, recovery: 5, damage: 16, hitstun: 14, blockstun: 8, stamina: 2,
+  // i2 range-finder, MULTISLASH: two quick cuts per press, no push, opens everything. bleeds each cut.
+  slash: { anim: 'jab', startup: 2, active: 5, recovery: 5, damage: 9, hitstun: 13, blockstun: 7, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'knife', bleed: 1, label: 'SLASH',
-    hitbox: { x: 22, y: -150, w: 88, h: 28 },
+    hitbox: { x: 22, y: -150, w: 90, h: 30 }, multihit: { times: 2, interval: 2 },
     cancels: ['slash', 'thrust', 'hamstring', 'risingslash', 'pistol', 'gunkick', 'heelshot', 'lowsweep'] },
-  // advancing lunge stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
-  thrust: { anim: 'cross', startup: 4, active: 3, recovery: 9, damage: 30, hitstun: 18, blockstun: 11, stamina: 4,
+  // advancing lunge DOUBLE-stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
+  thrust: { anim: 'cross', startup: 4, active: 6, recovery: 9, damage: 16, hitstun: 16, blockstun: 10, stamina: 4,
     guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', bleed: 1, label: 'THRUST', lungeVx: 6,
-    hitbox: { x: 26, y: -150, w: 100, h: 32 },
+    hitbox: { x: 26, y: -150, w: 100, h: 32 }, multihit: { times: 2, interval: 3 },
     cancels: ['risingslash', 'pistol', 'heelshot', 'hamstring', 'upshot'] },
   // upward gut → LAUNCHER (juggle starter). Can flow into a point-blank air shot.
   risingslash: { anim: 'uppercut', startup: 6, active: 5, recovery: 18, damage: 46, hitstun: 0, blockstun: 14, stamina: 10,
@@ -88,33 +88,33 @@ const VESPER_MOVES = {
   // ── PISTOL (off hand, ◀P) — point-blank shot ──
   // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip, NO bleed. Flows on
   // into more knife/kick so a string reads "slash, slash, BANG, kick".
-  pistol: { anim: 'cross', startup: 5, active: 2, recovery: 12, damage: 32, hitstun: 16, blockstun: 12, stamina: 5,
-    guard: 'mid', kind: 'punch', kbx: 4.0, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'POINT-BLANK',
-    hitbox: { x: 18, y: -152, w: 64, h: 30 }, popsGround: true,
+  pistol: { anim: 'cross', startup: 5, active: 6, recovery: 12, damage: 16, hitstun: 15, blockstun: 11, stamina: 5,
+    guard: 'mid', kind: 'punch', kbx: 2.5, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'POINT-BLANK',
+    hitbox: { x: 18, y: -152, w: 66, h: 30 }, multihit: { times: 2, interval: 3 }, popsGround: true,
     cancels: ['thrust', 'heelshot', 'hamstring'] },
   // ── GUN-KATA KICKS (K) — off-hand fires on contact ──
   // quick low: the pressure glue (big stun, no push), keeps her turn alive.
   gunkick: { anim: 'legkick', startup: 4, active: 3, recovery: 9, damage: 20, hitstun: 24, blockstun: 8, stamina: 3,
-    guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'GUN KICK', popsGround: true,
+    guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'GUN KICK', popsGround: true,
     hitbox: { x: 22, y: -95, w: 78, h: 34 },
     cancels: ['gunkick', 'slash', 'hamstring', 'heelshot', 'lowsweep'] },
   // gun-kata roundhouse: mid spacing tool, fires on contact, makes room.
   heelshot: { anim: 'frontkick', startup: 5, active: 4, recovery: 11, damage: 38, hitstun: 17, blockstun: 10, stamina: 4,
-    guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'HEEL SHOT', popsGround: true,
+    guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, gun: true, label: 'HEEL SHOT', popsGround: true,
     hitbox: { x: 30, y: -140, w: 90, h: 36 },
     cancels: ['upshot', 'pirouette', 'lowsweep'] },
   // rising knee-kick → JUGGLE KEEPER (low launch): the air-combo filler. Flow into a shot.
   upshot: { anim: 'knee', startup: 7, active: 3, recovery: 14, damage: 34, hitstun: 0, blockstun: 12, stamina: 7,
-    guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'UPSHOT',
+    guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'UPSHOT',
     hitbox: { x: 12, y: -158, w: 56, h: 66 }, launcher: true, launchVy: -10, popsGround: true,
     cancels: ['pistol'] },
   // spinning gun-kata heel → her big ENDER: blasts grounded, SIDE-SPIKES airborne/tumbling.
   pirouette: { anim: 'backkick', startup: 11, active: 4, recovery: 24, damage: 64, hitstun: 0, blockstun: 16, stamina: 11,
-    guard: 'mid', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER, weapon: 'pistol', gun: true, label: 'PIROUETTE',
+    guard: 'mid', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER, gun: true, label: 'PIROUETTE',
     hitbox: { x: 24, y: -150, w: 96, h: 46 }, lungeVx: 7, heavy: true, popsGround: true, blast: true, sideSpikeAir: true, noFlowCancel: true },
   // low sweep → hard knockdown ender (oki).
   lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
-    guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, weapon: 'pistol', gun: true, label: 'SWEEP',
+    guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, gun: true, label: 'SWEEP',
     hitbox: { x: 18, y: -40, w: 92, h: 32 }, knockdown: true, heavy: true, popsGround: true },
 };
 

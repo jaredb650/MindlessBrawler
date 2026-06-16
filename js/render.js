@@ -1209,37 +1209,41 @@ function drawSkeleton(ctx, P, c) {
   // on its active frames), and a sidearm resting in the off hand. dualWield → the lead hand is
   // never empty (knife by default). Brawler: no weapon, no dualWield → nothing draws.
   const activeW = c.weapon || (L.dualWield ? 'knife' : null);
-  if (activeW) {
+  if (activeW === 'knife') {
     const hx = P.handF.x, hy = P.handF.y;
-    let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;   // hand-pointing dir
+    let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;   // blade-pointing dir
     const ang = Math.atan2(uy, ux);
-    if (activeW === 'knife') {
-      capsule(ctx, hx, hy, hx + ux * 22, hy + uy * 22, 4, c.flash ? '#ffffff' : '#d7dde6');   // blade
-      capsule(ctx, hx - uy * 5, hy + ux * 5, hx + uy * 5, hy - ux * 5, 3, c.flash ? '#ffffff' : '#3a3a44');   // crossguard
-      if (c.mvActive) {   // SLASH LINE — bright crescent trailing the blade's sweep
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = c.flash ? '#ffffff' : 'rgba(195,242,255,0.9)'; ctx.lineWidth = 3.5;
-        ctx.beginPath(); ctx.arc(hx, hy, 30, ang - 0.95, ang + 0.55); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(hx, hy, 37, ang - 0.75, ang + 0.35); ctx.stroke();
-      }
-    } else if (activeW === 'pistol') {
-      capsule(ctx, hx, hy, hx + ux * 15, hy + uy * 15, 5.5, c.flash ? '#ffffff' : '#24242c');   // slide/barrel
-      capsule(ctx, hx, hy, hx - ux * 4 + uy * 9, hy - uy * 4 - ux * 9, 4.5, c.flash ? '#ffffff' : '#15151b');   // grip
-      if (c.mvActive && c.gun) {   // MUZZLE FLASH + tracer (point-blank shot)
-        const mx = hx + ux * 17, my = hy + uy * 17;
-        ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(mx, my, 6, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,233,150,0.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        for (const a of [-0.5, 0, 0.5]) { ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(ang + a) * 13, my + Math.sin(ang + a) * 13); ctx.stroke(); }
-        ctx.strokeStyle = 'rgba(255,240,180,0.55)'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + ux * 72, my + uy * 72); ctx.stroke();   // tracer
-      }
+    capsule(ctx, hx, hy, hx + ux * 22, hy + uy * 22, 4, c.flash ? '#ffffff' : '#d7dde6');   // blade
+    capsule(ctx, hx - uy * 5, hy + ux * 5, hx + uy * 5, hy - ux * 5, 3, c.flash ? '#ffffff' : '#3a3a44');   // crossguard
+    if (c.mvActive) {   // SLASH LINE — bright crescent trailing the blade's sweep
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = c.flash ? '#ffffff' : 'rgba(195,242,255,0.9)'; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.arc(hx, hy, 30, ang - 0.95, ang + 0.55); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(hx, hy, 37, ang - 0.75, ang + 0.35); ctx.stroke();
     }
+  } else if (activeW === 'pistol') {
+    const hx = P.handF.x, hy = P.handF.y;
+    let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
+    capsule(ctx, hx, hy, hx + ux * 15, hy + uy * 15, 5.5, c.flash ? '#ffffff' : '#24242c');   // slide/barrel
+    capsule(ctx, hx, hy, hx - ux * 4 + uy * 9, hy - uy * 4 - ux * 9, 4.5, c.flash ? '#ffffff' : '#15151b');   // grip
   }
   // off-hand sidearm: a small pistol resting in the rear hand (always, so she reads as armed)
   if (L.dualWield) {
     const hx = P.handR.x, hy = P.handR.y; let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
     capsule(ctx, hx, hy, hx + ux * 11, hy + uy * 11, 4.5, c.flash ? '#ffffff' : shade('#24242c', 0.8));
+  }
+  // MUZZLE FLASH (gun moves) — ALWAYS fires FORWARD (+x = toward the enemy in local space, since the
+  // body is drawn facing +x). Fired from the gun hand: the LEAD hand on the point-blank shot
+  // (weapon:'pistol'), the OFF-hand sidearm during gun-kata kicks. Fixes the old "shoots backward".
+  if (c.mvActive && c.gun) {
+    const gh = (c.weapon === 'pistol') ? P.handF : P.handR;
+    const mx = gh.x + 18, my = gh.y;
+    ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(mx, my, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,233,150,0.9)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (const a of [-0.6, -0.2, 0.2, 0.6]) { ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(a) * 14, my + Math.sin(a) * 14); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,240,180,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 78, my); ctx.stroke();   // tracer straight forward
   }
 }
 
