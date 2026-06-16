@@ -88,9 +88,10 @@ const VESPER_MOVES = {
   // ── PISTOL (off hand, ◀P) — point-blank shot ──
   // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip, NO bleed. Flows on
   // into more knife/kick so a string reads "slash, slash, BANG, kick".
-  pistol: { anim: 'cross', startup: 5, active: 6, recovery: 12, damage: 16, hitstun: 15, blockstun: 11, stamina: 5,
-    guard: 'mid', kind: 'punch', kbx: 2.5, hitstop: CFG.HITSTOP_MED, weapon: 'pistol', gun: true, label: 'POINT-BLANK',
-    hitbox: { x: 18, y: -152, w: 66, h: 30 }, multihit: { times: 2, interval: 3 }, popsGround: true,
+  pistol: { anim: 'cross', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
+    guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'pistol', gun: true, label: 'PISTOL',
+    hitbox: { x: 0, y: -150, w: 0, h: 0 },   // no melee — she fires ONE round downrange (CRUMPLES on hit)
+    projectile: 'pistolround', bulletArts: false,
     cancels: ['thrust', 'heelshot', 'hamstring'] },
   // ── GUN-KATA KICKS (K) — off-hand fires on contact ──
   // quick low: the pressure glue (big stun, no push), keeps her turn alive.
@@ -114,7 +115,7 @@ const VESPER_MOVES = {
   shotgun: { anim: 'shotgun', startup: 11, active: 4, recovery: 32, damage: 52, hitstun: 0, blockstun: 18, stamina: 13,
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, weapon: 'shotgun', label: 'SHOTGUN',
     hitbox: { x: 16, y: -168, w: 188, h: 78 }, blast: true, sideSpike: true, sideSpikeAir: true, heavy: true, noFlowCancel: true,
-    planted: true, rackFrame: 25, bulletArts: false },   // already a gun — no bullet-arts off it
+    planted: true, rackFrame: 25, bulletArts: false, fireSfx: 'shotgun_blast' },   // already a gun — no bullet-arts off it
   // low sweep → hard knockdown ender (oki).
   lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
     guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, gun: true, label: 'SWEEP',

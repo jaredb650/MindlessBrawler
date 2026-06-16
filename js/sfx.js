@@ -37,6 +37,7 @@ const SFX = {
 
 const SOUND_MANIFEST = {
   impacts:   ['hit_light', 'hit_med', 'hit_heavy', 'hit_heavy2', 'body_blow', 'block', 'parry', 'bounce', 'body_slam', 'ground_pop', 'wall_splat', 'spike', 'sidespike', 'overhand_hit', 'gunshot', 'wall_spike'],
+  guns:      ['pistol_shot', 'shotgun_blast'],
   voice:     ['grunt_1', 'grunt_2'],
   swings:    ['whoosh_light', 'whoosh_heavy', 'fly_takeoff'],
   movement:  ['jump', 'dash', 'getup', 'tech'],

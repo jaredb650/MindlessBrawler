@@ -46,6 +46,8 @@ const SUPER_MOVE = {
 const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() direction/height checks
 // A Bullet-Arts round: tiny gun hit that re-stuns briefly (combo glue), no knockdown/launch.
 const BULLET_MOVE = { anim: 'bullet', damage: CFG.BULLET_DMG, guard: 'mid', blockstun: 6, hitstun: CFG.BULLET_HITSTUN, hitstop: 2, kbx: 0, kind: 'gun', label: 'BULLET' };
+// ◀P PISTOL SHOT round: one projectile that CRUMPLES a grounded victim (a stagger → free follow-up).
+const PISTOL_ROUND_MOVE = { anim: 'bullet', damage: CFG.PISTOL_ROUND_DMG, guard: 'mid', blockstun: 12, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', crumple: 'stand', label: 'PISTOL' };
 
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -455,6 +457,18 @@ function spawnBullet(owner) {
     owner, move: BULLET_MOVE, kind: 'bullet', dead: false, age: 0,
   });
   playSfx('hit_med');   // a gunshot pop (placeholder until a dedicated round sfx)
+}
+
+// ◀P PISTOL SHOT — one aimed round downrange. Crumples on hit (PISTOL_ROUND_MOVE).
+function spawnPistolRound(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 50,
+    y: CFG.FLOOR_Y - 128,
+    vx: d * CFG.PISTOL_ROUND_SPEED,
+    w: 28, h: 12, owner, move: PISTOL_ROUND_MOVE, kind: 'bullet', dead: false, age: 0,
+  });
+  playSfx('pistol_shot');
 }
 
 // BULLET CLIMAX volley — a few rounds at staggered heights (the barrage wall).

@@ -76,6 +76,8 @@ const CFG = {
   BULLET_INTERVAL: 4,           // frames between rounds while held
   BULLET_MAX: 3,                // rounds per strike
   BULLET_COST: 3,               // stamina per round
+  PISTOL_ROUND_DMG: 24,         // ◀P pistol shot (one projectile, CRUMPLES on hit)
+  PISTOL_ROUND_SPEED: 22,
   // ── Vesper SUPERS ──
   CLIMAX_FRAMES: 44,            // Bullet Climax: how long the barrage fires
   CLIMAX_INTERVAL: 3,          // frames between volleys

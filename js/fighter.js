@@ -801,10 +801,14 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // GUN MOVES: FIRE on the active frame — spawn the round (pistol) + the shot sound.
+        if (this.f === mv.startup + 1) {
+          if (mv.projectile === 'pistolround') spawnPistolRound(this);
+          if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
+        }
         // SHOTGUN: eject the spent shell (a physics object) on the rack frame.
         if (mv.rackFrame && this.f === mv.rackFrame) {
           spawnShell(this.x - this.facing * 4, CFG.FLOOR_Y - CFG.BODY_H * 0.62, -this.facing * 2.4 + (Math.random() - 0.5) * 1.6, -6 - Math.random() * 2);
-          playSfx('whoosh_heavy');   // the rack/chk-chk (placeholder until a dedicated shell sfx)
         }
         // BULLET ARTS (Vesper): keep HOLDING P/K after a CONNECTED strike → she trails gunfire that
         // extends the combo. Fires after the active frames, capped per strike, costs stamina.
