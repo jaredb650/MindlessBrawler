@@ -68,15 +68,15 @@ const VESPER_MOVES = {
   slash: { anim: 'jab', startup: 2, active: 5, recovery: 5, damage: 9, hitstun: 13, blockstun: 7, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'knife', bleed: 1, label: 'SLASH',
     hitbox: { x: 22, y: -150, w: 90, h: 30 }, multihit: { times: 2, interval: 2 },
-    cancels: ['slash', 'thrust', 'hamstring', 'risingslash', 'pistol', 'gunkick', 'heelshot', 'lowsweep'] },
+    cancels: ['slash', 'thrust', 'hamstring', 'risingslash', 'pistol', 'gunkick', 'heelshot', 'rifleburst'] },
   // advancing lunge DOUBLE-stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
   thrust: { anim: 'cross', startup: 4, active: 6, recovery: 9, damage: 16, hitstun: 16, blockstun: 10, stamina: 4,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', bleed: 1, label: 'THRUST', lungeVx: 6,
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'THRUST', lungeVx: 6,
     hitbox: { x: 26, y: -150, w: 100, h: 32 }, multihit: { times: 2, interval: 3 },
     cancels: ['risingslash', 'pistol', 'heelshot', 'hamstring', 'upshot'] },
   // upward gut → LAUNCHER (juggle starter). Can flow into a point-blank air shot.
   risingslash: { anim: 'uppercut', startup: 6, active: 5, recovery: 18, damage: 46, hitstun: 0, blockstun: 14, stamina: 10,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', bleed: 1, label: 'RISING SLASH',
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'RISING SLASH',
     hitbox: { x: 12, y: -190, w: 58, h: 86 }, launcher: true, launchVy: -13, heavy: true, popsGround: true,
     cancels: ['pistol'] },
   // low slash to the leg → BUCKLE (crumple/kneel): a frozen, fully-hittable guaranteed follow-up.
@@ -88,7 +88,7 @@ const VESPER_MOVES = {
   // ── PISTOL (off hand, ◀P) — point-blank shot ──
   // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip, NO bleed. Flows on
   // into more knife/kick so a string reads "slash, slash, BANG, kick".
-  pistol: { anim: 'cross', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
+  pistol: { anim: 'jab', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'pistol', gun: true, label: 'PISTOL',
     hitbox: { x: 0, y: -150, w: 0, h: 0 },   // no melee — she fires ONE round downrange (CRUMPLES on hit)
     projectile: 'pistolround', bulletArts: false,
@@ -98,16 +98,18 @@ const VESPER_MOVES = {
   gunkick: { anim: 'legkick', startup: 4, active: 3, recovery: 9, damage: 20, hitstun: 24, blockstun: 8, stamina: 3,
     guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'GUN KICK', popsGround: true,
     hitbox: { x: 22, y: -95, w: 78, h: 34 },
-    cancels: ['gunkick', 'slash', 'hamstring', 'heelshot', 'lowsweep'] },
+    cancels: ['gunkick', 'slash', 'hamstring', 'heelshot', 'rifleburst'] },
   // gun-kata roundhouse: mid spacing tool, fires on contact, makes room.
   heelshot: { anim: 'frontkick', startup: 5, active: 4, recovery: 11, damage: 38, hitstun: 17, blockstun: 10, stamina: 4,
     guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, gun: true, label: 'HEEL SHOT', popsGround: true,
     hitbox: { x: 30, y: -140, w: 90, h: 36 },
-    cancels: ['upshot', 'shotgun', 'lowsweep'] },
-  // rising knee-kick → JUGGLE KEEPER (low launch): the air-combo filler. Flow into a shot.
-  upshot: { anim: 'knee', startup: 7, active: 3, recovery: 14, damage: 34, hitstun: 0, blockstun: 12, stamina: 7,
+    cancels: ['upshot', 'shotgun', 'rifleburst'] },
+  // ↑K UPSHOT: a rising knee that LAUNCHES grounded foes, PLUS an UZI BURST sprayed in an arc
+  // overhead — the anti-air that shreds anyone already in the air (the AR rounds juggle).
+  upshot: { anim: 'knee', startup: 7, active: 3, recovery: 16, damage: 34, hitstun: 0, blockstun: 12, stamina: 8,
     guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'UPSHOT',
     hitbox: { x: 12, y: -158, w: 56, h: 66 }, launcher: true, launchVy: -10, popsGround: true,
+    burst: { count: 6, spread: 0.85, speed: 17, up: -11, grav: 0.5, move: 'ar', y: 150 },
     cancels: ['pistol'] },
   // ◀K: SHOTGUN BLAST — she PLANTS (no movement), pulls a shotgun and fires a long-range blast,
   // then RACKS it (the spent shell ejects as a physics object). A clean hit SIDE-SPIKES them flat
@@ -115,11 +117,18 @@ const VESPER_MOVES = {
   shotgun: { anim: 'shotgun', startup: 11, active: 4, recovery: 32, damage: 52, hitstun: 0, blockstun: 18, stamina: 13,
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, weapon: 'shotgun', label: 'SHOTGUN',
     hitbox: { x: 16, y: -168, w: 188, h: 78 }, blast: true, sideSpike: true, sideSpikeAir: true, heavy: true, noFlowCancel: true,
-    planted: true, rackFrame: 25, bulletArts: false, fireSfx: 'shotgun_blast' },   // already a gun — no bullet-arts off it
-  // low sweep → hard knockdown ender (oki).
+    planted: true, rackFrame: 25, bulletArts: false, fireSfx: 'shotgun_blast', gib: true },   // a shotgun KO GIBS the head
+  // low sweep → hard knockdown ender (oki). [still defined for combo refs; ↓K now = rifleburst]
   lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
-    guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, gun: true, label: 'SWEEP',
+    guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, label: 'SWEEP',
     hitbox: { x: 18, y: -40, w: 92, h: 32 }, knockdown: true, heavy: true, popsGround: true },
+  // ↓K ASSAULT RIFLE: she PLANTS, pulls a rifle and fires a 3-round BURST downrange — damaging
+  // rounds that JUGGLE (launch) on hit. No movement; the burst (not a melee) does the work.
+  rifleburst: { anim: 'shotgun', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
+    guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_MED, weapon: 'rifle', label: 'RIFLE BURST',
+    hitbox: { x: 0, y: -150, w: 0, h: 0 }, planted: true, bulletArts: false,
+    burst: { count: 3, spread: 0.04, speed: 26, up: 0, move: 'ar', y: 122, trail: 16 },
+    cancels: [] },
 };
 
 CHARACTERS.vesper = {
@@ -128,7 +137,7 @@ CHARACTERS.vesper = {
   moves: VESPER_MOVES,
   neutralMap: {
     punch: { up: 'risingslash', down: 'hamstring', forward: 'thrust', back: 'pistol', neutral: 'slash' },
-    kick:  { up: 'upshot', down: 'lowsweep', forward: 'heelshot', back: 'shotgun', neutral: 'gunkick' },
+    kick:  { up: 'upshot', down: 'rifleburst', forward: 'heelshot', back: 'shotgun', neutral: 'gunkick' },
   },
   airMap: CHARACTERS.brawler.airMap,                // TEMP — air knife/gun later
   dashMap: CHARACTERS.brawler.dashMap,              // TEMP

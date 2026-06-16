@@ -745,6 +745,14 @@ function logicStep() {
       const dir = Math.sign(f.vx) || f.facing;
       spawnBlood(f.x, CFG.FLOOR_Y - 110, dir, 42);
       spawnSpark(f.x, CFG.FLOOR_Y - 110, 'blood');
+      // SHOTGUN KO → GIB: the head flies off as a physics object, body goes headless.
+      if (f.gibArmed > 0 && !f.decapitated) {
+        f.decapitated = true;
+        const hy = f.y - CFG.BODY_H + 14;
+        spawnHead(f.x, hy, dir * (9 + Math.random() * 7), -13 - Math.random() * 4, '#f0d2bc', f.color);
+        spawnBlood(f.x, hy + 14, dir, 52); spawnBlood(f.x, hy + 14, -dir, 28);
+        spawnSpark(f.x, hy, 'parry');
+      }
     }
     const winner = f1.hp <= 0 ? (f2.hp <= 0 ? null : f2) : f1;
     game.banner = {

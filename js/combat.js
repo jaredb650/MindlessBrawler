@@ -48,6 +48,24 @@ const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() 
 const BULLET_MOVE = { anim: 'bullet', damage: CFG.BULLET_DMG, guard: 'mid', blockstun: 6, hitstun: CFG.BULLET_HITSTUN, hitstop: 2, kbx: 0, kind: 'gun', label: 'BULLET' };
 // ◀P PISTOL SHOT round: one projectile that CRUMPLES a grounded victim (a stagger → free follow-up).
 const PISTOL_ROUND_MOVE = { anim: 'bullet', damage: CFG.PISTOL_ROUND_DMG, guard: 'mid', blockstun: 12, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', crumple: 'stand', label: 'PISTOL' };
+// Uzi spray round (light, hitstun) + assault-rifle round (heavier, LAUNCHES → juggle).
+const UZI_BULLET_MOVE = { anim: 'bullet', damage: 8, guard: 'mid', blockstun: 6, hitstun: 11, hitstop: 2, kbx: 0, kind: 'gun', label: 'UZI' };
+const AR_BULLET_MOVE = { anim: 'bullet', damage: 16, guard: 'mid', blockstun: 8, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', launcher: true, launchVy: -9, label: 'RIFLE' };
+const BURST_MOVES = { uzi: UZI_BULLET_MOVE, ar: AR_BULLET_MOVE };
+// Fire a fanned BURST of rounds. b = { count, spread (rad), speed, up (vy bias, -=up), grav, move, y }.
+function spawnGunBurst(owner, b) {
+  const d = owner.facing, mv = BURST_MOVES[b.move] || UZI_BULLET_MOVE;
+  for (let i = 0; i < b.count; i++) {
+    const t = b.count > 1 ? (i / (b.count - 1) - 0.5) : 0;
+    const ang = t * (b.spread || 0);
+    Projectiles.push({
+      x: owner.x + d * (46 - i * (b.trail || 0)), y: CFG.FLOOR_Y - (b.y || 120),
+      vx: d * b.speed * Math.cos(ang), vy: b.speed * Math.sin(ang) + (b.up || 0), grav: b.grav || 0,
+      w: 20, h: 8, owner, move: mv, kind: 'bullet', dead: false, age: 0,
+    });
+  }
+  playSfx('pistol_shot');
+}
 
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -203,6 +221,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     vic.bleed = Math.min(CFG.MAX_BLEED, vic.bleed + move.bleed);
     vic.bleedTimer = CFG.BLEED_DURATION;
   }
+  if (move.gib) vic.gibArmed = 90;   // shotgun — a KO within this window gibs the head (main.js)
 
   // ── MAGIC PUNCH COMBO payoff ──
   // The 4th link (final cross) of the jab→cross→uppercut→cross STARTER connecting hands both bodies
@@ -559,6 +578,8 @@ function updateProjectiles(f1, f2, game) {
     if (p.dead) continue;
     p.age++;
     p.x += p.vx;
+    if (p.vy) p.y += p.vy;          // arced bursts (uzi arc, etc.)
+    if (p.grav) p.vy += p.grav;
     const vic = p.owner === f1 ? f2 : f1;
     const move = p.move || SUPER_MOVE;
     const isB = p.kind === 'bullet';
@@ -575,7 +596,7 @@ function updateProjectiles(f1, f2, game) {
       spawnSpark(p.x + Math.sign(p.vx) * p.w / 2, p.y + p.h / 2, 'hit', isB ? 0 : 2);
       if (!isB) playSfx('explosion');
     }
-    if (p.x < -200 || p.x > CFG.STAGE_W + 200) p.dead = true;
+    if (p.x < -200 || p.x > CFG.STAGE_W + 200 || p.y < -260 || p.y > CFG.FLOOR_Y + 60) p.dead = true;
   }
   for (let i = Projectiles.length - 1; i >= 0; i--) if (Projectiles[i].dead) Projectiles.splice(i, 1);
 }

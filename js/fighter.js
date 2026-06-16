@@ -121,6 +121,7 @@ class Fighter {
     this.wallSpiked = false;   // a wall-spike wallsplat → slow slide down the wall + blood trail
     this.bleed = 0;            // bleed stacks (Vesper's knife DoT)
     this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
+    this.gibArmed = 0;         // hit by a gib move (shotgun) recently → a KO decapitates
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.bulletsFired = 0;     // bullet-arts rounds fired this strike (Vesper)
@@ -655,6 +656,7 @@ class Fighter {
     // arm the magnet on a much-later poke. An off-sequence move start zeroes it directly.
     if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
     if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
+    if (this.gibArmed > 0) this.gibArmed--;       // shotgun-gib window
     // BLEED DoT (Vesper's knife wounds): drips damage while it lasts, then clears. Can bleed out a KO.
     if (this.bleed > 0) {
       if (--this.bleedTimer <= 0) { this.bleed = 0; }
@@ -804,6 +806,7 @@ class Fighter {
         // GUN MOVES: FIRE on the active frame — spawn the round (pistol) + the shot sound.
         if (this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
+          if (mv.burst) spawnGunBurst(this, mv.burst);   // uzi spray / assault-rifle burst
           if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
         }
         // SHOTGUN: eject the spent shell (a physics object) on the rack frame.
