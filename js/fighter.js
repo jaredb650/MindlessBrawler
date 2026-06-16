@@ -145,7 +145,10 @@ class Fighter {
     if (FLASH_ON_ENTER.has(name)) this.hitFlash = CFG.HIT_FLASH;   // white impact frame on every fallheavy/wallsplat/launched/hitstun entry
 
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; this.punchChain = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; }
+    // (punchChain is deliberately NOT cleared on neutral: a magic-combo link recovers to idle
+    //  between hits while the victim is still in hitstun, so the chain's lifetime is the VICTIM's
+    //  combo — cleared in update() when the opponent leaves their hit state, not when WE idle.)
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }
     if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
     if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
@@ -612,6 +615,12 @@ class Fighter {
     if (this.invuln > 0) this.invuln--;
     if (this.hitFlash > 0) this.hitFlash--;   // universal contact-flash timer (set in the receive* funnels)
     if (this.counterCD > 0) this.counterCD--;
+
+    // MAGIC PUNCH COMBO lifetime: combat.js advances the chain on each clean hit, but it only
+    // stays armed as long as the VICTIM's combo does. It survives us idling between links — yet
+    // the instant the opponent is no longer in a hit state (combo dropped, or never started) it
+    // clears, so a stale chain can't latch the magnet onto a fresh poke.
+    if (this.punchChain > 0 && !opp.inHitState()) this.punchChain = 0;
 
     // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
     // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.
