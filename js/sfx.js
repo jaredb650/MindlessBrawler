@@ -44,7 +44,7 @@ const SOUND_MANIFEST = {
   counter:   ['counter_slip', 'counter_hit'],
   execution: ['exec_grab', 'exec_punch', 'exec_riser', 'exec_blast'],
   flatliner: ['flatliner_freeze', 'flatliner_hit', 'flatliner_drop', 'flatliner_ko'],
-  match:     ['fight_start', 'ko'],
+  match:     ['fight_start', 'ko', 'ko_freeze'],
   ui:        ['ui_move', 'ui_confirm', 'ui_back'],
   music:     ['music_menu', 'music_fight'],
 };

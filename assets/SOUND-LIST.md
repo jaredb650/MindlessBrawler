@@ -114,6 +114,7 @@ counter_hit · ko.
 |---|---|
 | `fight_start` | round start — announcer "FIGHT!" or bell + sting |
 | `ko` | the knockout — big "K.O." sting / impact |
+| `ko_freeze` | the black/white KO freeze-frame — a sharp electric/time-stop stinger |
 
 ### UI (menus)
 | file | sound |

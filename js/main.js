@@ -420,7 +420,7 @@ function logicStep() {
     game.matchState = 'ko';
     // the freeze-frame beat — but the bespoke finishers (execution / flatliner) already
     // have their own dramatic freeze, so only normal KOs + super get this one.
-    if (!game.executionKill && !game.flatlinerKill) game.koFreeze = CFG.KO_FREEZE;
+    if (!game.executionKill && !game.flatlinerKill) { game.koFreeze = CFG.KO_FREEZE; playSfx('ko_freeze'); }   // electric stinger on the silhouette freeze
     game.slowmo = CFG.KO_SLOWMO_FRAMES;
     game.flash = CFG.KO_FLASH; game.flashMax = CFG.KO_FLASH;   // EVERY KO flashes — shared KO juice, zero per-move wiring
     // blood on EVERY kill — a gout from each downed fighter, in their launch direction
