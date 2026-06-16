@@ -60,7 +60,7 @@ const CFG = {
   MOMENTUM_KEEP: 0.6,           // fraction of walk/run speed carried into a strike
   PRESS_DRIFT: 1.6,             // px/frame advancing while striking (hold toward)
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
-  FLOW_CANCEL_RECOVERY: 4,      // on CONTACT (hit/block) recovery caps at this — whiffs eat it all
+  FLOW_CANCEL_RECOVERY: 4,      // on a clean HIT recovery caps at this — block rides FULL recovery (negative on block), whiffs eat it all
   CANCEL_WINDOW_PAD: 12,        // frames past a move's active window you can still chain-cancel (flow leniency)
 
   // Defense

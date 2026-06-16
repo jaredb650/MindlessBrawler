@@ -79,7 +79,8 @@ class CPU {
       for (const pr of Projectiles) {
         if (pr.dead || pr.owner === self) continue;
         const closing = Math.sign(pr.vx) === Math.sign(self.x - pr.x);   // shell traveling toward us
-        if (closing && Math.abs(pr.x - self.x) < 320) { synth[away] = true; return synth; }   // stand mid-block, eat the chip
+        // block AWAY FROM THE SHELL, not the opponent — they may have crossed up after firing
+        if (closing && Math.abs(pr.x - self.x) < 320) { synth[(self.x - pr.x) >= 0 ? 'right' : 'left'] = true; return synth; }   // stand mid-block, eat the chip
       }
     }
 

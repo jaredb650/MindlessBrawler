@@ -24,6 +24,11 @@
 // Entering any of these means the defender escaped — combo bookkeeping resets.
 const NEUTRAL_RESET = new Set(['idle', 'walk', 'crouch', 'run', 'blockstun', 'getup', 'downed', 'backroll', 'kipup', 'wakeuproll']);
 
+// Impact states that flash the body white on ENTRY (the universal contact flash). Covers
+// the DIRECT setState('fallheavy'/'wallsplat') knockdown / throw-slam / suplex / wall-impact
+// paths that bypass the receive* funnels. Block/crumple flash from their own funnels.
+const FLASH_ON_ENTER = new Set(['hitstun', 'launched', 'fallheavy', 'wallsplat']);
+
 // States where this.move stays live (everything else clears it on entry).
 const MOVE_STATES = new Set(['attack', 'airattack', 'flyattack']);
 
@@ -127,6 +132,8 @@ class Fighter {
     const prev = this.state;
     this.state = name;
     this.f = 0;
+    if (FLASH_ON_ENTER.has(name)) this.hitFlash = CFG.HIT_FLASH;   // white impact frame on every fallheavy/wallsplat/launched/hitstun entry
+
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
     if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; }
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }

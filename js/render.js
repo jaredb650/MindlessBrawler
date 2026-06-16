@@ -66,6 +66,10 @@ function spawnStain(x, y, vertical) {
   else { Stains[stainWrite % STAIN_CAP] = s; stainWrite++; }   // recycle the oldest slot, no shift/reindex
 }
 
+// rematch: drop the decals AND reset the ring cursor (else the next match recycles a
+// non-oldest slot once it refills). resetMatch() calls this instead of Stains.length = 0.
+function clearStains() { Stains.length = 0; stainWrite = 0; }
+
 function drawStains(ctx) {
   for (const s of Stains) {
     ctx.globalAlpha = s.a;
