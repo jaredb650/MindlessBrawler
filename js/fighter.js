@@ -115,6 +115,7 @@ class Fighter {
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
+    this.superKind = 'cannon'; // 'cannon' (neutral super) | 'beam' (forward super)
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
@@ -306,6 +307,9 @@ class Fighter {
     if (p.pressed.super && this.meter >= CFG.SUPER_COST) {
       p.consume('super');
       this.meter = 0;
+      // FORWARD + super = the OVERDRIVE BEAM; any other direction = the Mech Cannon.
+      const fwd = (this.facing === 1 && p.held.right) || (this.facing === -1 && p.held.left);
+      this.superKind = fwd ? 'beam' : 'cannon';
       this.setState('superstart');
       this.superFlash = true;
       return true;
@@ -990,8 +994,13 @@ class Fighter {
         break;
       }
       case 'superstart': {
-        if (this.f === CFG.SUPER_STARTUP) this.spawnShot = true;
-        if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');
+        if (this.superKind === 'beam') {
+          // charge → fire (the beam's multi-hits resolve in combat.js updateBeam) → recovery → idle
+          if (this.f >= CFG.BEAM_CHARGE + CFG.BEAM_ACTIVE + CFG.BEAM_RECOVERY) this.setState('idle');
+        } else {
+          if (this.f === CFG.SUPER_STARTUP) this.spawnShot = true;
+          if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');
+        }
         break;
       }
     }

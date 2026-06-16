@@ -444,7 +444,26 @@ function drawFighter(ctx, f, game) {
       }
       break;
     }
-    case 'superstart': lean(P, 0.12); guardUp(P); P.faceMood = 1; break;
+    case 'superstart': {
+      if (f.superKind === 'beam') {
+        if (f.f >= CFG.BEAM_CHARGE) {              // FIRING: thrust both palms forward, the beam pours out
+          lean(P, 0.32);
+          P.handF = { x: 56, y: -130 }; P.handR = { x: 46, y: -120 };
+          P.armBendF = 1; P.armBendR = 1;
+          P.head.x += 4;
+        } else {                                   // CHARGING: cup both hands back at the hip
+          lean(P, -0.2);
+          P.handF = { x: -22, y: -108 }; P.handR = { x: -32, y: -122 };
+          P.armBendF = -1; P.armBendR = -1;
+          P.head.x -= 4;
+        }
+        P.footF.x = 28; P.footR.x = -26;
+        P.faceMood = 1;
+      } else {
+        lean(P, 0.12); guardUp(P); P.faceMood = 1;
+      }
+      break;
+    }
     case 'throwgrab': {
       lean(P, 0.3);
       P.handF = { x: 56, y: -108 }; P.handR = { x: 52, y: -124 };
@@ -925,6 +944,74 @@ function drawProjectile(ctx, p) {
   rr(ctx, p.x - p.w / 2 + (d === 1 ? p.w * 0.45 : p.w * 0.1), p.y + 12, p.w * 0.45, p.h - 24, (p.h - 24) / 2);
 }
 
+// ── OVERDRIVE BEAM visuals ──
+function radialGlow(ctx, x, y, r, color) {
+  if (r <= 0) return;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+function beamRect(ctx, x0, x1, cy, h, color) {
+  if (h <= 0) return;
+  ctx.fillStyle = color;
+  const x = Math.min(x0, x1), w = Math.abs(x1 - x0);
+  rr(ctx, x, cy - h / 2, w, h, h / 2);
+}
+
+// The charging ball (during BEAM_CHARGE) and the giant pouring beam (during BEAM_ACTIVE).
+// Drawn additively for glow, on top of everything. `ff` lets the freeze pass animate it.
+function drawBeam(ctx, f, ff) {
+  const t = (ff == null) ? f.f : ff;
+  const dir = f.facing;
+  const cy = CFG.FLOOR_Y - 130;
+  const ox = f.x + dir * 56;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (t < CFG.BEAM_CHARGE) {
+    // the forming ball — grows + crackles as it charges
+    const g = Math.min(1, t / Math.max(1, CFG.BEAM_CHARGE));
+    const r = 8 + g * 46 + Math.sin(t * 0.8) * 3;
+    radialGlow(ctx, ox, cy, r * 3, 'rgba(110,215,255,0.45)');
+    ball(ctx, ox, cy, r, '#bdefff');
+    ball(ctx, ox, cy, r * 0.55, '#ffffff');
+    for (let i = 0; i < 6; i++) {                  // sparks spiralling INTO the ball
+      const a = t * 0.3 + i * (Math.PI * 2 / 6);
+      const rr2 = r * 2.4;
+      ctx.globalAlpha = 0.5;
+      ball(ctx, ox + Math.cos(a) * rr2, cy + Math.sin(a) * rr2 * 0.7, 2.5, '#e8fbff');
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    const k = t - CFG.BEAM_CHARGE;
+    const grow = Math.min(1, k / 6);               // snaps out over ~6 frames
+    const fade = Math.min(1, (CFG.BEAM_ACTIVE - k) / 8);
+    const env = Math.max(0, Math.min(grow, fade));
+    if (env <= 0) { ctx.restore(); return; }
+    const len = CFG.BEAM_LEN;
+    const h = CFG.BEAM_H * env;
+    const x0 = ox, x1 = ox + dir * len;
+    const wob = Math.sin(k * 0.9) * 6 + Math.sin(k * 2.3) * 3;
+    // layered beam: wide soft glow → cyan body → bright inner → white core
+    beamRect(ctx, x0, x1, cy, h * 1.55 + wob, 'rgba(70,190,255,0.22)');
+    beamRect(ctx, x0, x1, cy, h * 1.0, 'rgba(120,225,255,0.55)');
+    beamRect(ctx, x0, x1, cy, h * 0.52, 'rgba(220,250,255,0.85)');
+    beamRect(ctx, x0, x1, cy, h * 0.2 + Math.sin(k * 1.6) * 2, '#ffffff');   // pulsing white core
+    // muzzle burst at the origin
+    radialGlow(ctx, x0, cy, h * 1.6, 'rgba(190,242,255,0.8)');
+    ball(ctx, x0, cy, h * 0.5, '#ffffff');
+    // energy streaking down the length
+    ctx.globalAlpha = 0.8;
+    for (let i = 0; i < 10; i++) {
+      const px = x0 + dir * ((k * 26 + i * len / 10) % len);
+      ball(ctx, px, cy + Math.sin(i * 1.7 + k * 0.5) * h * 0.3, 3 + Math.random() * 3, '#eafcff');
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
 function drawStage(ctx) {
   const g = ctx.createLinearGradient(0, 0, 0, CFG.STAGE_H);
   g.addColorStop(0, '#1b1b26');
@@ -1012,13 +1099,16 @@ function render(ctx, game, alpha) {
   drawStage(ctx);
   drawStains(ctx);   // blood decals on the floor/walls, under the fighters
 
-  for (const f of game.fighters) if (f.state === 'superstart') drawMech(ctx, f);
+  for (const f of game.fighters) if (f.state === 'superstart' && f.superKind !== 'beam') drawMech(ctx, f);
   for (const p of Projectiles) drawProjectile(ctx, p);
 
   // attacker draws on top
   const [a, b] = game.fighters;
   const order = a.move && !b.move ? [b, a] : [a, b];
   for (const f of order) drawFighter(ctx, f, game);
+
+  // OVERDRIVE BEAM pours out OVER the fighters for maximum drama
+  for (const f of game.fighters) if (f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
 
   for (const p of Particles) {
     ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
@@ -1058,12 +1148,23 @@ function render(ctx, game, alpha) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
     const who = game.superWho;
-    if (who) drawMech(ctx, who, Math.min(1, (CFG.SUPER_FREEZE - game.superFreeze) / 8));
+    const prog = Math.min(1, (CFG.SUPER_FREEZE - game.superFreeze) / 8);
+    const beam = who && who.superKind === 'beam';
+    if (who && !beam) drawMech(ctx, who, prog);
     if (who) drawFighter(ctx, who, game);
-    ctx.fillStyle = '#ffe082';
+    if (who && beam) {                              // a swelling charge aura during the freeze
+      const cy = CFG.FLOOR_Y - 130, ox = who.x + who.facing * 56;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      radialGlow(ctx, ox, cy, 60 + prog * 220, 'rgba(110,215,255,0.5)');
+      ball(ctx, ox, cy, 12 + prog * 40, '#dffaff');
+      ball(ctx, ox, cy, 6 + prog * 18, '#ffffff');
+      ctx.restore();
+    }
+    ctx.fillStyle = beam ? '#8fe9ff' : '#ffe082';
     ctx.font = 'bold 64px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('MECH CANNON', CFG.STAGE_W / 2, 200);
+    ctx.fillText(beam ? 'OVERDRIVE BEAM' : 'MECH CANNON', CFG.STAGE_W / 2, 200);
   }
 
   // counter-hit cinematic: dim the room, the two of them on top of the slip

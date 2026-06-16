@@ -43,6 +43,7 @@ const SUPER_MOVE = {
   hitstop: 20, kbx: 16, launcher: true, launchVy: -13, isSuper: true,
   popsGround: true, popVy: -12,   // a 20mm shell absolutely moves a downed body
 };
+const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() direction/height checks
 
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -364,6 +365,62 @@ function spawnCannon(owner) {
   });
 }
 
+// The OVERDRIVE BEAM: while the forward-super fighter is in its firing window, a giant
+// hitbox engulfs a big chunk of the screen in front of them, multi-hitting the opponent,
+// dragging them to the wall, then DETONATING on the final frame. Driven entirely off the
+// firing fighter's state + f — no separate entity to manage. Blockable (chip) if guarded.
+function updateBeam(att, vic, game) {
+  const FIRE0 = CFG.BEAM_CHARGE;
+  const FIRE1 = CFG.BEAM_CHARGE + CFG.BEAM_ACTIVE;
+  if (att.f < FIRE0 || att.f >= FIRE1) return;          // charge + recovery: no beam
+  game.shake = Math.max(game.shake, CFG.SHAKE_MED);     // the whole screen rumbles while it fires
+
+  const dir = att.facing;
+  const cy = CFG.FLOOR_Y - 130;
+  const ox = att.x + dir * 56;                          // beam origin = the cupped hands
+  const beam = { x: dir === 1 ? ox : ox - CFG.BEAM_LEN, y: cy - CFG.BEAM_H / 2, w: CFG.BEAM_LEN, h: CFG.BEAM_H };
+  const engulfed = vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && rectsOverlap(beam, vic.hurtbox());
+  if (!engulfed) return;
+
+  const blocking = canBlock(vic, att.x, BEAM_MOVE);
+  const last = att.f === FIRE1 - 1;                      // DETONATE on the final firing frame (once)
+  const tick = (att.f - FIRE0) % CFG.BEAM_HIT_INTERVAL === 0;
+
+  if (last) {
+    vic.hp = Math.max(0, vic.hp - CFG.BEAM_FINISH_DMG);
+    vic.setLaunched(dir * CFG.BEAM_FINISH_VX, CFG.BEAM_FINISH_VY, true);
+    if (vic.hp <= 0) vic.noTech = true;                  // can't tech your own erasure
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
+    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    game.flash = CFG.KO_FLASH; game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);   // white detonation pop
+    spawnBlood(vic.x, cy, dir, CFG.HEAVY_BLOOD + 14);
+    spawnSpark(vic.x, cy, 'hit', 2);
+    playSfx('explosion');
+    return;
+  }
+
+  // continuous drag toward the wall (every firing frame → smooth with render interp)
+  if (blocking) {
+    vic.pushVel = dir * CFG.BEAM_BLOCK_PUSH;
+  } else {
+    vic.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x + dir * CFG.BEAM_PUSH));
+  }
+
+  if (!tick) return;                                      // damage only on the tick cadence
+  if (blocking) {
+    vic.hp = Math.max(CFG.CHIP_FLOOR, vic.hp - CFG.BEAM_TICK_CHIP);
+    vic.receiveBlockstun(CFG.BEAM_HIT_INTERVAL + 3);      // held in guard through the beam
+    spawnSpark(vic.x - dir * CFG.BODY_W / 2, cy + (Math.random() - 0.5) * 80, 'block');
+    playSfx('block');
+  } else {
+    vic.hp -= CFG.BEAM_TICK_DMG;
+    if (vic.hp <= 0) { vic.hp = 0; vic.setLaunched(dir * 12, -11, true); vic.noTech = true; return; }
+    vic.receiveHitstun(CFG.BEAM_HIT_INTERVAL + 4);        // re-stunned each tick → locked in the beam
+    spawnSpark(vic.x, cy + (Math.random() - 0.5) * CFG.BEAM_H * 0.5, 'hit', 1);
+    playSfx('hit_med');
+  }
+}
+
 function updateProjectiles(f1, f2, game) {
   for (const p of Projectiles) {
     if (p.dead) continue;
@@ -423,5 +480,6 @@ function combatUpdate(f1, f2, game) {
     }
   }
   updateProjectiles(f1, f2, game);
+  for (const f of [f1, f2]) if (f.state === 'superstart' && f.superKind === 'beam') updateBeam(f, f === f1 ? f2 : f1, game);
   separateBodies(f1, f2);
 }

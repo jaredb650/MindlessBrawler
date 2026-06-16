@@ -259,6 +259,23 @@ const CFG = {
   SUPER_RECOVERY: 34,
   SUPER_SHOT_SPEED: 22,
 
+  // FORWARD + super → the OVERDRIVE BEAM (neutral/back super stays the Mech Cannon).
+  // A charge-up, then a giant multi-hit beam that engulfs a big chunk of the screen,
+  // drags the body to the wall, and detonates.
+  BEAM_CHARGE: 22,             // reactable wind-up after the super freeze (the ball forms)
+  BEAM_ACTIVE: 48,             // frames the beam pours out
+  BEAM_RECOVERY: 26,
+  BEAM_HIT_INTERVAL: 4,        // a multi-hit tick every N firing frames
+  BEAM_TICK_DMG: 24,           // damage per engulfed tick (direct, not combo-scaled)
+  BEAM_FINISH_DMG: 130,        // the detonation hit
+  BEAM_TICK_CHIP: 5,           // chip per tick if blocked
+  BEAM_PUSH: 6.5,              // px/frame the engulfed body is dragged toward the wall
+  BEAM_BLOCK_PUSH: 11,         // pushback per tick on a blocker
+  BEAM_LEN: 820,               // beam length — covers a big chunk of the screen
+  BEAM_H: 210,                 // beam thickness (hit + core height)
+  BEAM_FINISH_VX: 17,          // launch on the detonation
+  BEAM_FINISH_VY: -13,
+
   // Bodies
   BODY_W: 60,
   BODY_H: 170,
