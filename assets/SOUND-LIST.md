@@ -38,7 +38,8 @@ counter_hit · ko.
 |---|---|
 | `hit_light` | light jab/poke landing — quick sharp slap/thud |
 | `hit_med` | solid cross/kick — meatier mid thud |
-| `hit_heavy` | a heavy ender connecting — deep bassy **CRACK** |
+| `hit_heavy` | a heavy **punch** ender — deep bassy **CRACK** (power-punch) |
+| `hit_heavy2` | a heavy **kick** ender — meaty **flesh/thud** impact (so heavies aren't all one sound) |
 | `body_blow` | shot to the body/liver — dull *winding* thud (knee, liver shot) |
 | `block` | attack stopped on guard — deflecting clack/clang |
 | `parry` | clean parry — crisp metallic *ting* |
@@ -79,6 +80,11 @@ counter_hit · ko.
 |---|---|
 | `crumple` | a body-shot CRUMPLE (liver shot / spinning elbow) — a pained hurt grunt |
 | `buckle` | the calf-kick BUCKLE to one knee — a sharp bone-crack |
+
+### Pain grunts (random, on any hit ≥45 dmg — add as many as you like)
+| file | sound |
+|---|---|
+| `grunt_1` `grunt_2` | a fighter's pained/exertion grunt — picked at random on a meaty hit |
 
 ### Super (Mech Cannon)
 | file | sound |

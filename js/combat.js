@@ -30,7 +30,8 @@ function pushFeed(text, color) {
 }
 
 function hitSfx(move) {
-  if (move.hitstop >= CFG.HITSTOP_ENDER) playSfx('hit_heavy');
+  if (move.hitSound) playSfx(move.hitSound);                                                  // optional per-move override
+  else if (move.hitstop >= CFG.HITSTOP_ENDER) playSfx(move.kind === 'kick' ? 'hit_heavy2' : 'hit_heavy');   // heavy KICKS = flesh impact, heavy PUNCHES = power punch (variety — hit_heavy was overused)
   else if (move.hitstop >= CFG.HITSTOP_MED) playSfx('hit_med');
   else playSfx('hit_light');
   if (move.staminaDrain) playSfx('body_blow');
@@ -174,6 +175,8 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   const dmgScale = Math.max(CFG.MIN_DMG_SCALE, 1 - CFG.DMG_SCALE_PER_HIT * (hits - 1));
   const dmg = Math.max(1, Math.round(move.damage * dmgScale));
   vic.hp -= dmg;
+  // a pained grunt on a meaty hit — random, and skipped on crumple moves (those already grunt)
+  if (dmg >= CFG.GRUNT_DMG && !move.crumple && Math.random() < CFG.GRUNT_CHANCE) playSfx(Math.random() < 0.5 ? 'grunt_1' : 'grunt_2');
   // body shots break the will to fight: knee drains the gas tank directly
   if (move.staminaDrain) vic.stamina = Math.max(0, vic.stamina - move.staminaDrain * dmgScale);
   const meterBefore = att.meter;

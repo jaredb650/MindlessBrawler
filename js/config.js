@@ -80,6 +80,8 @@ const CFG = {
   SAME_MOVE_EXTRA_DECAY: 0.12,  // flow pass: was 0.22 — simple rhythmic pressure (jab jab jab) holds longer
   MIN_HITSTUN_SCALE: 0.30,
   MAX_AIR_HITS: 3,              // juggle limit — after this, hits stop lifting
+  GRUNT_DMG: 45,               // a hit dealing at least this much can trigger a random pain grunt
+  GRUNT_CHANCE: 0.4,           // ...and only this fraction of the time, so grunts pepper in (not every hit)
   // Gazelle hook — a leaping lead hook off 2 jabs (forward+P). Launches into the air juggle.
   GAZELLE_LAUNCH_VY: -13,       // launch height of the gazelle hook (between hook's drop and uppercut's -13.5 pop) — starts the air juggle
   GAZELLE_HOP_VX: 6.5,          // forward leap speed of the gazelle-step (seeded into attackDrift, glides/decays through the swing)
