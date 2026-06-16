@@ -208,6 +208,8 @@ const CFG = {
   SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly
   SIDESPIKE_WALL_DMG: 130,         // a side-spiked body that SLAMS the wall takes SIGNIFICANT extra damage (can KO)
   SIDESPIKE_WALL_SHAKE: 16,        // the wall-spike screen rumble (vs the normal WALLSPLAT_SHAKE 6)
+  WALLSPIKE_SLIDE_SPEED: 3,        // px/frame the wall-spiked body slowly slides DOWN the wall
+  WALLSPIKE_SLIDE_FRAMES: 34,      // how long it slides (smearing a blood trail) before peeling off
   OVERHAND_FREEZE: 26,             // dramatic hit-freeze when the charged overhand lands
   OVERHAND_FLASH: 10,              // white flash on the connect
   ELECTRIC_BURST: 46,              // electric particles in the on-hit explosion (bigger blast)

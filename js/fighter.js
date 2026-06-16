@@ -105,6 +105,7 @@ class Fighter {
     this.sideSpikeFrames = 0;  // electric overhand: reduced-gravity flat-flight window
     this.pendingElectric = 0;  // electrocution queued by the side spike — converts to `electrified` on landing
     this.electrified = 0;      // electrocution seize timer: locked + convulsing + passive DoT
+    this.wallSpiked = false;   // a wall-spike wallsplat → slow slide down the wall + blood trail
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
@@ -471,15 +472,20 @@ class Fighter {
     this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (peel-off under normal gravity)
     const by = this.y - CFG.BODY_H * 0.55;
     if (sideSpiked) {
+      this.wallSpiked = true;                                   // → slow slide down the wall + blood trail (wallsplat case)
       this.hp = Math.max(0, this.hp - CFG.SIDESPIKE_WALL_DMG);   // the wall-spike HURTS
       if (this.hp <= 0) this.pendingElectric = 0;               // dead → no posthumous electrocution
       game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
       game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
       spawnRumble(wx + into * 12, this.y - CFG.BODY_H * 0.5, into);   // debris blasted off the wall
+      spawnBlood(wx + into * 14, by, into, 38);                       // BLOOD EXPLOSION out from the wall
+      for (let i = 0; i < 5; i++) spawnStain(wx - into * 22, by + (Math.random() - 0.5) * CFG.BODY_H * 0.7, true);   // splattered up the wall
       spawnDust(wx, CFG.FLOOR_Y, 20);
       spawnSpark(wx + into * 20, by, 'hit', 2);
       if (this.pendingElectric > 0) spawnElectric(wx + into * 20, this.y - CFG.BODY_H * 0.5, CFG.ELECTRIC_BURST);
       spawnFloatText(this.x, this.y - CFG.BODY_H - 20, 'WALL SPIKE!!', '#ffd54f');
+      playSfx('hit_heavy');                                          // heavy hit layered on impact
+      playSfx('wall_spike');                                         // the punch-a-rock impact, layered
     } else {
       game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
       spawnDust(wx, this.y, 12);
@@ -567,7 +573,7 @@ class Fighter {
   }
 
   setLaunched(vx, vy, freshLaunch) {
-    if (freshLaunch) { this.bounced = false; this.noTech = false; this.sideSpikeFrames = 0; this.pendingElectric = 0; }   // a FRESH launch clears any stale side-spike arming
+    if (freshLaunch) { this.bounced = false; this.noTech = false; this.sideSpikeFrames = 0; this.pendingElectric = 0; this.wallSpiked = false; }   // a FRESH launch clears any stale side-spike arming
     this.hitFlash = CFG.HIT_FLASH;   // OTG pops / launches / KO blasts all flash on contact too
     // Hard guard: a missing/NaN launch velocity must never reach physics — it would
     // NaN the body's position and make it vanish off-screen. Default to a gentle float.
@@ -858,6 +864,18 @@ class Fighter {
         // Any strike that connects re-launches normally (combat.js sees a grounded,
         // non-downed body). Holds position; gravity is suppressed (not airborne).
         this.vx = 0; this.vy = 0;
+        // WALL SPIKE: slowly slide DOWN the wall, smearing a blood trail, then peel off.
+        if (this.wallSpiked) {
+          this.y = Math.min(CFG.FLOOR_Y, this.y + CFG.WALLSPIKE_SLIDE_SPEED);
+          const wx = this.facing === 1 ? CFG.WALL_L + 8 : CFG.WALL_R - 8;          // the wall is behind the body
+          if (this.f % 3 === 0) spawnStain(wx, this.y - CFG.BODY_H * 0.45 + Math.random() * 30, true);   // vertical streak down the wall
+          if (this.f >= CFG.WALLSPIKE_SLIDE_FRAMES) {
+            this.wallSpiked = false;
+            this.setLaunched(-this.facing * 2, CFG.WALLSPLAT_DROP_VY, false);       // peel off into the fall (electrocution arms on landing)
+            playSfx('body_slam');
+          }
+          break;
+        }
         if (this.f >= CFG.WALLSPLAT_FRAMES) {
           // peel off the wall and slide down into the bounce/fall path
           this.setLaunched(-this.facing * 2, CFG.WALLSPLAT_DROP_VY, false);
