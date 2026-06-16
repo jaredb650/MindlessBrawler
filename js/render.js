@@ -377,7 +377,7 @@ const BRAWLER_LOOK = {
 const VESPER_LOOK = {
   glove: '#17171f', skin: '#f0d2bc', bootShade: 0.32,
   torsoW: 25, headR: 13.5, armW: 9, legW: 11, armWR: 8, legWR: 10,
-  female: true, hair: '#15121b',
+  female: true, hair: '#15121b', longHair: true, shades: true,
 };
 
 // Per-character body dispatch: each character draws its own silhouette + pose set. Both run the
@@ -1141,13 +1141,30 @@ function drawSkeleton(ctx, P, c) {
     ctx.restore();
   }
 
-  // ponytail behind the head (drawn first so the head overlaps its root)
-  if (L.hair) capsule(ctx, P.head.x - L.headR * 0.5, P.head.y - 2, P.head.x - L.headR * 1.7, P.head.y + 16, 6.5, hairCol);
+  // hair behind the head (drawn first so the head overlaps its root). longHair = a flowing
+  // ponytail that trails well down the back in two tapering segments.
+  if (L.hair) {
+    const hx = P.head.x - L.headR * 0.55;
+    if (L.longHair) {
+      capsule(ctx, hx, P.head.y - 4, hx - 7, P.head.y + 30, 8, hairCol);
+      capsule(ctx, hx - 7, P.head.y + 30, hx - 3, P.head.y + 62, 6.5, hairCol);   // long flowing tail
+    } else {
+      capsule(ctx, hx, P.head.y - 2, P.head.x - L.headR * 1.7, P.head.y + 16, 6.5, hairCol);
+    }
+  }
   // rear limbs (darker — depth)
   limbIK(ctx, P.sho.x - 6, P.sho.y + 4, P.handR.x, P.handR.y, ARM, P.armBendR, L.armWR, c.dark, 8, c.flash ? '#fff' : shade(L.glove, 0.8));
   limbIK(ctx, P.hip.x - 4, P.hip.y + 4, P.footR.x, P.footR.y, LEG, P.legBendR, L.legWR, c.dark, 8.5, shade(c.boot, 0.85));
   // torso: pelvis → chest, trunks band
   capsule(ctx, P.hip.x, P.hip.y, P.sho.x, P.sho.y, L.torsoW, c.body);
+  // female curves (subtle): bust bumping FORWARD off the chest, butt bumping BACK off the hips.
+  // forward = +x in this local space; both are body-colored so they read as one silhouette.
+  if (L.female) {
+    const chx = P.sho.x + (P.hip.x - P.sho.x) * 0.30, chy = P.sho.y + (P.hip.y - P.sho.y) * 0.30;
+    ctx.fillStyle = c.body;
+    ctx.beginPath(); ctx.ellipse(chx + L.torsoW * 0.42, chy + 3, L.torsoW * 0.40, L.torsoW * 0.30, -0.15, 0, Math.PI * 2); ctx.fill();   // bust
+    ctx.beginPath(); ctx.ellipse(P.hip.x - L.torsoW * 0.46, P.hip.y - 3, L.torsoW * 0.42, L.torsoW * 0.36, 0.15, 0, Math.PI * 2); ctx.fill();   // butt
+  }
   // female: a short skirt/coat flare at the hips
   if (L.female) {
     ctx.fillStyle = c.dark; ctx.beginPath();
@@ -1169,6 +1186,16 @@ function drawSkeleton(ctx, P, c) {
     ctx.beginPath(); ctx.ellipse(P.head.x - L.headR * 0.75, P.head.y, L.headR * 0.5, L.headR * 0.95, 0, 0, Math.PI * 2); ctx.fill();   // sideburn down the back
   }
   drawFace(ctx, P.head.x, P.head.y, P.faceMood, c.dead, c.flash);
+  // Matrix shades: a sleek dark lens over the forward eye + a temple arm running back to the hair.
+  if (L.shades) {
+    const ex = P.head.x + L.headR * 0.42, ey = P.head.y - L.headR * 0.05;
+    ctx.fillStyle = c.flash ? '#ffffff' : '#0b0b10';
+    ctx.beginPath(); ctx.ellipse(ex, ey, L.headR * 0.46, L.headR * 0.30, -0.12, 0, Math.PI * 2); ctx.fill();   // lens
+    ctx.strokeStyle = c.flash ? '#ffffff' : '#0b0b10'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ex - L.headR * 0.3, ey - 2); ctx.lineTo(P.head.x - L.headR * 0.9, ey - 4); ctx.stroke();   // temple arm
+    ctx.fillStyle = c.flash ? '#ffffff' : 'rgba(150,180,255,0.35)';   // a faint glint
+    ctx.beginPath(); ctx.ellipse(ex + 1, ey - 2, L.headR * 0.16, L.headR * 0.1, -0.12, 0, Math.PI * 2); ctx.fill();
+  }
   // front arm + glove
   limbIK(ctx, P.sho.x + 5, P.sho.y + 2, P.handF.x, P.handF.y, ARM, P.armBendF, L.armW, c.body, 8.5, c.glove);
 }
