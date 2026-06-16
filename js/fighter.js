@@ -1116,7 +1116,8 @@ class Fighter {
           // charge → fire (the beam's multi-hits resolve in combat.js updateBeam) → recovery → idle
           if (this.f >= CFG.BEAM_CHARGE + CFG.BEAM_ACTIVE + CFG.BEAM_RECOVERY) this.setState('idle');
         } else if (this.superKind === 'combo') {
-          // the starter punch to his side — if it REACHES, the inescapable combo begins (main.js)
+          // the starter — an UNBLOCKABLE command-grab (by design): if it REACHES a grounded
+          // body, the inescapable combo begins (main.js). Whiff = wasted meter; spacing/jump dodges.
           if (this.f === CFG.SUPER_STARTUP) {
             const grounded = !opp.isAirborne() && !['downed', 'fallheavy', 'getup'].includes(opp.state);
             if (opp.hp > 0 && opp.invuln <= 0 && grounded && Math.abs(opp.x - this.x) <= CFG.COMBO_STARTER_RANGE) {

@@ -307,6 +307,9 @@ function startSuperCombo(att, vic, game) {
   });
   att.setState('supercombo'); att.comboStrike = 'punch';
   vic.setState('executed');
+  // unblockable command-grab (by design) — clear any lingering side-spike/electric/wall arming on the
+  // grabbed body so it can't leak (mirrors beginClinch/beginThrown), and drop a stale noTech.
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
   game.hitstop = Math.max(game.hitstop, 6);
   game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
   spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'hit', 2);
