@@ -346,6 +346,10 @@ function logicStep() {
     if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
     else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); canvas.style.imageRendering = Retro.enabled ? 'pixelated' : 'auto'; }
   }
+  // RENDER INTERP: capture each body's position at the START of this tick (unconditionally,
+  // so it stays correct through freezes AND cinematics where update() doesn't run) — render()
+  // lerps prev→current between logic ticks for smooth motion on >60Hz displays.
+  for (const f of game.fighters) { f.prevX = f.x; f.prevY = f.y; }
   // SCENE layer (menu.js): the title / mode-select / move-list / pause screens run
   // their own step and never touch the fight. In the fight, a pause keypress (Esc /
   // Enter / P) lifts us to the pause screen before any fight logic runs.
@@ -473,10 +477,12 @@ function frame(now) {
   // RETRO: everything draws into the low-res buffer (rctx), then retroEnd pixelates
   // + palette-quantizes + upscales it onto the real canvas. Passthrough when off.
   const rctx = retroBegin(ctx);
+  // how far (0..1) we are between the last logic tick and the next → render interpolation factor
+  const alpha = CFG.RENDER_INTERP ? Math.max(0, Math.min(1, acc / STEP)) : 1;
   if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'movelist') {
     drawMenu(rctx, game);
   } else {
-    render(rctx, game);
+    render(rctx, game, alpha);
     if (game.koFreeze <= 0) drawUI(rctx, game);   // hide the HUD during the KO silhouette freeze
     if (game.scene === 'paused') drawPauseOverlay(rctx, game);   // freeze the fight, overlay the menu
   }

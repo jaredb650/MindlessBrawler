@@ -173,7 +173,7 @@ function attackExt(f) {
   if (!mv) return 0;
   if (f.f <= mv.startup) return 0.25 + 0.45 * (f.f / mv.startup);
   if (f.f <= mv.startup + mv.active) return 1;
-  return Math.max(0.2, 1 - (f.f - mv.startup - mv.active) / Math.max(1, mv.recovery));
+  return Math.max(0, 1 - (f.f - mv.startup - mv.active) / Math.max(1, mv.recovery));   // retract fully by end of recovery so the limb is already home when state flips to idle (no snap)
 }
 
 // ── the fighter ──────────────────────────────────────────────
@@ -193,18 +193,27 @@ function drawFighter(ctx, f, game) {
   const boot = flash ? '#eeeeee' : shade(f.color, 0.45);
   const skin = flash ? '#ffffff' : '#e8c39e';
 
+  // RENDER INTERP: glide the body between logic ticks (smooth on >60Hz). Snap (no glide)
+  // on a teleport-sized jump (reset / wall-snap). Visual only — never affects logic.
+  let rx = f.x, ry = f.y;
+  const ra = game.renderAlpha;
+  if (ra != null && ra < 1 && f.prevX != null) {
+    const dx = f.x - f.prevX, dy = f.y - f.prevY;
+    if (Math.abs(dx) <= CFG.INTERP_SNAP && Math.abs(dy) <= CFG.INTERP_SNAP) { rx = f.prevX + dx * ra; ry = f.prevY + dy * ra; }
+  }
+
   // ground shadow
-  const air = Math.max(0, CFG.FLOOR_Y - f.y);
+  const air = Math.max(0, CFG.FLOOR_Y - ry);
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.beginPath();
-  ctx.ellipse(f.x, CFG.FLOOR_Y + 6, Math.max(18, 44 - air * 0.08), 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - air * 0.08), 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
   // hit vibration: jitter the freshly-hit body during the hitstop freeze so the
   // frozen beat reads as a violent impact, not a dropped frame.
   const vib = (game.hitstop > 0 && f.hitFlash > 0) ? (Math.random() - 0.5) * CFG.HIT_VIB : 0;
-  ctx.translate(f.x + vib, f.y);
+  ctx.translate(rx + vib, ry);
   if (f.facing === -1) ctx.scale(-1, 1);
   // Spinning moves (back kick / backfist): a VISUAL 360 — flip away during the
   // wind-up, whip back around as the strike extends. Gameplay facing is untouched.
@@ -335,7 +344,7 @@ function drawFighter(ctx, f, game) {
     faceMood: 0,   // -1 hurt · 0 neutral · 1 fierce
     trail: null,   // {from, to, isLeg} swing ghosts
   };
-  const bob = Math.sin(f.f * 0.09) * 2;
+  const bob = Math.sin(f.animClock * 0.09) * 2;   // animClock (not f.f) → breathing stays continuous across idle/walk/state changes
   P.sho.y += bob; P.head.y += bob; P.handF.y += bob; P.handR.y += bob;
 
   const ext = attackExt(f);
@@ -348,13 +357,14 @@ function drawFighter(ctx, f, game) {
 
   switch (key) {
     case 'walk': {
-      const s = Math.sin(f.f * 0.28);
-      P.footF.x = 22 + s * 13; P.footR.x = -18 - s * 13;
+      const s = Math.sin(f.animClock * 0.28);
+      // stride amplitude (17) ≈ WALK_SPEED/0.28, so peak foot speed ~matches body travel → far less ice-skating
+      P.footF.x = 22 + s * 17; P.footR.x = -18 - s * 17;
       P.footF.y = -Math.max(0, s) * 7; P.footR.y = -Math.max(0, -s) * 7;
       break;
     }
     case 'run': {
-      const s = Math.sin(f.f * 0.42);
+      const s = Math.sin(f.animClock * 0.42);
       lean(P, 0.28);
       P.footF.x = 26 + s * 24; P.footR.x = -22 - s * 24;
       P.footF.y = -Math.max(0, s) * 14; P.footR.y = -Math.max(0, -s) * 14;
@@ -968,7 +978,8 @@ function drawDebugBoxes(ctx, fighters) {
   }
 }
 
-function render(ctx, game) {
+function render(ctx, game, alpha) {
+  game.renderAlpha = (alpha == null) ? 1 : alpha;   // drawFighter reads this (avoids threading it through every call)
   ctx.save();
   if (game.shake > 0) {
     ctx.translate((Math.random() - 0.5) * game.shake * 2, (Math.random() - 0.5) * game.shake * 2);

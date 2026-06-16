@@ -147,6 +147,12 @@ const CFG = {
   HIT_FLASH: 3,                 // frames the body flashes white on a CLEAN contact (universal, frame-locked to the hit)
   HIT_FLASH_BLOCK: 2,          // shorter white blip on block
   HIT_VIB: 3,                   // px the freshly-hit body vibrates during the hitstop freeze (a freeze without jitter reads as a dropped frame)
+
+  // RENDER INTERPOLATION — logic is a fixed 60fps; render lerps body positions
+  // between ticks so motion is smooth on >60Hz displays (144Hz no longer shows the
+  // same frame 2-3× in a row). Visual only — hitboxes/sfx/state never interpolate.
+  RENDER_INTERP: true,
+  INTERP_SNAP: 120,             // a prev→current jump bigger than this is a TELEPORT (reset/wall-snap) → don't glide it
   KO_SLOWMO_FRAMES: 90,
   KO_FLASH: 12,                 // screen-flash frames on EVERY KO (shared KO-juice helper)
   KO_FREEZE: 20,                // KO cinematic: world freezes on black, just white silhouettes, before the launch

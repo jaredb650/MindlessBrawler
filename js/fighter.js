@@ -71,6 +71,8 @@ class Fighter {
   reset() {
     this.x = this.spawnX;
     this.y = CFG.FLOOR_Y;
+    this.prevX = this.x; this.prevY = this.y;   // render-interpolation snapshot (smooth motion on >60Hz)
+    this.animClock = 0;                          // never-reset cyclic-anim phase → idle/walk bob + stride stay continuous across transitions
     this.vx = 0; this.vy = 0;
     this.pushVel = 0;
     this.facing = this.spawnFacing;
@@ -518,6 +520,7 @@ class Fighter {
   update(opp, game) {
     this.opp = opp;   // stash so startMove() can re-aim opponent-relative (flight moves) even on a cross-up
     this.f++;
+    this.animClock++;                         // monotonic — drives cyclic anim (bob/stride) so transitions don't pop f back to 0
     if (this.invuln > 0) this.invuln--;
     if (this.hitFlash > 0) this.hitFlash--;   // universal contact-flash timer (set in the receive* funnels)
     if (this.counterCD > 0) this.counterCD--;
