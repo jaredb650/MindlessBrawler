@@ -129,6 +129,33 @@ const VESPER_MOVES = {
     hitbox: { x: 0, y: -150, w: 0, h: 0 }, planted: true, bulletArts: false,
     burst: { count: 3, spread: 0.04, speed: 26, up: 0, move: 'ar', y: 122, trail: 16 },
     cancels: [] },
+  // ── AIR (knife + gun) ──
+  // neutral air P: a basic air knife.
+  airslash: { anim: 'airpunch', startup: 4, active: 999, recovery: 0, damage: 16, hitstun: 16, blockstun: 9, stamina: 3,
+    guard: 'high', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_LIGHT, air: true, weapon: 'knife', bleed: 1,
+    hitbox: { x: 16, y: -80, w: 62, h: 46 }, popsGround: true, label: 'AIR SLASH' },
+  // air ▶P: TELE-SLASH — a fast forward BLINK-slash (iaido). On hit → a stun-burst slash combo.
+  teleslash: { anim: 'airpunch', startup: 3, active: 999, recovery: 0, damage: 18, hitstun: 0, blockstun: 12, stamina: 8,
+    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
+    hitbox: { x: 6, y: -130, w: 98, h: 98 }, dive: { vx: 30, vy: -1 },
+    slashCombo: { hits: 2, launchVy: -13, label: 'IAIDO' }, label: 'TELE-SLASH' },
+  // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
+  airuzi: { anim: 'jumpkick', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,
+    guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, air: true, gun: true,
+    hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, spread: 0.18, speed: 22, up: 0, move: 'uzi' }, label: 'AIR UZI' },
+  // air ↓K: AIR SPIKE — a downward knife slash (NO dive, she keeps her arc); SPIKES foes from above.
+  airspike: { anim: 'divekick', startup: 5, active: 999, recovery: 0, damage: 32, hitstun: 0, blockstun: 12, stamina: 6,
+    guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, air: true, weapon: 'knife', bleed: 1,
+    hitbox: { x: 8, y: -50, w: 78, h: 98 }, spike: CFG.AXEKICK_SPIKE_VY, label: 'AIR SPIKE' },
+  // air ↓P: DIVE GRAB — a diving knife; on hit it COMMAND-GRABS into a TRIPLE SLASH (3rd launches).
+  elbowdrop: { anim: 'elbowdrop', startup: 3, active: 999, recovery: 0, damage: 18, hitstun: 0, blockstun: 13, stamina: 6,
+    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
+    hitbox: { x: 12, y: -44, w: 64, h: 60 }, dive: { vx: CFG.ELBOWDROP_VX, vy: CFG.ELBOWDROP_VY },
+    slashCombo: { hits: 3, launchVy: -14, label: 'TRIPLE SLASH' }, label: 'DIVE GRAB' },
+  // run+↓: SLIDE — on contact, a RISING DOUBLE SLASH whose 2nd hit launches HIGH (juggle setup).
+  slidetackle: { anim: 'slidetackle', startup: 4, active: 10, recovery: 16, damage: 24, hitstun: 0, blockstun: 12, stamina: 8,
+    guard: 'low', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_MED, hitbox: { x: 18, y: -46, w: 96, h: 46 },
+    slide: true, heavy: true, slashCombo: { hits: 2, launchVy: -17, label: 'RISING SLASH' }, label: 'SLIDE' },
 };
 
 CHARACTERS.vesper = {
@@ -139,7 +166,10 @@ CHARACTERS.vesper = {
     punch: { up: 'risingslash', down: 'hamstring', forward: 'thrust', back: 'pistol', neutral: 'slash' },
     kick:  { up: 'upshot', down: 'rifleburst', forward: 'heelshot', back: 'shotgun', neutral: 'gunkick' },
   },
-  airMap: CHARACTERS.brawler.airMap,                // TEMP — air knife/gun later
+  airMap: {
+    punch: { forward: 'teleslash', down: 'elbowdrop', neutral: 'airslash' },   // ▶=blink slash, ↓=dive grab combo
+    kick:  { forward: 'airuzi', down: 'airspike', neutral: 'jumpkick' },         // ▶=uzi spray, ↓=downward spike
+  },
   dashMap: CHARACTERS.brawler.dashMap,              // TEMP
   otgKickForward: CHARACTERS.brawler.otgKickForward,
   superMap: { forward: 'tango', back: 'witchtime', neutral: 'climax' },   // her 3 supers (Phase C)

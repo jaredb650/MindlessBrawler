@@ -59,7 +59,8 @@ function spawnGunBurst(owner, b) {
     const t = b.count > 1 ? (i / (b.count - 1) - 0.5) : 0;
     const ang = t * (b.spread || 0);
     Projectiles.push({
-      x: owner.x + d * (46 - i * (b.trail || 0)), y: CFG.FLOOR_Y - (b.y || 120),
+      x: owner.x + d * (46 - i * (b.trail || 0)),
+      y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.55 : CFG.FLOOR_Y - (b.y || 120),
       vx: d * b.speed * Math.cos(ang), vy: b.speed * Math.sin(ang) + (b.up || 0), grav: b.grav || 0,
       w: 20, h: 8, owner, move: mv, kind: 'bullet', dead: false, age: 0,
     });
@@ -230,6 +231,16 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   if (live && att.punchChain >= 4 && att.state === 'attack'
       && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     startMagicCombo(att, vic, game);   // clears att.punchChain
+    return;
+  }
+
+  // ── VESPER slash-combo cinematics ──
+  // A move carrying `slashCombo` (dive grab / slide tackle / tele-slash) OR the slash→thrust→rising
+  // chain (vesperChain 3) hands both bodies to the scripted slash-flurry cinematic (main.js).
+  if (live && (move.slashCombo || (att.charType === 'vesper' && att.moveName === 'risingslash' && att.vesperChain >= 3))
+      && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    att.vesperChain = 0;
+    startSlashCombo(att, vic, game, move.slashCombo || { hits: 3, launchVy: -14, aerial: true, label: 'AERIAL RAVE' });
     return;
   }
 

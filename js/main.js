@@ -573,7 +573,54 @@ function runTangoCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine };
+// Generic VESPER slash-flurry cinematic — used by the dive-grab (3 slashes), slide tackle (2,
+// launches high), tele-slash (2), and the slash→thrust→rising aerial rave (3). opts =
+// { hits, launchVy, aerial, label }. She blinks around the locked victim slashing, last hit LAUNCHES.
+function startSlashCombo(att, vic, game, opts) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 70, Math.min(CFG.WALL_R - 70, vic.x));
+  startCine('slashcombo', att, vic, game, { vicX, hits: 0, total: opts.hits || 3, launchVy: opts.launchVy || -13, aerial: !!opts.aerial, nextHit: 4, interval: 5, poseF0: 0 });
+  att.setState('magiccombo'); att.comboStrike = 'punch';
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'parry', 1); playSfx('hit_heavy');
+  if (opts.label) pushFeed(opts.label + '!!', att.color);
+}
+function runSlashComboCine(game, ex) {
+  const { att, vic, data } = ex;
+  const vy0 = data.aerial ? CFG.FLOOR_Y - 96 - data.hits * 16 : CFG.FLOOR_Y;
+  vic.x = data.vicX; vic.y = vy0;
+  att.f = Math.max(0, ex.f - data.poseF0);
+  if (data.hits < data.total && ex.f >= data.nextHit) {
+    data.hits++;
+    const last = data.hits >= data.total;
+    const side = (data.hits % 2 === 0) ? 1 : -1;
+    const ghostX = att.x, ghostY = att.y;
+    att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x + side * (88 + (data.hits % 2) * 26)));
+    att.y = data.aerial ? vy0 : CFG.FLOOR_Y;
+    att.facing = Math.sign(vic.x - att.x) || att.facing;
+    data.poseF0 = ex.f;
+    vic.hp = Math.max(1, vic.hp - 22);
+    const cy = vy0 - 80;
+    spawnSpark(vic.x, cy, 'parry'); spawnBlood(vic.x, cy, att.facing, last ? 28 : 12);
+    spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 4); spawnDust(att.x, CFG.FLOOR_Y, 3);
+    game.shake = Math.max(game.shake, 4 + data.hits);
+    game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 3);
+    playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
+    data.nextHit = ex.f + data.interval;
+    if (last) {
+      // FINISHER: launch them up for the juggle, hand control back.
+      att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * 64));
+      att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      vic.setLaunched(att.facing * 3, data.launchVy, true);
+      game.cine = null;
+    }
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine, slashcombo: runSlashComboCine };
 
 function runCine(game) {
   const ex = game.cine;
