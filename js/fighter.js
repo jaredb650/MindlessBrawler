@@ -49,7 +49,7 @@ function groundLeapY(f, mv) {
 
 // Execution window: they're gassed, nearly dead, and you're close enough.
 function canExecute(att, opp) {
-  return opp.state === 'gassed' && opp.hp > 0 && opp.hp <= CFG.MAX_HP * CFG.EXECUTE_HP_FRAC
+  return opp.state === 'gassed' && opp.hp > 0 && opp.hp <= opp.stats.maxHp * CFG.EXECUTE_HP_FRAC
     && Math.abs(opp.x - att.x) <= CFG.EXECUTE_RANGE;
 }
 
@@ -71,6 +71,7 @@ class Fighter {
     this.char = charDef(char);     // per-character identity (js/characters.js); default = brawler
     this.charType = this.char.id;
     this.moveSet = this.char.moves;
+    this.stats = this.char.stats;  // physical feel (hp/speed/jump/gravity/stamina/backdash)
     this.spawnX = x;
     this.spawnFacing = facing;
     this.reset();
@@ -84,9 +85,9 @@ class Fighter {
     this.vx = 0; this.vy = 0;
     this.pushVel = 0;
     this.facing = this.spawnFacing;
-    this.hp = CFG.MAX_HP;
+    this.hp = this.stats.maxHp;
     this.meter = 0;
-    this.stamina = CFG.MAX_STAMINA;
+    this.stamina = this.stats.maxStamina;
     this.state = 'idle';
     this.f = 0;
     this.move = null; this.moveName = null;
@@ -254,8 +255,8 @@ class Fighter {
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
       const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
-      if (this.state === 'run') this.attackDrift = this.runDir * CFG.RUN_SPEED * CFG.MOMENTUM_KEEP;
-      else if (this.state === 'walk') this.attackDrift = heldDir * CFG.WALK_SPEED * CFG.MOMENTUM_KEEP;
+      if (this.state === 'run') this.attackDrift = this.runDir * this.stats.runSpeed * CFG.MOMENTUM_KEEP;
+      else if (this.state === 'walk') this.attackDrift = heldDir * this.stats.walkSpeed * CFG.MOMENTUM_KEEP;
       else if (this.state !== 'attack') this.attackDrift = 0;
       if (mv.slide) this.attackDrift = (this.runDir || this.facing) * CFG.SLIDE_TACKLE_SPEED;   // the slide tackle glides hard
     }
@@ -655,7 +656,7 @@ class Fighter {
     if (this.groundpoundCD > 0) this.groundpoundCD--;
 
     const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip', 'crumple', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled']);
-    if (!NO_REGEN.has(this.state)) this.stamina = Math.min(CFG.MAX_STAMINA, this.stamina + CFG.STAMINA_REGEN);
+    if (!NO_REGEN.has(this.state)) this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen);
 
     // Parry timing: how *fresh* is the block? Holding back forever never parries.
     const away = Math.sign(this.x - opp.x) || -this.facing;
@@ -674,9 +675,9 @@ class Fighter {
         // swap directly (both neutral) but keep the sprite contract: f restarts per anim
         if (this.state !== next) { this.state = next; this.f = 0; }
         if (dir !== 0) {
-          this.x += dir * CFG.WALK_SPEED;
+          this.x += dir * this.stats.walkSpeed;
           // walking them down refuels faster than turtling — aggression is rewarded
-          if (dir === this.facing) this.stamina = Math.min(CFG.MAX_STAMINA, this.stamina + CFG.ADVANCE_REGEN_BONUS);
+          if (dir === this.facing) this.stamina = Math.min(this.stats.maxStamina, this.stamina + CFG.ADVANCE_REGEN_BONUS);
         }
         break;
       }
@@ -702,20 +703,20 @@ class Fighter {
         if (this.tryActions(opp, game)) break;
         const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
         if (heldDir !== this.runDir) { this.setState('idle'); break; }
-        this.x += this.runDir * CFG.RUN_SPEED;
+        this.x += this.runDir * this.stats.runSpeed;
         break;
       }
       case 'backdash': {
-        this.x += this.bdDir * CFG.BACKDASH_SPEED * Math.max(0, 1 - this.f / CFG.BACKDASH_FRAMES);
-        if (this.f >= CFG.BACKDASH_FRAMES) this.setState('idle');
+        this.x += this.bdDir * this.stats.backdashSpeed * Math.max(0, 1 - this.f / this.stats.backdashFrames);
+        if (this.f >= this.stats.backdashFrames) this.setState('idle');
         break;
       }
       case 'prejump': {
         if (this.f >= CFG.PREJUMP_FRAMES) {
           const dir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
           const toward = Math.sign(opp.x - this.x) || this.facing;
-          this.vx = dir === 0 ? 0 : dir * (dir === toward ? CFG.JUMP_DRIFT_FWD : CFG.JUMP_DRIFT_BACK);
-          this.vy = CFG.JUMP_VEL;
+          this.vx = dir === 0 ? 0 : dir * (dir === toward ? this.stats.jumpDriftFwd : this.stats.jumpDriftBack);
+          this.vy = this.stats.jumpVel;
           this.usedAirAttack = false;
           this.setState('air');
           playSfx('jump');
@@ -1143,7 +1144,7 @@ class Fighter {
       case 'gassed': {
         // Wide open: no attacks, no block, no jump — just a slow desperate shuffle.
         const dir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
-        this.x += dir * CFG.WALK_SPEED * 0.4;
+        this.x += dir * this.stats.walkSpeed * 0.4;
         if (this.f % 14 === 1) {   // sweat drips (logic-rate, freeze-gated — not in render)
           Particles.push({ x: this.x, y: this.y - CFG.BODY_H * 0.9, vx: this.facing, vy: -1.5, life: 16, maxLife: 16, color: '#4fc3f7', size: 3, grav: 0.2 });
         }
@@ -1176,9 +1177,9 @@ class Fighter {
     if (this.isAirborne()) {
       // side spike: gravity SUPPRESSED (not zero) for the flat-flight window → flies straight, sags slightly
       if (this.sideSpikeFrames > 0) {
-        this.vy += CFG.GRAVITY * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--;
+        this.vy += this.stats.gravity * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--;
         spawnSideTrail(this.x, this.y - CFG.BODY_H * 0.5);   // a particle trail streaming off the flying body
-      } else this.vy += CFG.GRAVITY;
+      } else this.vy += this.stats.gravity;
       this.x += this.vx;
       this.y += this.vy;
       if (this.y >= CFG.FLOOR_Y && this.vy >= 0) {

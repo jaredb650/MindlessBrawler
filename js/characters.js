@@ -14,6 +14,21 @@ const CHARACTERS = {
     id: 'brawler',
     name: 'BRAWLER',
     moves: MOVES,        // the shared MMA moveset (js/moves.js)
+    // physical "feel" — the bruiser's values ARE the original CFG constants (so nothing changes).
+    // A 2nd character overrides these (e.g. less HP, faster, less-floaty jumps).
+    stats: {
+      maxHp: CFG.MAX_HP,
+      maxStamina: CFG.MAX_STAMINA,
+      staminaRegen: CFG.STAMINA_REGEN,
+      walkSpeed: CFG.WALK_SPEED,
+      runSpeed: CFG.RUN_SPEED,
+      jumpVel: CFG.JUMP_VEL,
+      jumpDriftFwd: CFG.JUMP_DRIFT_FWD,
+      jumpDriftBack: CFG.JUMP_DRIFT_BACK,
+      gravity: CFG.GRAVITY,
+      backdashSpeed: CFG.BACKDASH_SPEED,
+      backdashFrames: CFG.BACKDASH_FRAMES,
+    },
     // input → move name (resolved by the data-driven resolve* helpers in moves.js).
     // dirCat ∈ up|down|forward|back|neutral; `neutral` is the fallback for any unlisted dir.
     neutralMap: {

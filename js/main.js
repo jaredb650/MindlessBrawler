@@ -531,7 +531,7 @@ function resetMatch() {
   FloatTexts.length = 0;
   clearStains();   // fresh arena each fight (clears decals + the ring-buffer cursor)
   Heads.length = 0;   // clear severed heads
-  UIState.trail = [CFG.MAX_HP, CFG.MAX_HP];
+  UIState.trail = [game.fighters[0].stats.maxHp, game.fighters[1].stats.maxHp];
   game.hitstop = 0;
   game.superFreeze = 0;
   game.superWho = null;

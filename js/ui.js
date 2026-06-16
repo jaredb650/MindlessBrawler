@@ -30,16 +30,16 @@ function drawUI(ctx, game) {
   ctx.textBaseline = 'alphabetic';
 
   // health
-  drawBar(ctx, 40, 28, barW, barH, UIState.trail[0] / CFG.MAX_HP, '#ff8a65', '#2a2a33', true);
-  drawBar(ctx, 40, 28, barW, barH, f1.hp / CFG.MAX_HP, '#ffd54f', 'rgba(0,0,0,0)', true);
-  drawBar(ctx, W - 40 - barW, 28, barW, barH, UIState.trail[1] / CFG.MAX_HP, '#ff8a65', '#2a2a33', false);
-  drawBar(ctx, W - 40 - barW, 28, barW, barH, f2.hp / CFG.MAX_HP, '#ffd54f', 'rgba(0,0,0,0)', false);
+  drawBar(ctx, 40, 28, barW, barH, UIState.trail[0] / f1.stats.maxHp, '#ff8a65', '#2a2a33', true);
+  drawBar(ctx, 40, 28, barW, barH, f1.hp / f1.stats.maxHp, '#ffd54f', 'rgba(0,0,0,0)', true);
+  drawBar(ctx, W - 40 - barW, 28, barW, barH, UIState.trail[1] / f2.stats.maxHp, '#ff8a65', '#2a2a33', false);
+  drawBar(ctx, W - 40 - barW, 28, barW, barH, f2.hp / f2.stats.maxHp, '#ffd54f', 'rgba(0,0,0,0)', false);
 
   // stamina (thin, under health) — flashes when gassed
   const st1 = f1.state === 'gassed' && f1.f % 10 < 5 ? '#ff5252' : '#9ccc65';
   const st2 = f2.state === 'gassed' && f2.f % 10 < 5 ? '#ff5252' : '#9ccc65';
-  drawBar(ctx, 40, 60, barW * 0.7, 8, f1.stamina / CFG.MAX_STAMINA, st1, '#2a2a33', true);
-  drawBar(ctx, W - 40 - barW * 0.7, 60, barW * 0.7, 8, f2.stamina / CFG.MAX_STAMINA, st2, '#2a2a33', false);
+  drawBar(ctx, 40, 60, barW * 0.7, 8, f1.stamina / f1.stats.maxStamina, st1, '#2a2a33', true);
+  drawBar(ctx, W - 40 - barW * 0.7, 60, barW * 0.7, 8, f2.stamina / f2.stats.maxStamina, st2, '#2a2a33', false);
 
   // names
   ctx.font = 'bold 16px system-ui, sans-serif';
@@ -88,7 +88,7 @@ function drawUI(ctx, game) {
   // execution prompt: they're gassed, nearly dead, and in reach
   if (!game.execution) {
     for (const [me, them] of [[f1, f2], [f2, f1]]) {
-      if (them.state === 'gassed' && them.hp > 0 && them.hp <= CFG.MAX_HP * CFG.EXECUTE_HP_FRAC
+      if (them.state === 'gassed' && them.hp > 0 && them.hp <= them.stats.maxHp * CFG.EXECUTE_HP_FRAC
           && Math.abs(them.x - me.x) <= CFG.EXECUTE_RANGE * 2 && game.frame % 14 < 9) {
         ctx.fillStyle = '#ff5252';
         ctx.font = 'bold 28px system-ui, sans-serif';
