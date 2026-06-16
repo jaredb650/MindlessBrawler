@@ -39,6 +39,7 @@ const SOUND_MANIFEST = {
   movement:  ['jump', 'dash', 'getup', 'tech'],
   grapples:  ['throw_grab', 'throw_slam', 'clinch_break'],
   stamina:   ['gassed'],
+  crumple:   ['crumple', 'buckle'],
   super:     ['super_freeze', 'explosion', 'meter_ready'],
   counter:   ['counter_slip', 'counter_hit'],
   execution: ['exec_grab', 'exec_punch', 'exec_riser', 'exec_blast'],

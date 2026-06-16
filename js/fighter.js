@@ -393,6 +393,7 @@ class Fighter {
     this.stunFrames = frames;
     this.crumpleKind = kind || 'stand';
     this.vx = 0; this.vy = 0;
+    playSfx(this.crumpleKind === 'kneel' ? 'buckle' : 'crumple');   // bone-break on a buckle, hurt grunt on a body-shot crumple
   }
 
   // Shared SPIKE reaction (diving elbow; reusable by any future spike). Slams an

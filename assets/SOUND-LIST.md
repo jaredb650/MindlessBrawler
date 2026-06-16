@@ -74,6 +74,12 @@ counter_hit · ko.
 |---|---|
 | `gassed` | running out of gas — heavy exhausted exhale/pant |
 
+### Crumple stuns
+| file | sound |
+|---|---|
+| `crumple` | a body-shot CRUMPLE (liver shot / spinning elbow) — a pained hurt grunt |
+| `buckle` | the calf-kick BUCKLE to one knee — a sharp bone-crack |
+
 ### Super (Mech Cannon)
 | file | sound |
 |---|---|
