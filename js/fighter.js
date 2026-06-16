@@ -125,6 +125,7 @@ class Fighter {
     this.swordWind = false;    // super-combo finisher: blade in the windup (raised) vs a live swipe (render)
     this.decapitated = false;  // sword-finisher KO: head detached → body renders headless
     this.punchChain = 0;       // magic punch combo progress: jab(1)→cross(2)→uppercut(3)→cross(4)
+    this.punchChainTimer = 0;  // grace frames the chain stays armed between links (input-driven, decays in update)
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
@@ -232,9 +233,19 @@ class Fighter {
   startMove(name, isAir = false) {
     const mv = MOVES[name];
     this.stamina = Math.max(0, this.stamina - mv.stamina);
-    // (MAGIC PUNCH COMBO chain is tracked on the CLEAN HIT in combat.js, not on input —
-    // so it's earned without a cancel-timing race. A non-jab move start can't ADVANCE it,
-    // but it shouldn't drop it mid-string either; the hit-tracker + NEUTRAL_RESET own that.)
+    // MAGIC PUNCH COMBO — drive the chain off the INPUT SEQUENCE (jab→cross→uppercut→cross), not
+    // hit-confirm: the moment it reaches 2 the magnet (attack-case) yanks you into range so every
+    // remaining link CONNECTS on its own — that's the "inescapable latch". Any off-sequence start
+    // breaks it; a grace timer (update()) lets it survive loose timing between links but expires so
+    // a stale jab can't arm it later. The combat.js override only fires on a CLEAN hit, so blocking
+    // the string still defends — you just get latched, not comboed.
+    const pc = this.punchChain;
+    this.punchChain = name === 'jab' ? 1
+      : (name === 'cross' && pc === 1) ? 2
+      : (name === 'uppercut' && pc === 2) ? 3
+      : (name === 'cross' && pc === 3) ? 4
+      : 0;
+    if (this.punchChain > 0) this.punchChainTimer = CFG.PUNCHCHAIN_GRACE;
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
@@ -616,11 +627,10 @@ class Fighter {
     if (this.hitFlash > 0) this.hitFlash--;   // universal contact-flash timer (set in the receive* funnels)
     if (this.counterCD > 0) this.counterCD--;
 
-    // MAGIC PUNCH COMBO lifetime: combat.js advances the chain on each clean hit, but it only
-    // stays armed as long as the VICTIM's combo does. It survives us idling between links — yet
-    // the instant the opponent is no longer in a hit state (combo dropped, or never started) it
-    // clears, so a stale chain can't latch the magnet onto a fresh poke.
-    if (this.punchChain > 0 && !opp.inHitState()) this.punchChain = 0;
+    // MAGIC PUNCH COMBO lifetime: the chain is armed by the input sequence (startMove) and held
+    // by a grace timer so loose timing between links survives — but it expires, so a lone jab can't
+    // arm the magnet on a much-later poke. An off-sequence move start zeroes it directly.
+    if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
 
     // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
     // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.

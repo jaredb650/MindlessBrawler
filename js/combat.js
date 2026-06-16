@@ -208,16 +208,8 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // ── MAGIC PUNCH COMBO (jab→cross→uppercut→cross, chain>=2) ──
   // Every hit (incl. the uppercut) stays GROUNDED and RE-STUNS — no launch, so the string is
   // inescapable AND loops: after the last hit they're standing in hitstun, ready for the next combo.
-  // Track the chain on THIS clean hit (earned — a whiff never reaches here, a block took the
-  // early-return path above, any off-sequence hit resets it). No cancel-timing race.
-  if (live) {
-    const m = move.anim;
-    att.punchChain = m === 'jab' ? 1
-      : (m === 'cross' && att.punchChain === 1) ? 2
-      : (m === 'uppercut' && att.punchChain === 2) ? 3
-      : (m === 'cross' && att.punchChain === 3) ? 4
-      : 0;
-  }
+  // The chain is armed by the INPUT sequence (fighter.js startMove) + the magnet pulls each link
+  // into range; here we only honor it on a real CLEAN hit, so blocking the string still defends.
   if (live && att.punchChain >= 2 && att.state === 'attack'
       && !vic.isAirborne() && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     // grounded, normal-state victim only — airborne/downed/special bodies fall through to their

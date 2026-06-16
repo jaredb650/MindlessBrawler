@@ -66,6 +66,7 @@ const CFG = {
   MAGNET_DIST: 76,              // px the attacker latches at (just outside the pushbox so bodies don't separate)
   MAGNET_PULL: 0.5,            // how hard it snaps to that range each frame
   MAGNET_HITSTUN: 15,          // re-stun on each magic-combo hit — covers the next link → inescapable
+  PUNCHCHAIN_GRACE: 50,        // frames the magic-combo input chain stays armed between links (loose-timing leniency)
   CANCEL_WINDOW_PAD: 12,        // frames past a move's active window you can still chain-cancel (flow leniency)
 
   // Defense
