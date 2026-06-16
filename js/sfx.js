@@ -25,6 +25,7 @@ const SFX = {
   musicVol: 0.45,       // music bus
   pitchVary: 0.06,      // ±6% random playbackRate on every sfx → no two hits sound identical
   throttleMs: 32,       // don't re-stack the SAME sound faster than this
+  gain: { hit_heavy: 0.8 },   // per-sound volume trim (tune by ear): hit_heavy was too loud → -20%
   ctx: null,            // AudioContext (lazy)
   masterGain: null,     // master GainNode → destination
   buffers: {},          // name → AudioBuffer | null (missing) | Promise (decoding)
@@ -91,14 +92,15 @@ function _loadBuffer(name) {
   return p;
 }
 
-function _spawn(buf, opts) {
+function _spawn(name, buf, opts) {
   const c = SFX.ctx;
   const src = c.createBufferSource();
   src.buffer = buf;
   const pv = (opts && opts.pitch != null) ? opts.pitch : SFX.pitchVary;
   src.playbackRate.value = 1 + (Math.random() - 0.5) * 2 * pv;
+  const sg = (SFX.gain[name] != null) ? SFX.gain[name] : 1;   // per-sound trim (tune by ear in SFX.gain)
   const g = c.createGain();
-  g.gain.value = Math.max(0, (opts && opts.vol != null ? opts.vol : 1) * SFX.sfxVol);
+  g.gain.value = Math.max(0, (opts && opts.vol != null ? opts.vol : 1) * SFX.sfxVol * sg);
   src.connect(g); g.connect(SFX.masterGain);
   src.start();
 }
@@ -114,7 +116,7 @@ function playSfx(name, opts) {
   const buf = SFX.buffers[name];
   if (buf && !buf.then) {                     // a decoded AudioBuffer (not a Promise, not null)
     SFX.last[name] = now;
-    _spawn(buf, opts);
+    _spawn(name, buf, opts);
   } else if (buf === undefined) {
     _loadBuffer(name);                        // kick a decode for next time (don't play late)
   }
