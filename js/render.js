@@ -7,6 +7,38 @@
 const Particles = [];
 const FloatTexts = [];
 const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
+const Heads = [];        // severed heads — physics objects that fly, bounce, roll (decapitation KO)
+
+// A severed head launched off the body — bounces, rolls, bleeds, settles on the floor.
+function spawnHead(x, y, vx, vy, skin, color) {
+  Heads.push({ x, y, vx, vy, rot: (Math.random() - 0.5) * 0.6, vrot: (Math.random() - 0.5) * 0.5, skin, color, rest: false });
+  if (Heads.length > 6) Heads.shift();
+}
+function updateHeads() {
+  for (const h of Heads) {
+    if (h.rest) continue;
+    h.x += h.vx; h.y += h.vy; h.vy += 0.6; h.rot += h.vrot;
+    if (h.y < CFG.FLOOR_Y - 24 && Math.random() < 0.4) spawnBlood(h.x, h.y + 8, Math.sign(h.vx) || 0, 1);   // dripping in the air
+    if (h.x < CFG.WALL_L + 14) { h.x = CFG.WALL_L + 14; h.vx = -h.vx * 0.4; }
+    if (h.x > CFG.WALL_R - 14) { h.x = CFG.WALL_R - 14; h.vx = -h.vx * 0.4; }
+    if (h.y >= CFG.FLOOR_Y - 8) {
+      h.y = CFG.FLOOR_Y - 8;
+      if (h.vy > 2.5) { h.vy = -h.vy * 0.42; h.vx *= 0.7; spawnBlood(h.x, CFG.FLOOR_Y, Math.sign(h.vx) || 1, 8); spawnStain(h.x, CFG.FLOOR_Y + 1, false); }
+      else { h.vy = 0; h.vx *= 0.86; h.vrot *= 0.78; if (Math.abs(h.vx) < 0.4 && Math.abs(h.vrot) < 0.02) { h.vx = 0; h.vrot = 0; h.rest = true; spawnStain(h.x, CFG.FLOOR_Y + 1, false); } }
+    }
+  }
+}
+function drawHeads(ctx) {
+  for (const h of Heads) {
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.rot);
+    ctx.fillStyle = '#7b241c'; ctx.beginPath(); ctx.ellipse(0, 12, 9, 6, 0, 0, Math.PI * 2); ctx.fill();   // ragged bloody stump under the chin
+    ball(ctx, 0, 0, 15, h.skin);
+    drawFace(ctx, 0, 0, -1, true, false);   // dead face (X eyes)
+    ctx.restore();
+  }
+}
 
 // `power` (hits only): 0 light · 1 med · 2 heavy → scales the burst so heavies READ heavy.
 // Callers that omit it default to med, so existing spark calls look ~unchanged.
@@ -246,6 +278,7 @@ function drawSword(ctx, hx, hy, f, winding) {
 
 // FX run even during hitstop — the freeze is for bodies, not sparks.
 function updateFx() {
+  updateHeads();
   for (let i = Particles.length - 1; i >= 0; i--) {
     const p = Particles[i];
     p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--;
@@ -387,8 +420,8 @@ function drawFighter(ctx, f, game) {
     capsule(ctx, -20, -10, -38, 6, 11, dark);          // rear arm
     capsule(ctx, -14, 8, 16, -8, 30, body);            // torso
     capsule(ctx, 12, 14, 30, 28, 13, body);            // front leg
-    ball(ctx, 28, -16, 15, skin);                       // head
-    drawFace(ctx, 28, -16, 0.6, dead, flash);
+    if (f.decapitated) { ctx.fillStyle = '#7b241c'; ctx.beginPath(); ctx.ellipse(28, -16, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); }   // headless — bloody stump
+    else { ball(ctx, 28, -16, 15, skin); drawFace(ctx, 28, -16, 0.6, dead, flash); }
     capsule(ctx, 8, -14, 28, 4, 11, body);             // front arm
     if (f.pendingElectric > 0) { drawElectricArcs(ctx, 6, 4, 40, 4); drawElectricArcs(ctx, 22, -14, 26, 3); }   // electricity wreathing a side-spiked body in flight
     ctx.restore();
@@ -418,8 +451,8 @@ function drawFighter(ctx, f, game) {
     capsule(ctx, -26, -16, -54, -8, 13, dark);          // far leg sprawled
     capsule(ctx, -22, -18, 26, -20, 28, body);          // torso
     capsule(ctx, -24, -14, -48, -22, 12, body);         // near leg bent up
-    ball(ctx, 44, -24, 15, skin);
-    drawFace(ctx, 44, -24, 0.2, dead, flash);
+    if (f.decapitated) { ctx.fillStyle = '#7b241c'; ctx.beginPath(); ctx.ellipse(44, -24, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); }
+    else { ball(ctx, 44, -24, 15, skin); drawFace(ctx, 44, -24, 0.2, dead, flash); }
     capsule(ctx, 14, -24, 34, -6, 10, body);            // arm flopped
     ctx.restore();
     return;
@@ -431,8 +464,8 @@ function drawFighter(ctx, f, game) {
     ctx.rotate(t * Math.PI / 2 * 0.92);
     capsule(ctx, 0, -8, 4, -76, 30, body);
     capsule(ctx, 2, -76, 6, -132, 32, body);
-    ball(ctx, 8, -150, 15, skin);
-    drawFace(ctx, 8, -150, 0.4, dead, flash);
+    if (f.decapitated) { ctx.fillStyle = '#7b241c'; ctx.beginPath(); ctx.ellipse(8, -150, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); }
+    else { ball(ctx, 8, -150, 15, skin); drawFace(ctx, 8, -150, 0.4, dead, flash); }
     capsule(ctx, 4, -120, 26, -86, 11, body);
     capsule(ctx, 2, -120, -18, -88, 11, dark);
     ctx.restore();
@@ -1299,6 +1332,7 @@ function render(ctx, game, alpha) {
   const [a, b] = game.fighters;
   const order = a.move && !b.move ? [b, a] : [a, b];
   for (const f of order) drawFighter(ctx, f, game);
+  drawHeads(ctx);   // severed heads fly/roll over the bodies
 
   // OVERDRIVE BEAM pours out OVER the fighters for maximum drama (the freeze overlay owns the charge visual)
   for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);

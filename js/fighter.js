@@ -123,6 +123,7 @@ class Fighter {
     this.superKind = 'cannon'; // 'cannon' (neutral) | 'beam' (forward) | 'combo' (back)
     this.comboStrike = 'punch';// super-combo flurry: which strike the current teleport hit shows (render)
     this.swordWind = false;    // super-combo finisher: blade in the windup (raised) vs a live swipe (render)
+    this.decapitated = false;  // sword-finisher KO: head detached → body renders headless
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter

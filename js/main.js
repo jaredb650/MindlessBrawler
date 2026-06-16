@@ -356,6 +356,13 @@ function runSuperComboCine(game, ex) {
     if (data.swipe < CFG.SWORD_SWIPES && ex.f >= data.swordAt) {
       data.swipe++; data.poseF0 = ex.f; att.swordWind = false;   // a real swipe → the slash sweep
       const last = data.swipe >= CFG.SWORD_SWIPES;
+      // TELEPORT to a fresh angle for each slash (left, right, then the killing blow from ABOVE)
+      const side = data.swipe % 2 === 1 ? -1 : 1;
+      att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, data.vicX + side * 84));
+      att.y = last ? CFG.FLOOR_Y - 52 : CFG.FLOOR_Y;
+      att.facing = Math.sign(data.vicX - att.x) || att.facing;
+      spawnElectric(att.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, 5);   // teleport streak off the new spot
+      spawnDust(att.x, CFG.FLOOR_Y, 4);
       const cy = CFG.FLOOR_Y - 110;
       spawnSpark(vic.x, cy + (Math.random() - 0.5) * 70, 'parry');   // bright slash flash
       spawnBlood(vic.x, cy, att.facing, last ? 44 : 14);
@@ -366,13 +373,19 @@ function runSuperComboCine(game, ex) {
         vic.hp = Math.max(1, vic.hp - Math.round(data.startHp * 0.12));
         data.swordAt = ex.f + CFG.SWORD_SWIPE_FRAMES;
       } else {
-        // FINISH HIM — the kill (logicStep's KO block fires slow-mo + flash next frame)
+        // FINISH HIM — DECAPITATION: the head flies off as a physics object, body goes headless
         vic.hp = 0;
-        vic.setLaunched(att.facing * 13, -11, true); vic.noTech = true;
+        vic.setLaunched(att.facing * 9, -8, true); vic.noTech = true;
+        vic.decapitated = true;
+        const hx = vic.x, hy = CFG.FLOOR_Y - CFG.BODY_H + 14;
+        spawnHead(hx, hy, att.facing * (10 + Math.random() * 7), -14 - Math.random() * 4, '#e8c39e', vic.color);
+        spawnBlood(hx, hy + 14, att.facing, 54);    // the neck geyser
+        spawnBlood(hx, hy + 14, -att.facing, 26);
+        spawnSpark(hx, hy, 'parry');
         att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
         game.comboKill = true;
         game.cine = null;
-        pushFeed('FINISHED!!', att.color);
+        pushFeed('DECAPITATED!!', att.color);
       }
     }
   }
@@ -393,6 +406,7 @@ function resetMatch() {
   Particles.length = 0;
   FloatTexts.length = 0;
   clearStains();   // fresh arena each fight (clears decals + the ring-buffer cursor)
+  Heads.length = 0;   // clear severed heads
   UIState.trail = [CFG.MAX_HP, CFG.MAX_HP];
   game.hitstop = 0;
   game.superFreeze = 0;
