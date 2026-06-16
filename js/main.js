@@ -192,8 +192,8 @@ function runSuplexCine(game, ex) {
   }
 }
 // GROUND & POUND entry: mount a DOWNED opponent and hand BOTH bodies to the shared
-// canned-cinematic harness (kind:'groundpound'). NON-lethal — the flurry drains the
-// victim's STAMINA only (hp is never touched). Sets the attacker's re-mount cooldown.
+// canned-cinematic harness (kind:'groundpound'). The flurry drains the victim's
+// STAMINA and deals HP (can KO). Sets the attacker's re-mount cooldown.
 function startGroundPound(att, vic, game) {
   att.groundpoundCD = CFG.GROUNDPOUND_COOLDOWN;
   att.setState('gpmount');
@@ -204,7 +204,7 @@ function startGroundPound(att, vic, game) {
   pushFeed('MOUNT!', att.color);
 }
 
-// Ground & Pound: mount → 4 hammerfists that DRAIN STAMINA (never HP — non-lethal),
+// Ground & Pound: mount → 4 hammerfists that DRAIN STAMINA + deal HP (can KO),
 // then dismount and re-seat the victim DOWNED on the floor for oki (true okizeme).
 function runGroundPoundCine(game, ex) {
   const { att, vic } = ex;
@@ -214,16 +214,26 @@ function runGroundPoundCine(game, ex) {
   } else if (ex.f <= CFG.GP_MOUNT + CFG.GP_FLURRY) {
     const t = ex.f - CFG.GP_MOUNT;
     if (t % CFG.GP_BEAT === 1) {   // 4 hammerfists across the flurry
-      vic.stamina = Math.max(0, vic.stamina - CFG.GROUNDPOUND_DRAIN_PER_HIT);   // NON-lethal: stamina only
-      spawnSpark(vic.x, CFG.FLOOR_Y - 36 - Math.random() * 14, 'hit');
+      vic.stamina = Math.max(0, vic.stamina - CFG.GROUNDPOUND_DRAIN_PER_HIT);
+      vic.hp -= CFG.GROUNDPOUND_DMG_PER_HIT;                                     // now it HURTS
+      vic.hitFlash = CFG.HIT_FLASH;                                             // white pop per hammerfist
+      spawnSpark(vic.x, CFG.FLOOR_Y - 36 - Math.random() * 14, 'hit', 1);
+      spawnBlood(vic.x, CFG.FLOOR_Y - 40, att.facing, 4);
       game.shake = Math.max(game.shake, 4);
       game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_LIGHT);
       playSfx('hit_med');
       playSfx('body_blow');
+      if (vic.hp <= 0) {   // a hammerfist FINISHED them → dismount + KO (logicStep's KO block fires next frame)
+        vic.hp = 0;
+        att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+        vic.setLaunched(att.facing * 4, -7, true); vic.noTech = true;
+        spawnBlood(vic.x, CFG.FLOOR_Y - 70, att.facing, 22);
+        game.cine = null;
+      }
     }
   } else if (ex.f >= CFG.GP_MOUNT + CFG.GP_FLURRY + CFG.GP_OUT) {
     // dismount → attacker recovers; victim re-seated DOWNED with a fresh floor timer
-    // so the knockdown game continues (true oki). NON-lethal: hp untouched.
+    // so the knockdown game continues (true oki) — if they survived the flurry.
     att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
     vic.setState(vic.stamina <= 0 ? 'gassed' : 'downed');
     spawnDust(vic.x, CFG.FLOOR_Y, 8);

@@ -96,7 +96,7 @@ const CFG = {
   // Gazelle hook — a leaping lead hook off 2 jabs (forward+P). Launches into the air juggle.
   GAZELLE_LAUNCH_VY: -13,       // launch height of the gazelle hook (between hook's drop and uppercut's -13.5 pop) — starts the air juggle
   GAZELLE_HOP_VX: 6.5,          // forward leap speed of the gazelle-step (seeded into attackDrift, glides/decays through the swing)
-  GAZELLE_HOP_APEX: 64,         // px the body rises at the peak of the grounded leap (cosmetic+spacing; not an air state)
+  GAZELLE_HOP_APEX: 28,         // px the body rises at the leap peak — LOW enough that the hook's hitbox still meets a standing body (was 64: flew clean over the opponent's head)
 
   // Knockdown / ground game — downed bodies are HITTABLE (full damage).
   // Kicks/heavies pop them off the floor for ground juggles; after
@@ -229,10 +229,11 @@ const CFG = {
   EXECUTE_RANGE: 120,
 
   // Ground & Pound — P+K standing over a DOWNED opponent (close) → mount + 4
-  // hammerfists. NON-lethal: drains stamina only, never HP. Re-seats them downed
-  // (true oki). Cooldown stops immediate re-mount looping (must exceed KNOCKDOWN_FRAMES).
+  // hammerfists that DRAIN STAMINA and deal HP (can finish a low body). Re-seats
+  // them downed (true oki) if they survive. Cooldown stops immediate re-mount looping.
   GROUNDPOUND_RANGE: 110,        // must be this close to a downed body to mount (tighter than EXECUTE_RANGE)
   GROUNDPOUND_DRAIN_PER_HIT: 16, // stamina ripped per hammerfist (4 hits → up to 64; can gas them out)
+  GROUNDPOUND_DMG_PER_HIT: 34,   // HP per hammerfist (4 hits → ~136; a finished-off body gets KO'd)
   GROUNDPOUND_COOLDOWN: 70,      // attacker lockout after a pound — can't instantly re-mount the same wakeup (> KNOCKDOWN_FRAMES 55)
   GP_MOUNT: 14,                  // beat 1: seat onto the body (no damage)
   GP_FLURRY: 48,                 // beat 2: the 4-hammerfist window

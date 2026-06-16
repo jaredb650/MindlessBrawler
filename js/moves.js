@@ -54,7 +54,7 @@ const MOVES = {
     anim: 'gazelle', startup: 7, active: 4, recovery: 17,
     damage: 78, hitstun: 0, blockstun: 13, stamina: 8,
     guard: 'mid', kind: 'punch', kbx: 3.5, hitstop: CFG.HITSTOP_ENDER,
-    hitbox: { x: 18, y: -172, w: 80, h: 54 },   // swings high — the leaping hook arcs over the guard line
+    hitbox: { x: 18, y: -156, w: 80, h: 58 },   // a leaping hook to the head — high, but low enough to connect with the lowered hop apex
     launcher: true, launchVy: CFG.GAZELLE_LAUNCH_VY,
     gazelleHop: { vx: CFG.GAZELLE_HOP_VX, apex: CFG.GAZELLE_HOP_APEX },   // grounded-leap arc (read in startMove + attack case)
     heavy: true, popsGround: true, chainOnly: true,
