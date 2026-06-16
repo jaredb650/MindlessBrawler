@@ -1146,8 +1146,9 @@ function drawSkeleton(ctx, P, c) {
   if (L.hair) {
     const hx = P.head.x - L.headR * 0.55;
     if (L.longHair) {
-      capsule(ctx, hx, P.head.y - 4, hx - 7, P.head.y + 30, 8, hairCol);
-      capsule(ctx, hx - 7, P.head.y + 30, hx - 3, P.head.y + 62, 6.5, hairCol);   // long flowing tail
+      capsule(ctx, hx, P.head.y - 4, hx - 6, P.head.y + 30, 8.5, hairCol);
+      capsule(ctx, hx - 6, P.head.y + 30, hx - 1, P.head.y + 64, 7, hairCol);
+      capsule(ctx, hx - 1, P.head.y + 64, hx - 7, P.head.y + 98, 5.5, hairCol);   // long flowing tail
     } else {
       capsule(ctx, hx, P.head.y - 2, P.head.x - L.headR * 1.7, P.head.y + 16, 6.5, hairCol);
     }
@@ -1155,15 +1156,21 @@ function drawSkeleton(ctx, P, c) {
   // rear limbs (darker — depth)
   limbIK(ctx, P.sho.x - 6, P.sho.y + 4, P.handR.x, P.handR.y, ARM, P.armBendR, L.armWR, c.dark, 8, c.flash ? '#fff' : shade(L.glove, 0.8));
   limbIK(ctx, P.hip.x - 4, P.hip.y + 4, P.footR.x, P.footR.y, LEG, P.legBendR, L.legWR, c.dark, 8.5, shade(c.boot, 0.85));
-  // torso: pelvis → chest, trunks band
-  capsule(ctx, P.hip.x, P.hip.y, P.sho.x, P.sho.y, L.torsoW, c.body);
-  // female curves (subtle): bust bumping FORWARD off the chest, butt bumping BACK off the hips.
-  // forward = +x in this local space; both are body-colored so they read as one silhouette.
+  // torso: pelvis → chest. female = an HOURGLASS (S-curve side profile: bust bulges forward up
+  // top, waist pinches, butt bulges back at the hips); male = the plain capsule (brawler unchanged).
   if (L.female) {
-    const chx = P.sho.x + (P.hip.x - P.sho.x) * 0.30, chy = P.sho.y + (P.hip.y - P.sho.y) * 0.30;
-    ctx.fillStyle = c.body;
-    ctx.beginPath(); ctx.ellipse(chx + L.torsoW * 0.42, chy + 3, L.torsoW * 0.40, L.torsoW * 0.30, -0.15, 0, Math.PI * 2); ctx.fill();   // bust
-    ctx.beginPath(); ctx.ellipse(P.hip.x - L.torsoW * 0.46, P.hip.y - 3, L.torsoW * 0.42, L.torsoW * 0.36, 0.15, 0, Math.PI * 2); ctx.fill();   // butt
+    const ax = P.sho.x - P.hip.x, ay = P.sho.y - P.hip.y, len = Math.hypot(ax, ay) || 1;
+    const px = -ay / len, py = ax / len;   // perpendicular: +p = FORWARD (+x-ish), -p = back
+    // profile up the torso: [t (hip→sho), frontHalfW, backHalfW] as fractions of torsoW
+    const prof = [[0, 0.34, 0.56], [0.30, 0.26, 0.27], [0.58, 0.37, 0.31], [0.82, 0.56, 0.33], [1, 0.42, 0.42]];
+    ctx.beginPath();
+    for (let i = 0; i < prof.length; i++) { const t = prof[i][0], fw = prof[i][1] * L.torsoW; const cx = P.hip.x + ax * t, cy = P.hip.y + ay * t; const x = cx + px * fw, y = cy + py * fw; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    for (let i = prof.length - 1; i >= 0; i--) { const t = prof[i][0], bw = prof[i][2] * L.torsoW; const cx = P.hip.x + ax * t, cy = P.hip.y + ay * t; ctx.lineTo(cx - px * bw, cy - py * bw); }
+    ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 4.5; ctx.stroke();   // outline behind
+    ctx.fillStyle = c.body; ctx.fill();
+  } else {
+    capsule(ctx, P.hip.x, P.hip.y, P.sho.x, P.sho.y, L.torsoW, c.body);
   }
   // female: a short skirt/coat flare at the hips
   if (L.female) {

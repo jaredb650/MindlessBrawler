@@ -28,6 +28,8 @@ const CHARACTERS = {
       gravity: CFG.GRAVITY,
       backdashSpeed: CFG.BACKDASH_SPEED,
       backdashFrames: CFG.BACKDASH_FRAMES,
+      momentumKeep: CFG.MOMENTUM_KEEP,   // fraction of move speed carried into a strike
+      driftDecay: 0.92,                  // per-frame decay of that attack-slide
     },
     // input → move name (resolved by the data-driven resolve* helpers in moves.js).
     // dirCat ∈ up|down|forward|back|neutral; `neutral` is the fallback for any unlisted dir.
@@ -73,6 +75,8 @@ CHARACTERS.vesper = {
     gravity: CFG.GRAVITY * 1.3,                     // falls harder → far less floaty
     backdashSpeed: CFG.BACKDASH_SPEED * 1.2,        // quick evasive slip
     backdashFrames: CFG.BACKDASH_FRAMES,
+    momentumKeep: 1.0,                              // carries her FULL move speed into a strike (vs 0.6)...
+    driftDecay: 0.95,                               // ...and the slide bleeds off slower → flows into the next attack
   },
 };
 

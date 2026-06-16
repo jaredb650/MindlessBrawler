@@ -264,8 +264,8 @@ class Fighter {
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
       const heldDir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
-      if (this.state === 'run') this.attackDrift = this.runDir * this.stats.runSpeed * CFG.MOMENTUM_KEEP;
-      else if (this.state === 'walk') this.attackDrift = heldDir * this.stats.walkSpeed * CFG.MOMENTUM_KEEP;
+      if (this.state === 'run') this.attackDrift = this.runDir * this.stats.runSpeed * this.stats.momentumKeep;
+      else if (this.state === 'walk') this.attackDrift = heldDir * this.stats.walkSpeed * this.stats.momentumKeep;
       else if (this.state !== 'attack') this.attackDrift = 0;
       if (mv.slide) this.attackDrift = (this.runDir || this.facing) * CFG.SLIDE_TACKLE_SPEED;   // the slide tackle glides hard
     }
@@ -841,7 +841,7 @@ class Fighter {
           if (mv.lungeVx && this.f <= mv.startup) this.x += this.facing * mv.lungeVx;
           // momentum glides through the strike…
           this.x += this.attackDrift;
-          this.attackDrift *= 0.92;
+          this.attackDrift *= this.stats.driftDecay;
           // grounded-leap arc: gazelle rises off the floor and settles by recovery (no air state)
           if (mv.gazelleHop) this.y = CFG.FLOOR_Y - groundLeapY(this.f, mv);
           // …and holding toward keeps you advancing — pressing the attack sips stamina
