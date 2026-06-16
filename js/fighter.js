@@ -133,6 +133,7 @@ class Fighter {
     this.getupDelay = 0;       // frames of delayed-getup extension banked while downed
     this.usedAirAttack = false;
     this.usedAirDash = false;   // one air-dash per jump (Vesper)
+    this.usedDoubleJump = false; // one double jump per airtime (Vesper)
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
@@ -741,12 +742,37 @@ class Fighter {
           this.vy = this.stats.jumpVel;
           this.usedAirAttack = false;
           this.usedAirDash = false;
+          this.usedDoubleJump = false;
           this.setState('air');
           playSfx('jump');
         }
         break;
       }
       case 'air': {
+        // WALL JUMP / DOUBLE JUMP (Vesper) — both eat the JUMP press. A wall jump (near a wall)
+        // kicks her back into the stage and REFRESHES her air options; a double jump is a second
+        // hop. Wall jump wins when she's on a wall.
+        const nearL = this.x <= CFG.WALL_L + CFG.WALL_JUMP_REACH, nearR = this.x >= CFG.WALL_R - CFG.WALL_JUMP_REACH;
+        if (this.char.wallJump && this.pad.pressed.jump && (nearL || nearR) && this.stamina >= CFG.WALL_JUMP_COST) {
+          this.pad.consume('jump');
+          this.vy = this.stats.jumpVel;
+          this.vx = (nearL ? 1 : -1) * CFG.WALL_JUMP_VX;        // kick away from the wall, into the stage
+          this.usedDoubleJump = false; this.usedAirDash = false; this.usedAirAttack = false;   // the wall refreshes everything
+          this.stamina -= CFG.WALL_JUMP_COST;
+          spawnDust(this.x + (nearL ? -10 : 10), this.y - CFG.BODY_H * 0.4, 6);
+          playSfx('jump');
+        } else if (this.char.doubleJump && this.pad.pressed.jump && !this.usedDoubleJump && this.stamina >= CFG.DOUBLE_JUMP_COST) {
+          this.pad.consume('jump');
+          this.usedDoubleJump = true;
+          const jdir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
+          const toward = Math.sign(opp.x - this.x) || this.facing;
+          this.vx = jdir === 0 ? this.vx * 0.4 : jdir * (jdir === toward ? this.stats.jumpDriftFwd : this.stats.jumpDriftBack);
+          this.vy = this.stats.jumpVel * CFG.DOUBLE_JUMP_MULT;
+          this.usedAirAttack = false;   // a fresh jump → you can attack again
+          this.stamina -= CFG.DOUBLE_JUMP_COST;
+          spawnDust(this.x, this.y - CFG.BODY_H * 0.3, 5);
+          playSfx('jump');
+        }
         // AIR-DASH (Vesper): a double-tap in the air blinks her horizontally, once per jump.
         if (this.char.airDash && this.pad.tapDir !== 0 && !this.usedAirDash && this.stamina >= CFG.AIR_DASH_COST) {
           this.usedAirDash = true;

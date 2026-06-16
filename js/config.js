@@ -63,6 +63,12 @@ const CFG = {
   AIR_DASH_VX: 13,              // horizontal blink speed
   AIR_DASH_VY: -2,              // slight lift so it reads as a dash, not a fall
   AIR_DASH_COST: 8,             // stamina
+  // Double jump + wall jump (Vesper, gated on char flags).
+  DOUBLE_JUMP_COST: 6,          // stamina for the second jump
+  DOUBLE_JUMP_MULT: 0.92,       // second jump is a touch weaker than the first
+  WALL_JUMP_VX: 9,              // horizontal kick off the wall
+  WALL_JUMP_REACH: 54,          // how close to a wall counts as "on it"
+  WALL_JUMP_COST: 5,            // stamina; a wall jump REFRESHES her double jump + air-dash
   // BLEED (Vesper's knife DoT): each knife hit adds stacks + refreshes the timer; ticks while it lasts.
   MAX_BLEED: 6,                 // stack cap
   BLEED_DURATION: 150,          // frames a fresh knife hit keeps them bleeding (~2.5s)

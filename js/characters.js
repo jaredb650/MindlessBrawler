@@ -134,6 +134,8 @@ CHARACTERS.vesper = {
   otgKickForward: CHARACTERS.brawler.otgKickForward,
   superMap: CHARACTERS.brawler.superMap,            // TEMP until Phase C (her own supers)
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
+  doubleJump: true,                                 // a second jump in the air
+  wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)
   // physical feel — the rushdown identity: less HP, faster on the ground, snappier/less-floaty jump.
   stats: {
     maxHp: 820,                                     // glass cannon
