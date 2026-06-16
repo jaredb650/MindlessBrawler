@@ -1292,7 +1292,7 @@ function render(ctx, game, alpha) {
   drawStage(ctx);
   drawStains(ctx);   // blood decals on the floor/walls, under the fighters
 
-  for (const f of game.fighters) if (f.state === 'superstart' && f.superKind !== 'beam') drawMech(ctx, f);
+  for (const f of game.fighters) if (f.state === 'superstart' && f.superKind === 'cannon') drawMech(ctx, f);   // mech ONLY for the cannon (not beam/combo)
   for (const p of Projectiles) drawProjectile(ctx, p);
 
   // attacker draws on top
