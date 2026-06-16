@@ -726,7 +726,8 @@ function drawFighter(ctx, f, game) {
       break;
     }
     // SUPER COMBO (attacker): a hard committed strike at each teleport — punch or kick.
-    case 'supercombo': {
+    case 'supercombo':
+    case 'magiccombo': {   // same teleport strike pose; magiccombo is the shorter auto-flurry
       lean(P, 0.44);
       const tgt = f.comboStrike === 'kick' ? { x: 80, y: -96 } : { x: 80, y: -128 };
       strikeTo(P, tgt, f.comboStrike === 'kick' ? 'kick' : 'punch');
@@ -1016,7 +1017,7 @@ function drawFighter(ctx, f, game) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue

@@ -40,7 +40,7 @@ const MOVELIST_R = [
     ['Clinch throw', 'P+K mid-string'],
   ] },
   { title: 'STRING SPECIALS', rows: [
-    ['Magic combo (loop)', 'P  ▶P  ↑P  ▶P'], ['Machine-gun blows', '3 jabs (auto)'],
+    ['Auto-combo (land full string)', 'P ▶P ↑P ▶P'], ['Machine-gun blows', '3 jabs (auto)'],
     ['Overhand (electric)', 'machinegun → ▶ P'], ['Superman punch', 'front kick → ▶ P'],
     ['Liver shot', 'body jab → ↓ P'], ['Gazelle hook', '2 jabs → ▶ P'],
     ['Spinning elbow', 'backfist → ▶ P'], ['Calf kick', 'leg kick → K'],

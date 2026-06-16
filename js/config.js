@@ -298,6 +298,15 @@ const CFG = {
   COMBO_MIN_INTERVAL: 2,        // ...accelerating down to this
   COMBO_ACCEL: 0.5,             // interval shrinks by this each hit
   COMBO_RADIUS: 128,            // how far around the victim the attacker teleports
+  // ── MAGIC PUNCH COMBO auto-flurry (jab→cross→uppercut→cross STARTER → this cinematic) ──
+  MAGIC_COMBO_HITS: 4,          // teleport hits in the automatic payoff combo
+  MAGIC_COMBO_DELAY: 6,         // frames after the final cross lands before the flurry opens
+  MAGIC_COMBO_INTERVAL: 7,      // initial frames between flurry hits...
+  MAGIC_COMBO_MIN_INTERVAL: 3,  // ...accelerating down to this
+  MAGIC_COMBO_ACCEL: 1.5,       // interval shrinks by this each hit
+  MAGIC_COMBO_RADIUS: 116,      // teleport orbit radius around the victim
+  MAGIC_COMBO_DMG: 26,          // damage per teleport hit (4 hits — strong but not a one-touch kill)
+  MAGIC_COMBO_END_HITSTUN: 24,  // hitstun the victim is LEFT standing in (no launch) → loop into more
   SWORD_WINDUP: 22,             // beat to pull the sword after the flurry
   SWORD_SWIPE_FRAMES: 15,       // frames per slash
   SWORD_SWIPES: 3,

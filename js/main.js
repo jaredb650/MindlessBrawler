@@ -391,7 +391,74 @@ function runSuperComboCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine };
+// MAGIC PUNCH COMBO payoff: the player's jab→cross→uppercut→cross STARTER (fighter.js + combat.js)
+// lands its final cross, which hands both bodies here. A short automatic teleport flurry — the
+// attacker blinks around the locked victim landing MAGIC_COMBO_HITS, then LEAVES them standing in
+// hitstun (no launch) so the player can immediately flow into another combo. No KO finisher: if the
+// flurry's damage happens to be lethal it just resolves as a normal launch K.O.
+function startMagicCombo(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 40 + CFG.MAGIC_COMBO_RADIUS, Math.min(CFG.WALL_R - 40 - CFG.MAGIC_COMBO_RADIUS, vic.x));
+  startCine('magiccombo', att, vic, game, {
+    vicX, hits: 0, nextHit: CFG.MAGIC_COMBO_DELAY, interval: CFG.MAGIC_COMBO_INTERVAL, poseF0: 0,
+  });
+  att.setState('magiccombo'); att.comboStrike = 'punch'; att.punchChain = 0;
+  vic.setState('executed');
+  // locked body (cinematic) — clear any lingering side-spike/electric/wall arming so it can't leak
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 6);
+  game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'hit', 2);
+  playSfx('hit_heavy');
+  pushFeed('AUTO-COMBO!!', att.color);
+}
+
+function runMagicComboCine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y;   // pin the victim; the attacker orbits + teleports
+  att.f = Math.max(0, ex.f - data.poseF0);
+
+  if (data.hits < CFG.MAGIC_COMBO_HITS && ex.f >= data.nextHit) {
+    data.hits++;
+    const last = data.hits >= CFG.MAGIC_COMBO_HITS;
+    const side = (data.hits % 2 === 0) ? 1 : -1;          // alternate flanks
+    const aerial = (data.hits % 2 === 0);                 // every other hit from above
+    const r = CFG.MAGIC_COMBO_RADIUS * (0.72 + (data.hits % 2) * 0.2);
+    const ghostX = att.x, ghostY = att.y;                 // afterimage off the vacated spot
+    att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x + side * r));
+    att.y = aerial ? CFG.FLOOR_Y - 68 : CFG.FLOOR_Y;
+    att.facing = Math.sign(vic.x - att.x) || att.facing;
+    att.comboStrike = (data.hits % 2 === 0) ? 'kick' : 'punch';
+    data.poseF0 = ex.f;
+    vic.hp -= CFG.MAGIC_COMBO_DMG;
+    spawnSpark(vic.x + (Math.random() - 0.5) * 44, CFG.FLOOR_Y - 80 - Math.random() * 70, 'hit', 1);
+    spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 5);  // teleport streak off the old spot
+    spawnDust(att.x, CFG.FLOOR_Y, 4);
+    spawnBlood(vic.x, CFG.FLOOR_Y - 100, att.facing, last ? 22 : 8);
+    game.shake = Math.max(game.shake, 4 + data.hits);
+    game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 4);
+    playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
+    data.interval = Math.max(CFG.MAGIC_COMBO_MIN_INTERVAL, data.interval - CFG.MAGIC_COMBO_ACCEL);
+    data.nextHit = ex.f + Math.round(data.interval);
+    if (vic.hp <= 0) {   // flurry was lethal → plain launch K.O. (no special finisher)
+      vic.hp = 0;
+      vic.setLaunched(att.facing * 7, -11, true); vic.noTech = true;
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      game.cine = null;
+    }
+  } else if (data.hits >= CFG.MAGIC_COMBO_HITS && ex.f >= data.nextHit) {
+    // DONE — reappear beside them and LEAVE them standing in hitstun (no launch) → set up more combos
+    att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * CFG.MAGNET_DIST));
+    att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    vic.setState('hitstun'); vic.stunFrames = CFG.MAGIC_COMBO_END_HITSTUN; vic.vx = 0; vic.vy = 0;
+    vic.comboHits = 0;   // a fresh combo opportunity opens
+    game.hitstop = Math.max(game.hitstop, 4);
+    game.cine = null;
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine };
 
 function runCine(game) {
   const ex = game.cine;

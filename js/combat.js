@@ -194,6 +194,16 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   hitSfx(move);
   pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
 
+  // ── MAGIC PUNCH COMBO payoff ──
+  // The 4th link (final cross) of the jab→cross→uppercut→cross STARTER connecting hands both bodies
+  // to the automatic teleport-flurry cinematic (main.js). Fired BEFORE the KO check so it plays even
+  // when this hit would have been lethal — the cine resolves the kill itself if the flurry finishes it.
+  if (live && att.punchChain >= 4 && att.state === 'attack'
+      && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startMagicCombo(att, vic, game);   // clears att.punchChain
+    return;
+  }
+
   if (vic.hp <= 0) {
     // A primed just-frame overhand ALWAYS plays the Flatliner cinematic, even when its
     // own damage was lethal — otherwise the signature finisher silently downgrades to
@@ -205,11 +215,11 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
-  // ── MAGIC PUNCH COMBO (jab→cross→uppercut→cross, chain>=2) ──
-  // Every hit (incl. the uppercut) stays GROUNDED and RE-STUNS — no launch, so the string is
-  // inescapable AND loops: after the last hit they're standing in hitstun, ready for the next combo.
-  // The chain is armed by the INPUT sequence (fighter.js startMove) + the magnet pulls each link
-  // into range; here we only honor it on a real CLEAN hit, so blocking the string still defends.
+  // ── MAGIC PUNCH COMBO starter glue (the middle links: cross @2, uppercut @3) ──
+  // These stay GROUNDED and re-stun instead of launching, so the 4-move starter reliably connects
+  // all the way to its final cross (which fired the auto-combo above at chain 4). The chain is armed
+  // by the INPUT sequence (fighter.js startMove) + the magnet pulls each link into range; honored
+  // only on a real CLEAN hit, so blocking the string still defends. chain 4 already returned above.
   if (live && att.punchChain >= 2 && att.state === 'attack'
       && !vic.isAirborne() && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     // grounded, normal-state victim only — airborne/downed/special bodies fall through to their
