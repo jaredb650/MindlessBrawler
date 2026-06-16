@@ -86,12 +86,14 @@ counter_hit · ko.
 |---|---|
 | `grunt_1` `grunt_2` | a fighter's pained/exertion grunt — picked at random on a meaty hit |
 
-### Super (Mech Cannon)
+### Super (Mech Cannon = neutral+super · OVERDRIVE BEAM = forward+super)
 | file | sound |
 |---|---|
-| `super_freeze` | activation — cinematic power-up charge/whoosh |
-| `explosion` | the 20mm shell / blast — heavy explosion boom |
+| `super_freeze` | cannon activation — cinematic power-up charge/whoosh |
+| `explosion` | the 20mm shell / blast — heavy explosion boom (also layered on the beam blast-out + detonation) |
 | `meter_ready` | meter hits full — rising "ready" chime |
+| `beam_activate` | ✅ beam activation — electric twinkle as it charges |
+| `beam_fire` | ✅ beam blast-out — layered on top of `explosion` when the beam erupts |
 
 ### Counter
 | file | sound |
