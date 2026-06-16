@@ -83,10 +83,11 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     vic.hp -= dmg;
     if (move.staminaDrain) vic.stamina = Math.max(0, vic.stamina - move.staminaDrain);
     att.meter = Math.min(CFG.MAX_METER, att.meter + dmg * CFG.METER_PER_DAMAGE);
-    if (live) { att.moveHitDone = true; att.madeContact = true; }
+    if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
     game.hitstop = Math.max(game.hitstop, move.hitstop);
-    if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
-    spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+    const cpw = move.hitstop >= CFG.HITSTOP_ENDER ? 2 : move.hitstop >= CFG.HITSTOP_MED ? 1 : 0;
+    game.shake = Math.max(game.shake, cpw === 2 ? CFG.SHAKE_HEAVY : cpw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
+    spawnSpark(contactPoint.x, contactPoint.y, 'hit', cpw);
     if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
     hitSfx(move);
     pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);
@@ -185,8 +186,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   if (meterBefore < CFG.MAX_METER && att.meter >= CFG.MAX_METER) playSfx('meter_ready');
   if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }   // madeHit = a CLEAN hit (not block) → only this caps recovery (flow cancel)
   game.hitstop = Math.max(game.hitstop, move.hitstop);
-  if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
-  spawnSpark(contactPoint.x, contactPoint.y, 'hit');
+  const pw = move.hitstop >= CFG.HITSTOP_ENDER ? 2 : move.hitstop >= CFG.HITSTOP_MED ? 1 : 0;   // hit strength → shake + spark scale (so a cross isn't flat, an ender reads heavy)
+  game.shake = Math.max(game.shake, pw === 2 ? CFG.SHAKE_HEAVY : pw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
+  spawnSpark(contactPoint.x, contactPoint.y, 'hit', pw);
   if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
   hitSfx(move);
   pushFeed(MOVE_LABELS[move.anim] || move.anim, att.color);

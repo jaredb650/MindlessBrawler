@@ -142,6 +142,11 @@ const CFG = {
   HITSTOP_ENDER: 16,
   SUPER_FREEZE: 40,
   SHAKE_HEAVY: 7,
+  SHAKE_MED: 3,                 // every solid hit shakes a little — med/light tiers so a cross isn't flat
+  SHAKE_LIGHT: 1.5,
+  HIT_FLASH: 3,                 // frames the body flashes white on a CLEAN contact (universal, frame-locked to the hit)
+  HIT_FLASH_BLOCK: 2,          // shorter white blip on block
+  HIT_VIB: 3,                   // px the freshly-hit body vibrates during the hitstop freeze (a freeze without jitter reads as a dropped frame)
   KO_SLOWMO_FRAMES: 90,
   KO_FLASH: 12,                 // screen-flash frames on EVERY KO (shared KO-juice helper)
   KO_FREEZE: 20,                // KO cinematic: world freezes on black, just white silhouettes, before the launch

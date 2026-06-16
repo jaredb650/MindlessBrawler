@@ -81,6 +81,7 @@ class Fighter {
     this.f = 0;
     this.move = null; this.moveName = null;
     this.moveHitDone = false; this.madeContact = false; this.madeHit = false;
+    this.hitFlash = 0;
     this.stunFrames = 0;
     this.invuln = 0;
     this.backHeldFrames = 0;
@@ -386,8 +387,8 @@ class Fighter {
   }
 
   // ── reactions (combat.js calls these) ──────────────────────
-  receiveBlockstun(frames) { this.setState('blockstun'); this.stunFrames = frames; }
-  receiveHitstun(frames) { this.setState('hitstun'); this.stunFrames = frames; this.vx = 0; this.vy = 0; }
+  receiveBlockstun(frames) { this.setState('blockstun'); this.stunFrames = frames; this.hitFlash = CFG.HIT_FLASH_BLOCK; }
+  receiveHitstun(frames) { this.setState('hitstun'); this.stunFrames = frames; this.vx = 0; this.vy = 0; this.hitFlash = CFG.HIT_FLASH; }
   receiveParriedStagger() { this.setState('parried'); this.stunFrames = CFG.PARRY_ATTACKER_STAGGER; }
   // Shared crumple reaction (liver shot / spinning elbow / calf kick). Long OPEN
   // window held for a guaranteed follow-up, then recovers like hitstun. Stays
@@ -397,6 +398,7 @@ class Fighter {
     this.stunFrames = frames;
     this.crumpleKind = kind || 'stand';
     this.vx = 0; this.vy = 0;
+    this.hitFlash = CFG.HIT_FLASH;
     playSfx(this.crumpleKind === 'kneel' ? 'buckle' : 'crumple');   // bone-break on a buckle, hurt grunt on a body-shot crumple
   }
 
@@ -488,6 +490,7 @@ class Fighter {
 
   setLaunched(vx, vy, freshLaunch) {
     if (freshLaunch) { this.bounced = false; this.noTech = false; }
+    this.hitFlash = CFG.HIT_FLASH;   // OTG pops / launches / KO blasts all flash on contact too
     // Hard guard: a missing/NaN launch velocity must never reach physics — it would
     // NaN the body's position and make it vanish off-screen. Default to a gentle float.
     if (!Number.isFinite(vx)) vx = 0;
@@ -516,6 +519,7 @@ class Fighter {
     this.opp = opp;   // stash so startMove() can re-aim opponent-relative (flight moves) even on a cross-up
     this.f++;
     if (this.invuln > 0) this.invuln--;
+    if (this.hitFlash > 0) this.hitFlash--;   // universal contact-flash timer (set in the receive* funnels)
     if (this.counterCD > 0) this.counterCD--;
     if (this.groundpoundCD > 0) this.groundpoundCD--;
 

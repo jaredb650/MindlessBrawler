@@ -8,7 +8,9 @@ const Particles = [];
 const FloatTexts = [];
 const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
 
-function spawnSpark(x, y, kind) {
+// `power` (hits only): 0 light · 1 med · 2 heavy → scales the burst so heavies READ heavy.
+// Callers that omit it default to med, so existing spark calls look ~unchanged.
+function spawnSpark(x, y, kind, power) {
   const palettes = {
     hit:   ['#ffffff', '#ffb74d', '#ff7043'],
     block: ['#80deea', '#4dd0e1'],
@@ -16,15 +18,18 @@ function spawnSpark(x, y, kind) {
     blood: ['#c0392b', '#e74c3c', '#7b241c'],
   };
   const colors = palettes[kind] || palettes.hit;
-  const n = kind === 'parry' ? 14 : kind === 'hit' ? 10 : 6;
+  const p = (power == null) ? 1 : power;
+  const n = kind === 'parry' ? 14 : kind === 'hit' ? (6 + p * 5) : 6;   // light 6 / med 11 / heavy 16
+  const spMax = kind === 'block' ? 3 : kind === 'hit' ? (4 + p * 3) : 6;
+  const szMax = kind === 'hit' ? (2 + p * 1.5) : 3;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
-    const sp = 2 + Math.random() * (kind === 'block' ? 3 : 6);
+    const sp = 2 + Math.random() * spMax;
     Particles.push({
       x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
       life: 14 + Math.random() * 10, maxLife: 24,
       color: colors[(Math.random() * colors.length) | 0],
-      size: 2 + Math.random() * 3, grav: 0.15,
+      size: 2 + Math.random() * szMax, grav: 0.15,
       blood: kind === 'blood',
     });
   }
@@ -178,8 +183,7 @@ const REAR_HAND_PUNCH = new Set(['cross', 'uppercut', 'overhand']);
 // Skeleton in local space: feet at y=0, +x = forward.
 function drawFighter(ctx, f, game) {
   const key = f.animKey();
-  const flash = ((f.state === 'hitstun' || f.state === 'launched' || f.state === 'fallheavy') && f.f <= 2)
-    || (f.state === 'wallsplat' && f.f <= 2)
+  const flash = (f.hitFlash > 0)   // universal: every clean contact (hit/block/crumple/OTG/launch) flashes white, frame-locked to the hit
     || (f.state === 'executed' && f.f > 20 && f.f % 6 < 2)
     || game.koFreeze > 0;   // KO freeze-frame → solid white silhouette
 
@@ -197,7 +201,10 @@ function drawFighter(ctx, f, game) {
   ctx.fill();
 
   ctx.save();
-  ctx.translate(f.x, f.y);
+  // hit vibration: jitter the freshly-hit body during the hitstop freeze so the
+  // frozen beat reads as a violent impact, not a dropped frame.
+  const vib = (game.hitstop > 0 && f.hitFlash > 0) ? (Math.random() - 0.5) * CFG.HIT_VIB : 0;
+  ctx.translate(f.x + vib, f.y);
   if (f.facing === -1) ctx.scale(-1, 1);
   // Spinning moves (back kick / backfist): a VISUAL 360 — flip away during the
   // wind-up, whip back around as the strike extends. Gameplay facing is untouched.
