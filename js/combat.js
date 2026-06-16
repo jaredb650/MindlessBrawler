@@ -300,6 +300,14 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
+  // ── SPIKE (elbow drop / axe kick) vs a STANDING body ──
+  // Drive them straight into the floor with enough energy to BOUNCE → hard, untechable
+  // knockdown + OTG. (Airborne/tumbling victims are spiked in the isAirborne branch above.)
+  if (move.spike != null) {
+    vic.receiveSpike(move.spike, away, game);
+    return;
+  }
+
   // ── GROUND BOUNCE (superman punch) ──
   // A grounded, non-downed victim of a `groundBounce` move is popped UP a little so
   // the EXISTING launched→impact bounce path (fighter.js) fires when they crash back

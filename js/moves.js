@@ -177,7 +177,9 @@ const MOVES = {
     ],
     // noFlowCancel: the chop rides out its FULL recovery on hit — a clean landing
     // doesn't snap it short, so the swing reads as one committed motion.
+    // spike: the heel CHOPS bodies down into the floor (grounded + tumbling) → bounce.
     knockdown: true, heavy: true, popsGround: true, noFlowCancel: true, flyConvert: 'flyknee',
+    spike: CFG.AXEKICK_SPIKE_VY,
   },
   // ←+K: spinning back kick — huge telegraph, huge lunge, huge damage, and the
   // ONE strike that blasts people across the stage. Exempt from flow cancel:

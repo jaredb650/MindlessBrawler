@@ -197,7 +197,8 @@ const CFG = {
   // Elbow drop — down+P in the air: diving elbow that SPIKES an airborne body to the floor.
   ELBOWDROP_VX: 7,                // forward punch of the dive (× facing) — slightly shorter reach than divekick
   ELBOWDROP_VY: 13,               // downward dive speed (positive = down)
-  ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into an airborne victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
+  ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into a victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
+  AXEKICK_SPIKE_VY: 15,           // the axe kick chops bodies DOWN into the floor too (grounded + tumbling) → bounce
 
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
   THROW_RANGE: 120,

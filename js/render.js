@@ -97,6 +97,29 @@ function spawnFloatText(x, y, text, color) {
   FloatTexts.push({ x, y, text, color, life: 50 });
 }
 
+// Downward ENERGY SPIKE — a lance of bright energy driving a body into the floor,
+// then splashing outward along the ground. (elbow drop / axe kick spikes.)
+function spawnSpike(x, dir) {
+  const cols = ['#ffffff', '#b3e5fc', '#80deea', '#ffd54f'];
+  for (let i = 0; i < 18; i++) {           // streaks raining DOWN from chest height into the floor
+    Particles.push({
+      x: x + (Math.random() - 0.5) * 46, y: CFG.FLOOR_Y - 150 + Math.random() * 60,
+      vx: (Math.random() - 0.5) * 3 + (dir || 0) * 1.5, vy: 9 + Math.random() * 12,
+      life: 9 + Math.random() * 7, maxLife: 16,
+      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 3.5, grav: 0.4,
+    });
+  }
+  for (let i = 0; i < 14; i++) {           // ground-impact burst splashing out along the floor
+    const sp = 3 + Math.random() * 8;
+    Particles.push({
+      x, y: CFG.FLOOR_Y - 4,
+      vx: (Math.random() - 0.5) * 2 * sp, vy: -Math.random() * 4,
+      life: 10 + Math.random() * 8, maxLife: 18,
+      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 3, grav: 0.25,
+    });
+  }
+}
+
 // FX run even during hitstop — the freeze is for bodies, not sparks.
 function updateFx() {
   for (let i = Particles.length - 1; i >= 0; i--) {

@@ -320,9 +320,9 @@ class Fighter {
     // Neutral P+K (idle/walk/crouch/run) → the clinch grab. Mid-string P+K is
     // handled in the 'attack' case (→ throwgrab) and is intentionally untouched.
     // A TUMBLING (launched) body is grabbable; only true jump/air-attack states aren't.
-    if (p.pressed.punch && p.pressed.kick && this.stamina > 0
+    if (p.pressed.punch && p.pressed.kick && this.stamina > 0 && opp.hp > 0
         && ['idle', 'walk', 'crouch', 'run'].includes(this.state)
-        && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)) {
+        && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched', 'wallsplat'].includes(opp.state)) {
       // slide INTO the grab with leftover momentum — a walk/dash grab lunges further
       const slide = this.state === 'run' ? CFG.GRAB_SLIDE_RUN : this.state === 'walk' ? CFG.GRAB_SLIDE_WALK : 0;
       p.consume('punch');
@@ -431,8 +431,13 @@ class Fighter {
   receiveSpike(downVy, away, game) {
     this.setLaunched(away * 1.5, downVy, false);   // vy positive = DOWN; no fresh-launch DI on a hard spike
     this.noTech = true;
-    if (game) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
-    spawnDust(this.x, CFG.FLOOR_Y, 12);
+    if (game) {
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    }
+    spawnSpike(this.x, away);                       // downward energy lance + ground burst
+    spawnDust(this.x, CFG.FLOOR_Y, 14);
+    playSfx('body_slam');                           // heavy floor-impact slam
   }
 
   beginThrown(thrower) {
@@ -582,8 +587,10 @@ class Fighter {
         // run + DOWN → SLIDE TACKLE: take the legs out and pop them airborne.
         if (this.pad.held.down && this.stamina > 0) { this.startMove('slidetackle'); break; }
         // run + P/K → a committed dash attack (resolved BEFORE tryActions so the run
-        // commits into the lunge instead of a plain cross/legkick).
-        const dbtn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
+        // commits into the lunge instead of a plain cross/legkick). BUT P+K together is
+        // the dash GRAB — let that fall through to tryActions instead of eating it as a dashpunch.
+        const bothPK = this.pad.pressed.punch && this.pad.pressed.kick;
+        const dbtn = bothPK ? null : (this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null);
         if (dbtn && this.stamina > 0) {
           const dn = resolveDashMove(dbtn);
           if (dn) { this.pad.consume(dbtn); this.startMove(dn); break; }
@@ -801,8 +808,8 @@ class Fighter {
         // the grab reaches on frame 5; miss = long, punishable whiff. A TUMBLING
         // (launched) body is grabbable — snatch them out of the air and slam them.
         if (this.f === 5) {
-          const ok = opp.invuln <= 0
-            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup'].includes(opp.state)
+          const ok = opp.hp > 0 && opp.invuln <= 0
+            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'wallsplat'].includes(opp.state)
             && Math.abs(opp.x - this.x) <= CFG.THROW_RANGE;
           if (ok) {
             this.setState('throwanim');
@@ -864,8 +871,8 @@ class Fighter {
         // mirrors throwgrab: the reach lands on CLINCH_REACH_FRAME or it's a whiff.
         // A tumbling (launched) body counts — only true jump/air states are ungrabbable.
         if (this.f === CFG.CLINCH_REACH_FRAME) {
-          const ok = opp.invuln <= 0
-            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)
+          const ok = opp.hp > 0 && opp.invuln <= 0
+            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched', 'wallsplat'].includes(opp.state)
             && Math.abs(opp.x - this.x) <= CFG.CLINCH_GRAB_RANGE;
           if (ok) { this.beginClinch(opp); break; }
         }
