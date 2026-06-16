@@ -183,7 +183,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   const meterBefore = att.meter;
   att.meter = Math.min(CFG.MAX_METER, att.meter + dmg * CFG.METER_PER_DAMAGE);
   if (meterBefore < CFG.MAX_METER && att.meter >= CFG.MAX_METER) playSfx('meter_ready');
-  if (live) { att.moveHitDone = true; att.madeContact = true; }
+  if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }   // madeHit = a CLEAN hit (not block) → only this caps recovery (flow cancel)
   game.hitstop = Math.max(game.hitstop, move.hitstop);
   if (move.hitstop >= CFG.HITSTOP_ENDER) game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
   spawnSpark(contactPoint.x, contactPoint.y, 'hit');

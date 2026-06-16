@@ -80,7 +80,7 @@ class Fighter {
     this.state = 'idle';
     this.f = 0;
     this.move = null; this.moveName = null;
-    this.moveHitDone = false; this.madeContact = false;
+    this.moveHitDone = false; this.madeContact = false; this.madeHit = false;
     this.stunFrames = 0;
     this.invuln = 0;
     this.backHeldFrames = 0;
@@ -223,6 +223,7 @@ class Fighter {
     this.moveName = name;
     this.moveHitDone = false;
     this.madeContact = false;
+    this.madeHit = false;                    // reset per move — set true only on a CLEAN hit (combat.js), drives the flow cancel
     this.hitCount = 0;
     this.lastHitF = -99;
     this.jabCounted = false;                 // this move's connecting-jab tally (machine-gun chain)
@@ -701,12 +702,15 @@ class Fighter {
           let total = m.startup + m.active + m.recovery;
           // Death on whiff: a WHIFFED wakeup reversal eats bonus recovery — a read on it is a free punish.
           if (this.reversalWhiff && !this.madeContact) total += CFG.WAKEUP_REVERSAL_RECOVERY;
-          // FLOW CANCEL: contact (hit OR block) caps recovery — land something
-          // and you're moving again. Whiff and you eat every recovery frame.
+          // FLOW CANCEL: a clean HIT caps recovery — land it and you're moving again,
+          // so you stay plus and keep pressure. A BLOCK no longer caps recovery: the
+          // blocked move rides its full recovery, so blockstun makes you NEGATIVE on
+          // block (the turn hands back — real frame traps, and lows/overheads finally
+          // matter). Whiff still eats every recovery frame.
           const flowEnd = m.startup + m.active + CFG.FLOW_CANCEL_RECOVERY;
           // noFlowCancel moves (backkick, axe kick) ride out their FULL recovery
-          // even on contact — the spin/chop plays to completion, never snapped short.
-          const flowCancelable = this.madeContact && !m.noFlowCancel;
+          // even on hit — the spin/chop plays to completion, never snapped short.
+          const flowCancelable = this.madeHit && !m.noFlowCancel;
           if (this.f >= total || (flowCancelable && this.f >= flowEnd)) this.endMove();
         }
         break;
