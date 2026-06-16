@@ -40,19 +40,24 @@ const MOVELIST_R = [
     ['Clinch throw', 'P+K mid-string'],
   ] },
   { title: 'STRING SPECIALS', rows: [
-    ['Machine-gun blows', '3 jabs (auto)'], ['Overhand', 'machinegun → ▶ P'],
-    ['Superman punch', 'front kick → ▶ P'], ['Liver shot', 'body jab → ↓ P'],
-    ['Gazelle hook', '2 jabs → ▶ P'], ['Spinning elbow', 'backfist → ▶ P'],
-    ['Calf kick', 'leg kick → K'], ['Tornado kick', 'front kick → ◀ K'],
-    ['Elbow drop', 'juggle: jump → ↓ P'], ['German suplex', 'clinch knee → ↑ P+K'],
+    ['Magic combo (loop)', 'P  ▶P  ↑P  ▶P'], ['Machine-gun blows', '3 jabs (auto)'],
+    ['Overhand (electric)', 'machinegun → ▶ P'], ['Superman punch', 'front kick → ▶ P'],
+    ['Liver shot', 'body jab → ↓ P'], ['Gazelle hook', '2 jabs → ▶ P'],
+    ['Spinning elbow', 'backfist → ▶ P'], ['Calf kick', 'leg kick → K'],
+    ['Tornado kick', 'front kick → ◀ K'], ['Elbow drop (spike)', 'juggle: jump → ↓ P'],
+    ['German suplex', 'clinch knee → ↑ P+K'],
   ] },
   { title: 'KNOCKDOWN TECH', rows: [
     ['Back-roll', 'tap away on bounce'], ['Kip-up', 'jump on landing'],
     ['Wakeup roll', 'tap dir on wakeup'], ['Throw tech', 'mash P+K'],
   ] },
+  { title: "SUPERS  (full meter,  H  ·  ')", rows: [
+    ['Mech Cannon', 'super (neutral)'], ['Overdrive Beam', 'super + ▶'],
+    ['Super Combo → sword', 'super + ◀'],
+  ] },
   { title: 'FINISHERS', rows: [
     ['Ground & Pound', 'P+K over downed'], ['Execution', 'P+K vs gassed <10%'],
-    ['The Flatliner', 'just-frame overhand'], ['Mech Cannon (super)', "H  ·  '"],
+    ['The Flatliner', 'just-frame overhand'],
   ] },
 ];
 
