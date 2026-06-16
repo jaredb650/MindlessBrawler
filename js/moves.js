@@ -189,7 +189,8 @@ const MOVES = {
     damage: 100, hitstun: 0, blockstun: 16, stamina: 12,
     guard: 'mid', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 24, y: -150, w: 95, h: 45 },
-    lungeVx: 7, heavy: true, popsGround: true, blast: true, noFlowCancel: true,
+    // sideSpikeAir: vs a TUMBLING/AERIAL victim the spin SIDE-SPIKES them flat across the stage (grounded → the normal blast).
+    lungeVx: 7, heavy: true, popsGround: true, blast: true, sideSpikeAir: true, noFlowCancel: true,
   },
   // Flying knee (jump-converted from knee): flat arc, real travel.
   // THREE payoffs by spacing — the skill-shot move:

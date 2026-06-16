@@ -202,7 +202,7 @@ const CFG = {
   SPIKE_LIFT: 62,                  // a STANDING spike victim is yanked this high into a mid-air tumble first, THEN rocketed down → a real slam + bounce (not a quiet thud-to-downed)
 
   // ELECTRIC OVERHAND — the charged overhand: a horizontal SIDE SPIKE + a lingering electrocution.
-  SIDESPIKE_VX: 24,                // horizontal launch force (× away) — blasts them flat across the stage
+  SIDESPIKE_VX: 48,                // horizontal launch force (× away) — blasts them flat across the stage (FAST)
   SIDESPIKE_LIFT: 84,              // lifted to ~head height (where the overhand strikes) so they fly flat into the wall
   SIDESPIKE_FRAMES: 36,            // frames of REDUCED gravity (the dead-flat flight window)
   SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly

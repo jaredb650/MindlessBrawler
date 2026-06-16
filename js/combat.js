@@ -260,6 +260,13 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       }
       return;
     }
+    // sideSpikeAir (spinning back kick): a TUMBLING/AERIAL victim gets side-spiked flat
+    // across the stage instead of the normal blast. A grounded body takes the blast below.
+    if (move.sideSpikeAir && vic.isAirborne()) {
+      vic.receiveSideSpike(away, game);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+      return;
+    }
     vic.setLaunched(away * 15, -7, true);
     return;
   }
@@ -278,6 +285,13 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   }
 
   if (vic.isAirborne()) {
+    // SIDE SPIKE vs an AIRBORNE/TUMBLING body (spinning back kick): blast them dead-flat
+    // across the stage instead of juggling. Generic — no electrocution unless move.electric.
+    if (move.sideSpikeAir) {
+      vic.receiveSideSpike(away, game);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+      return;
+    }
     // SPIKE (diving elbow): slam an airborne body straight to the floor — untechable,
     // ground-bounce → OTG. Ends the juggle (no airHits++), bounded by MAX_GROUND_HITS.
     if (move.spike != null) {
