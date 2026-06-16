@@ -249,11 +249,15 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     // ELECTRIC OVERHAND: a horizontal SIDE SPIKE (blasts them dead-flat across the stage)
     // + a lingering electrocution (DoT + seize) that arms now and begins once they LAND.
     if (move.sideSpike) {
-      vic.receiveSideSpike(away, game);
-      game.hitstop = Math.max(game.hitstop, CFG.OVERHAND_FREEZE);                 // the dramatic freeze on the connect
+      vic.receiveSideSpike(away, game);                          // generic horizontal blast (its own particle + sidespike sfx)
       game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
-      game.flash = Math.max(game.flash, CFG.OVERHAND_FLASH); game.flashMax = Math.max(game.flashMax, CFG.OVERHAND_FLASH);
-      spawnElectric(contactPoint.x, contactPoint.y, CFG.ELECTRIC_BURST);          // blue energy explodes off the fist
+      if (move.electric) {                                       // electrocution + the dramatic beat are overhand-specific
+        vic.pendingElectric = CFG.ELECTRIC_FRAMES;
+        game.hitstop = Math.max(game.hitstop, CFG.OVERHAND_FREEZE);
+        game.flash = Math.max(game.flash, CFG.OVERHAND_FLASH); game.flashMax = Math.max(game.flashMax, CFG.OVERHAND_FLASH);
+        spawnElectric(contactPoint.x, contactPoint.y, CFG.ELECTRIC_BURST);   // big blue explosion off the fist
+        playSfx('overhand_hit');
+      }
       return;
     }
     vic.setLaunched(away * 15, -7, true);

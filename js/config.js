@@ -208,7 +208,8 @@ const CFG = {
   SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly
   OVERHAND_FREEZE: 26,             // dramatic hit-freeze when the charged overhand lands
   OVERHAND_FLASH: 10,              // white flash on the connect
-  ELECTRIC_BURST: 24,              // electric particles in the on-hit explosion
+  ELECTRIC_BURST: 46,              // electric particles in the on-hit explosion (bigger blast)
+  SIDESPIKE_BURST: 22,             // particles in the side-spike's own launch burst (horizontal energy)
   ELECTRIC_FRAMES: 168,            // electrocution duration (~2.8s) — DoT + seize, begins once they land
   ELECTRIC_TICK: 14,               // passive-damage cadence (a jolt every ~0.23s)
   ELECTRIC_DMG: 7,                 // HP per jolt (~12 jolts → ~84 over the shock)

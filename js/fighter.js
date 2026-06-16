@@ -178,7 +178,7 @@ class Fighter {
 
   pushbox() {
     // clinch/clinched are pinned bodies — null pushbox so a stray push-apart can't shove them
-    if (['downed', 'fallheavy', 'getup', 'thrown', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled', 'clinch', 'clinched'].includes(this.state)) return null;
+    if (['downed', 'fallheavy', 'getup', 'thrown', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled', 'clinch', 'clinched', 'electrified'].includes(this.state)) return null;
     return { x: this.x - CFG.PUSHBOX_W / 2, y: this.y - CFG.BODY_H, w: CFG.PUSHBOX_W, h: CFG.BODY_H };
   }
 
@@ -456,13 +456,15 @@ class Fighter {
     this.bounced = false;
     this.setLaunched(away * CFG.SIDESPIKE_VX, 0, false);   // vy = 0 → dead flat, no DI
     this.noTech = true;
-    this.sideSpikeFrames = CFG.SIDESPIKE_FRAMES;           // reduced-gravity flight window
-    this.pendingElectric = CFG.ELECTRIC_FRAMES;            // electrocution armed; starts on landing
+    this.sideSpikeFrames = CFG.SIDESPIKE_FRAMES;           // reduced-gravity flight window (electric arming is set by the caller)
+    spawnSideSpike(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.55, away);   // the side spike's own horizontal energy burst
     spawnDust(this.x, CFG.FLOOR_Y, 10);
+    playSfx('sidespike');
   }
 
   beginThrown(thrower) {
     this.setState('thrown');
+    this.sideSpikeFrames = 0; this.pendingElectric = 0;   // a throw mid-side-spike cancels the flight + armed electrocution
     this.invuln = CFG.THROW_FRAMES + 10;
     this.thrownFrom = this.x;
     const to = thrower.x - thrower.facing * 85;
@@ -512,6 +514,7 @@ class Fighter {
     this.inClinch = true;
     this.invuln = Math.max(this.invuln, 4);   // committed — brief ghost on the lock
     opp.y = CFG.FLOOR_Y; opp.vx = 0; opp.vy = 0;   // pluck a TUMBLING (airborne) body down into the grounded clinch
+    opp.sideSpikeFrames = 0; opp.pendingElectric = 0;   // a grab mid-side-spike cancels the flight + its armed electrocution
     opp.enterClinched(this);
     playSfx('throw_grab');
     pushFeed('CLINCH!', this.color);
@@ -536,7 +539,7 @@ class Fighter {
   }
 
   setLaunched(vx, vy, freshLaunch) {
-    if (freshLaunch) { this.bounced = false; this.noTech = false; }
+    if (freshLaunch) { this.bounced = false; this.noTech = false; this.sideSpikeFrames = 0; this.pendingElectric = 0; }   // a FRESH launch clears any stale side-spike arming
     this.hitFlash = CFG.HIT_FLASH;   // OTG pops / launches / KO blasts all flash on contact too
     // Hard guard: a missing/NaN launch velocity must never reach physics — it would
     // NaN the body's position and make it vanish off-screen. Default to a gentle float.
@@ -1077,8 +1080,10 @@ class Fighter {
     // ── shared physics ──
     if (this.isAirborne()) {
       // side spike: gravity SUPPRESSED (not zero) for the flat-flight window → flies straight, sags slightly
-      if (this.sideSpikeFrames > 0) { this.vy += CFG.GRAVITY * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--; }
-      else this.vy += CFG.GRAVITY;
+      if (this.sideSpikeFrames > 0) {
+        this.vy += CFG.GRAVITY * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--;
+        spawnSideTrail(this.x, this.y - CFG.BODY_H * 0.5);   // a particle trail streaming off the flying body
+      } else this.vy += CFG.GRAVITY;
       this.x += this.vx;
       this.y += this.vy;
       if (this.y >= CFG.FLOOR_Y && this.vy >= 0) {
@@ -1117,6 +1122,7 @@ class Fighter {
             // the side-spiked body has LANDED → the electrocution seize begins (top-of-update handler owns it)
             this.electrified = this.pendingElectric; this.pendingElectric = 0;
             this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
+            this.invuln = Math.max(this.invuln, 2);   // cover the very first seize frame (before the handler runs next tick)
             this.setState('electrified');
             playSfx('body_slam');
           } else {
@@ -1161,7 +1167,7 @@ class Fighter {
       this.x = minX;
       if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) {
         this.vx = 0; this.facing = 1;   // face away from the wall, into the stage
-        this.setState('wallsplat');
+        this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (so the peel-off falls under normal gravity)
         game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
         spawnDust(minX, this.y, 12);
         spawnSpark(minX + 20, this.y - CFG.BODY_H * 0.6, 'hit');
@@ -1175,7 +1181,7 @@ class Fighter {
       this.x = maxX;
       if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) {
         this.vx = 0; this.facing = -1;   // face away from the wall, into the stage
-        this.setState('wallsplat');
+        this.setState('wallsplat'); this.sideSpikeFrames = 0;   // flat-flight ends at the wall (so the peel-off falls under normal gravity)
         game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
         spawnDust(maxX, this.y, 12);
         spawnSpark(maxX - 20, this.y - CFG.BODY_H * 0.6, 'hit');

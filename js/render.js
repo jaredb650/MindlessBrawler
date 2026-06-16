@@ -120,6 +120,32 @@ function spawnSpike(x, dir) {
   }
 }
 
+// Horizontal SIDE-SPIKE burst — energy streaking in the launch direction (its own distinct look).
+function spawnSideSpike(x, y, dir) {
+  const cols = ['#ffffff', '#ffd54f', '#ffb74d', '#fff59d'];
+  for (let i = 0; i < (CFG.SIDESPIKE_BURST || 22); i++) {
+    Particles.push({
+      x: x - dir * 8, y: y + (Math.random() - 0.5) * 50,
+      vx: dir * (6 + Math.random() * 14), vy: (Math.random() - 0.5) * 5,   // mostly HORIZONTAL, along the blast
+      life: 8 + Math.random() * 9, maxLife: 17,
+      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 3.5, grav: 0.08,
+    });
+  }
+}
+
+// A small particle TRAIL streaming off a side-spiked body in flight (called each flight frame).
+function spawnSideTrail(x, y) {
+  const cols = ['#ffffff', '#ffd54f', '#ffe082', '#fff59d'];
+  for (let i = 0; i < 2; i++) {
+    Particles.push({
+      x: x + (Math.random() - 0.5) * 20, y: y + (Math.random() - 0.5) * 40,
+      vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+      life: 8 + Math.random() * 7, maxLife: 15,
+      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 2.5, grav: 0,
+    });
+  }
+}
+
 // Blue ELECTRIC burst — fast, gravity-less crackle sparks. (charged overhand explosion + the seize.)
 function spawnElectric(x, y, n) {
   const cols = ['#4fc3f7', '#81d4fa', '#b3e5fc', '#ffffff', '#e1f5fe'];

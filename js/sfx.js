@@ -25,6 +25,7 @@ const SFX = {
   musicVol: 0.45,       // music bus
   pitchVary: 0.06,      // ±6% random playbackRate on every sfx → no two hits sound identical
   throttleMs: 32,       // don't re-stack the SAME sound faster than this
+  throttle: { gunshot: 0 },   // per-sound throttle override (ms): gunshot fires EVERY machine-gun blow (no throttle)
   gain: { hit_heavy: 0.8, beam_fire: 0.8 },   // per-sound volume trim (tune by ear): hit_heavy -20%; beam_fire layers on explosion → -20%
   ctx: null,            // AudioContext (lazy)
   masterGain: null,     // master GainNode → destination
@@ -35,7 +36,7 @@ const SFX = {
 };
 
 const SOUND_MANIFEST = {
-  impacts:   ['hit_light', 'hit_med', 'hit_heavy', 'hit_heavy2', 'body_blow', 'block', 'parry', 'bounce', 'body_slam', 'ground_pop', 'wall_splat', 'spike'],
+  impacts:   ['hit_light', 'hit_med', 'hit_heavy', 'hit_heavy2', 'body_blow', 'block', 'parry', 'bounce', 'body_slam', 'ground_pop', 'wall_splat', 'spike', 'sidespike', 'overhand_hit', 'gunshot'],
   voice:     ['grunt_1', 'grunt_2'],
   swings:    ['whoosh_light', 'whoosh_heavy', 'fly_takeoff'],
   movement:  ['jump', 'dash', 'getup', 'tech'],
@@ -112,7 +113,8 @@ function playSfx(name, opts) {
   if (!c) return;                            // no Web Audio (headless) → silent
   if (c.state === 'suspended') { c.resume(); return; }   // not unlocked by a gesture yet
   const now = _now();
-  if (SFX.last[name] && now - SFX.last[name] < SFX.throttleMs) return;   // throttle identical rapid plays
+  const th = (SFX.throttle && SFX.throttle[name] != null) ? SFX.throttle[name] : SFX.throttleMs;
+  if (SFX.last[name] && now - SFX.last[name] < th) return;   // throttle identical rapid plays (per-sound override)
   const buf = SFX.buffers[name];
   if (buf && !buf.then) {                     // a decoded AudioBuffer (not a Promise, not null)
     SFX.last[name] = now;
