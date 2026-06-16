@@ -338,8 +338,12 @@ function dummyInputs() {
 }
 
 function logicStep() {
-  // global: M toggles mute in ANY scene (pulled before the scene branch drains the queue)
-  for (let i = KeyQueue.length - 1; i >= 0; i--) if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
+  // global: M toggles mute, V toggles the 16-bit filter — in ANY scene (pulled
+  // before the scene branch drains the queue so the menu doesn't eat them)
+  for (let i = KeyQueue.length - 1; i >= 0; i--) {
+    if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
+    else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); }
+  }
   // SCENE layer (menu.js): the title / mode-select / move-list / pause screens run
   // their own step and never touch the fight. In the fight, a pause keypress (Esc /
   // Enter / P) lifts us to the pause screen before any fight logic runs.
@@ -460,13 +464,17 @@ function frame(now) {
   // music: fight loop in a match, menu loop everywhere else (idempotent — also retries
   // play() once the browser autoplay gate opens on the first keypress)
   playMusic((game.scene === 'fight' || game.scene === 'paused') ? 'music_fight' : 'music_menu');
+  // RETRO: everything draws into the low-res buffer (rctx), then retroEnd pixelates
+  // + palette-quantizes + upscales it onto the real canvas. Passthrough when off.
+  const rctx = retroBegin(ctx);
   if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'movelist') {
-    drawMenu(ctx, game);
+    drawMenu(rctx, game);
   } else {
-    render(ctx, game);
-    if (game.koFreeze <= 0) drawUI(ctx, game);   // hide the HUD during the KO silhouette freeze
-    if (game.scene === 'paused') drawPauseOverlay(ctx, game);   // freeze the fight, overlay the menu
+    render(rctx, game);
+    if (game.koFreeze <= 0) drawUI(rctx, game);   // hide the HUD during the KO silhouette freeze
+    if (game.scene === 'paused') drawPauseOverlay(rctx, game);   // freeze the fight, overlay the menu
   }
+  retroEnd(ctx);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

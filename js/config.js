@@ -11,6 +11,17 @@ const CFG = {
   WALL_L: 40,
   WALL_R: 1240,
 
+  // 16-bit RETRO filter (js/retro.js) — toggle live with V. Tune by feel:
+  RETRO: {
+    scale: 4,            // pixel chunkiness: render at 1280/4×720/4 = 320×180, then nearest-neighbor upscale.
+                         //   use a CLEAN divisor (2,4,5,8) for uniform pixels — 4 is the 16-bit sweet spot; 5 = chunkier.
+    levels: 32,          // colors PER CHANNEL (the "16-bit" banding): lower = more banded/retro. 32≈subtle, 16=punchy, 8=poster.
+    quantize: true,      // palette-reduce the buffer (set false for pure pixelation, full color)
+    scanlines: false,    // thin CRT scanline overlay
+    scanlineAlpha: 0.14, // ...how dark each scanline is
+    scanlineGap: 3,      // ...screen px between scanlines
+  },
+
   // Physics
   GRAVITY: 0.85,
 
