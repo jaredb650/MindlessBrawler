@@ -457,6 +457,20 @@ function spawnBullet(owner) {
   playSfx('hit_med');   // a gunshot pop (placeholder until a dedicated round sfx)
 }
 
+// BULLET CLIMAX volley — a few rounds at staggered heights (the barrage wall).
+function spawnClimaxVolley(owner) {
+  const d = owner.facing;
+  for (let i = 0; i < 2; i++) {
+    Projectiles.push({
+      x: owner.x + d * 46,
+      y: CFG.FLOOR_Y - 60 - Math.random() * 120,        // spread across the body height
+      vx: d * (CFG.BULLET_SPEED + Math.random() * 6),
+      w: 22, h: 8, owner, move: BULLET_MOVE, kind: 'bullet', dead: false, age: 0,
+    });
+  }
+  playSfx('hit_med');
+}
+
 // The OVERDRIVE BEAM: while the forward-super fighter is in its firing window, a giant
 // hitbox engulfs a big chunk of the screen in front of them, multi-hitting the opponent,
 // dragging them to the wall, then DETONATING on the final frame. Driven entirely off the

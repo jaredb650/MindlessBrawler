@@ -1250,6 +1250,38 @@ class Fighter {
             }
           }
           if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');   // whiffed starter → recover (meter spent)
+        } else if (this.superKind === 'climax') {
+          // BULLET CLIMAX: she poses and UNLOADS — a screen-filling barrage over the active window.
+          if (this.f >= CFG.SUPER_STARTUP && this.f < CFG.SUPER_STARTUP + CFG.CLIMAX_FRAMES && (this.f - CFG.SUPER_STARTUP) % CFG.CLIMAX_INTERVAL === 0) {
+            spawnClimaxVolley(this);
+            game.shake = Math.max(game.shake, CFG.SHAKE_LIGHT);
+          }
+          if (this.f >= CFG.SUPER_STARTUP + CFG.CLIMAX_FRAMES + CFG.SUPER_RECOVERY) this.setState('idle');
+        } else if (this.superKind === 'tango') {
+          // KILLER TANGO: a teleport-slash rush — if a grounded opp is in range it starts the cinematic.
+          if (this.f === CFG.SUPER_STARTUP) {
+            const grounded = !opp.isAirborne() && !['downed', 'fallheavy', 'getup'].includes(opp.state);
+            if (opp.hp > 0 && opp.invuln <= 0 && grounded && Math.abs(opp.x - this.x) <= CFG.COMBO_STARTER_RANGE) startTango(this, opp, game);
+          }
+          if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');
+        } else if (this.superKind === 'witchtime') {
+          // WITCH TIME: an invuln DODGE. A real attack swinging into it triggers global slow-mo
+          // (she stays full speed → free punish). No attack to dodge = wasted meter.
+          this.invuln = Math.max(this.invuln, 2);
+          const m = opp.move;
+          const swingingAtMe = MOVE_STATES.has(opp.state) && m && opp.f >= m.startup - 2
+            && opp.f <= m.startup + (m.active || 0) + 4 && Math.abs(opp.x - this.x) < 190;
+          if (game.witchTime <= 0 && swingingAtMe) {
+            game.witchTime = CFG.WITCH_TIME_FRAMES; game.witchWho = this;
+            this.invuln = Math.max(this.invuln, 14);   // a safe beat to begin the punish
+            game.flash = Math.max(game.flash, 12); game.flashMax = Math.max(game.flashMax, 12);
+            game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+            playSfx('beam_activate');
+            pushFeed('WITCH TIME!!', this.color);
+            this.setState(this.stamina <= 0 ? 'gassed' : 'idle');   // out of the dodge → free to act
+          } else if (this.f >= CFG.SUPER_STARTUP + CFG.WITCH_DODGE_FRAMES) {
+            this.setState('idle');   // dodge ended, nothing to punish (meter spent)
+          }
         } else {
           if (this.f === CFG.SUPER_STARTUP) this.spawnShot = true;
           if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');

@@ -20,6 +20,8 @@ const game = {
   superWho: null,
   shake: 0,
   slowmo: 0,
+  witchTime: 0,        // Witch Time countdown (the slow-mo window)
+  witchWho: null,      // the fighter who stays FULL speed during Witch Time
   frame: 0,
   matchState: 'fight',
   banner: { text: 'FIGHT!', sub: '', timer: 70 },
@@ -515,7 +517,63 @@ function runSwordComboCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine };
+// KILLER TANGO (Vesper forward-super): a teleport knife-slash rush around the locked victim, then
+// she reappears in front and unloads a point-blank double-pistol blast that SIDE-SPIKES them flat.
+function startTango(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 40 + CFG.TANGO_RADIUS, Math.min(CFG.WALL_R - 40 - CFG.TANGO_RADIUS, vic.x));
+  startCine('tango', att, vic, game, { vicX, hits: 0, nextHit: CFG.TANGO_DELAY, interval: CFG.TANGO_INTERVAL, poseF0: 0 });
+  att.setState('magiccombo'); att.comboStrike = 'punch';   // reuse the teleport-strike pose
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 6);
+  game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'parry', 2); playSfx('hit_heavy');
+  pushFeed('KILLER TANGO!!', att.color);
+}
+function runTangoCine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y;
+  att.f = Math.max(0, ex.f - data.poseF0);
+  if (data.hits < CFG.TANGO_HITS && ex.f >= data.nextHit) {
+    data.hits++;
+    const last = data.hits >= CFG.TANGO_HITS;
+    const side = (data.hits % 2 === 0) ? 1 : -1;
+    const aerial = (data.hits % 2 === 0);
+    const r = CFG.TANGO_RADIUS * (0.7 + (data.hits % 2) * 0.22);
+    const ghostX = att.x, ghostY = att.y;
+    att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x + side * r));
+    att.y = aerial ? CFG.FLOOR_Y - 64 : CFG.FLOOR_Y;
+    att.facing = Math.sign(vic.x - att.x) || att.facing;
+    att.comboStrike = (data.hits % 2 === 0) ? 'kick' : 'punch';
+    data.poseF0 = ex.f;
+    vic.hp = Math.max(1, vic.hp - 22);
+    const cy = CFG.FLOOR_Y - 100;
+    spawnSpark(vic.x, cy + (Math.random() - 0.5) * 60, 'parry');
+    spawnBlood(vic.x, cy, att.facing, last ? 30 : 12);          // knife slashes draw blood
+    spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 4);        // teleport streak
+    spawnDust(att.x, CFG.FLOOR_Y, 4);
+    game.shake = Math.max(game.shake, 4 + data.hits);
+    game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 4);
+    playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
+    data.interval = Math.max(2, data.interval - 0.5);
+    data.nextHit = ex.f + Math.round(data.interval);
+  } else if (data.hits >= CFG.TANGO_HITS && ex.f >= data.nextHit) {
+    // FINISHER — point-blank double-pistol blast → SIDE SPIKE flat across the stage.
+    att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * 70));
+    att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    vic.hp = Math.max(1, vic.hp - 30);
+    const away = Math.sign(vic.x - att.x) || att.facing;
+    spawnSpark(vic.x, CFG.FLOOR_Y - 120, 'parry', 2); spawnBlood(vic.x, CFG.FLOOR_Y - 110, away, 26);
+    vic.receiveSideSpike(away, game);
+    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER); game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
+    game.cine = null;
+    pushFeed('PERFECTO!!', att.color);
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine };
 
 function runCine(game) {
   const ex = game.cine;
@@ -538,6 +596,8 @@ function resetMatch() {
   game.superWho = null;
   game.shake = 0;
   game.slowmo = 0;
+  game.witchTime = 0;
+  game.witchWho = null;
   game.execution = null;
   game.executionKill = false;
   game.counter = null;
@@ -648,8 +708,16 @@ function logicStep() {
   }
 
   const [f1, f2] = game.fighters;
-  f1.update(f2, game);
-  f2.update(f1, game);
+  // WITCH TIME: the world crawls — the SLOW fighter updates every other frame while the witch
+  // (Vesper) stays full speed → her free-punish window. Combat runs every frame so her hits land.
+  if (game.witchTime > 0) {
+    game.witchTime--;
+    if (game.witchTime === 0) game.witchWho = null;
+  }
+  const wtFast = game.witchTime > 0 ? game.witchWho : null;
+  const wtSkip = wtFast && (game.frame % 2 === 0);   // on these frames the slow fighter is frozen
+  if (!(wtSkip && f1 !== wtFast)) f1.update(f2, game);
+  if (!(wtSkip && f2 !== wtFast)) f2.update(f1, game);
   combatUpdate(f1, f2, game);
 
   // super flash trigger (set by Fighter.tryActions) — only if the activator is

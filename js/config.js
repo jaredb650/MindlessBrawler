@@ -76,6 +76,14 @@ const CFG = {
   BULLET_INTERVAL: 4,           // frames between rounds while held
   BULLET_MAX: 3,                // rounds per strike
   BULLET_COST: 3,               // stamina per round
+  // ── Vesper SUPERS ──
+  CLIMAX_FRAMES: 44,            // Bullet Climax: how long the barrage fires
+  CLIMAX_INTERVAL: 3,          // frames between volleys
+  TANGO_HITS: 7,               // Killer Tango: teleport slashes before the finisher
+  TANGO_DELAY: 6, TANGO_INTERVAL: 6, TANGO_RADIUS: 120,
+  WITCH_DODGE_FRAMES: 22,      // Witch Time: the dodge window (invuln) that can trigger the slow
+  WITCH_TIME_FRAMES: 150,      // how long the world crawls (she stays full speed) on a successful dodge
+  WITCH_RANGE: 200,            // (unused gate placeholder)
   // BLEED (Vesper's knife DoT): each knife hit adds stacks + refreshes the timer; ticks while it lasts.
   MAX_BLEED: 6,                 // stack cap
   BLEED_DURATION: 150,          // frames a fresh knife hit keeps them bleeding (~2.5s)

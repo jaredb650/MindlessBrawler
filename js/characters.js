@@ -132,7 +132,7 @@ CHARACTERS.vesper = {
   airMap: CHARACTERS.brawler.airMap,                // TEMP — air knife/gun later
   dashMap: CHARACTERS.brawler.dashMap,              // TEMP
   otgKickForward: CHARACTERS.brawler.otgKickForward,
-  superMap: CHARACTERS.brawler.superMap,            // TEMP until Phase C (her own supers)
+  superMap: { forward: 'tango', back: 'witchtime', neutral: 'climax' },   // her 3 supers (Phase C)
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
   doubleJump: true,                                 // a second jump in the air
   wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)
