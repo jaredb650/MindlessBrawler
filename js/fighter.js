@@ -235,7 +235,7 @@ class Fighter {
   }
 
   startMove(name, isAir = false) {
-    const mv = MOVES[name];
+    const mv = this.moveSet[name];
     this.stamina = Math.max(0, this.stamina - mv.stamina);
     // MAGIC PUNCH COMBO — drive the chain off the INPUT SEQUENCE (jab→cross→uppercut→cross), not
     // hit-confirm: the moment it reaches 2 the magnet (attack-case) yanks you into range so every
@@ -361,7 +361,7 @@ class Fighter {
     }
     const btn = p.pressed.punch ? 'punch' : p.pressed.kick ? 'kick' : null;
     if (btn && this.stamina > 0) {
-      const name = resolveNeutralMove(btn, this.dirCategory(opp, p.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160);
+      const name = resolveNeutralMove(btn, this.dirCategory(opp, p.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160, this.char);
       if (name) { p.consume(btn); this.startMove(name); return true; }
     }
     if (p.pressed.jump) { p.consume('jump'); this.setState('prejump'); return true; }
@@ -390,7 +390,7 @@ class Fighter {
     if (this.f < mv.startup || this.f > mv.startup + mv.active + CFG.CANCEL_WINDOW_PAD) return;
     const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
     if (!btn || this.stamina <= 0) return;
-    let cand = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160);
+    let cand = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), opp.state === 'downed' || opp.state === 'fallheavy', Math.abs(opp.x - this.x) < 160, this.char);
     // "Cross, then forward+punch again → hook": a basic ender route — flows even on whiff (buffer it).
     if (cand === 'cross' && mv.cancels.includes('hook')) cand = 'hook';
     let flatline = false;
@@ -696,7 +696,7 @@ class Fighter {
         const bothPK = this.pad.pressed.punch && this.pad.pressed.kick;
         const dbtn = bothPK ? null : (this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null);
         if (dbtn && this.stamina > 0) {
-          const dn = resolveDashMove(dbtn);
+          const dn = resolveDashMove(dbtn, this.char);
           if (dn) { this.pad.consume(dbtn); this.startMove(dn); break; }
         }
         if (this.tryActions(opp, game)) break;
@@ -727,7 +727,7 @@ class Fighter {
         if (!this.usedAirAttack && btn && this.stamina > 0) {
           this.pad.consume(btn);
           this.usedAirAttack = true;
-          this.startMove(resolveAirMove(btn, this.dirCategory(opp, this.pad.snap[btn])), true);
+          this.startMove(resolveAirMove(btn, this.dirCategory(opp, this.pad.snap[btn]), this.char), true);
         }
         break;
       }
@@ -801,7 +801,7 @@ class Fighter {
         }
         // tap JUMP during knee/uppercut startup (in range) → flying version
         if (mv.flyConvert && this.f <= mv.startup && this.pad.pressed.jump) {
-          const fm = MOVES[mv.flyConvert];
+          const fm = this.moveSet[mv.flyConvert];
           const range = mv.flyConvert === 'flyknee' ? CFG.FLY_KNEE_RANGE : CFG.FLY_UPPERCUT_RANGE;
           if (Math.abs(opp.x - this.x) <= range && this.stamina > 0) {
             this.pad.consume('jump');
@@ -1108,7 +1108,7 @@ class Fighter {
           // Reversal: a buffered strike fires AS you rise (getup invuln covers the startup).
           const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
           if (btn && this.stamina > 0) {
-            const name = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), false, false);
+            const name = resolveNeutralMove(btn, this.dirCategory(opp, this.pad.snap[btn]), false, false, this.char);
             if (name) { this.pad.consume(btn); this.startMove(name); this.reversalWhiff = true; break; }
           }
           // Late wakeup roll (a roll input buffered a hair past the floor).

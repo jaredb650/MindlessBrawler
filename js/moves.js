@@ -379,41 +379,27 @@ const MOVES = {
 // 'forward'/'back' are relative to facing; up does NOT jump (jump is its own button).
 // `oppDowned` includes the fallheavy collapse — soccer's startup bridges into the
 // downed state, so kicking someone mid-drop comes out as the punish, not a whiffed legkick.
-function resolveNeutralMove(btn, dirCat, oppDowned, closeToOpp) {
-  if (btn === 'punch') {
-    switch (dirCat) {
-      case 'up': return 'uppercut';
-      case 'down': return 'crouchjab';
-      case 'forward': return 'cross';
-      case 'back': return 'backfist';
-      default: return 'jab';
-    }
-  }
-  if (btn === 'kick') {
-    switch (dirCat) {
-      case 'up': return 'axekick';
-      case 'back': return 'backkick';
-      case 'down': return 'sweep';
-      case 'forward': return (oppDowned && closeToOpp) ? 'soccer' : 'frontkick';
-      default: return 'legkick';   // leg kick is the neutral poke now (a LOW); front kick moved to forward+K
-    }
-  }
-  return null;
+// Input → move name, driven by the active CHARACTER's maps (js/characters.js). `char` is the
+// fighter's character def. dirCat ∈ up|down|forward|back|neutral (neutral = the fallback for any
+// unlisted direction). Per-character maps let a 2nd character reuse the same input grammar with a
+// totally different moveset. The brawler maps reproduce the original switch behavior exactly.
+function resolveNeutralMove(btn, dirCat, oppDowned, closeToOpp, char) {
+  const map = char && char.neutralMap && char.neutralMap[btn];
+  if (!map) return null;
+  // forward+K vs a close DOWNED opponent → the OTG kick (brawler: soccer kick) instead of forward
+  if (btn === 'kick' && dirCat === 'forward' && oppDowned && closeToOpp && char.otgKickForward) return char.otgKickForward;
+  return map[dirCat] != null ? map[dirCat] : map.neutral;
 }
 
-// In-air button+direction → aerial move name. One attack per jump (the caller
-// gates with usedAirAttack). down = the DIVE for both buttons (down+K=divekick,
-// down+P=elbowdrop spike); everything else is the standard jump-in (P / K).
-function resolveAirMove(btn, dirCat) {
-  if (btn === 'punch') return dirCat === 'down' ? 'elbowdrop' : 'airpunch';   // down+P = diving elbow spike; else the standard air poke
-  if (btn === 'kick') return dirCat === 'down' ? 'divekick' : 'jumpkick';
-  return null;
+// In-air button+direction → aerial move name. One attack per jump (the caller gates with
+// usedAirAttack). Brawler: down = the DIVE for both buttons; else the standard jump-in.
+function resolveAirMove(btn, dirCat, char) {
+  const map = char && char.airMap && char.airMap[btn];
+  if (!map) return null;
+  return map[dirCat] != null ? map[dirCat] : map.neutral;
 }
 
-// Run-state button → dash attack. The run COMMITS into a dedicated lunge instead
-// of a normal — there is no directional variety here (you're already running).
-function resolveDashMove(btn) {
-  if (btn === 'punch') return 'dashpunch';
-  if (btn === 'kick') return 'dashkick';
-  return null;
+// Run-state button → dash attack (the run COMMITS into a dedicated lunge instead of a normal).
+function resolveDashMove(btn, char) {
+  return (char && char.dashMap && char.dashMap[btn]) || null;
 }

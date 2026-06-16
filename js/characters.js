@@ -14,6 +14,18 @@ const CHARACTERS = {
     id: 'brawler',
     name: 'BRAWLER',
     moves: MOVES,        // the shared MMA moveset (js/moves.js)
+    // input → move name (resolved by the data-driven resolve* helpers in moves.js).
+    // dirCat ∈ up|down|forward|back|neutral; `neutral` is the fallback for any unlisted dir.
+    neutralMap: {
+      punch: { up: 'uppercut', down: 'crouchjab', forward: 'cross', back: 'backfist', neutral: 'jab' },
+      kick:  { up: 'axekick', down: 'sweep', forward: 'frontkick', back: 'backkick', neutral: 'legkick' },
+    },
+    otgKickForward: 'soccer',   // forward+K vs a close DOWNED opponent (OTG) → soccer kick instead of frontkick
+    airMap: {
+      punch: { down: 'elbowdrop', neutral: 'airpunch' },   // down+P = diving elbow spike; else the air poke
+      kick:  { down: 'divekick', neutral: 'jumpkick' },
+    },
+    dashMap: { punch: 'dashpunch', kick: 'dashkick' },
   },
 };
 
