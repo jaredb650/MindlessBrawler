@@ -101,6 +101,7 @@ class Fighter {
     this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
     this.attackDrift = 0;      // momentum carried into/through strikes
+    this.grabSlide = 0;        // forward lunge carried into a grab's reach (walk/dash grabs reach further)
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
@@ -316,14 +317,18 @@ class Fighter {
       this.superFlash = true;
       return true;
     }
-    // Neutral P+K (idle/walk/crouch only) → the clinch grab. Mid-string P+K is
+    // Neutral P+K (idle/walk/crouch/run) → the clinch grab. Mid-string P+K is
     // handled in the 'attack' case (→ throwgrab) and is intentionally untouched.
+    // A TUMBLING (launched) body is grabbable; only true jump/air-attack states aren't.
     if (p.pressed.punch && p.pressed.kick && this.stamina > 0
-        && ['idle', 'walk', 'crouch'].includes(this.state)
-        && !opp.isAirborne() && !['downed', 'fallheavy', 'clinched'].includes(opp.state)) {
+        && ['idle', 'walk', 'crouch', 'run'].includes(this.state)
+        && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)) {
+      // slide INTO the grab with leftover momentum — a walk/dash grab lunges further
+      const slide = this.state === 'run' ? CFG.GRAB_SLIDE_RUN : this.state === 'walk' ? CFG.GRAB_SLIDE_WALK : 0;
       p.consume('punch');
       p.consume('kick');
       this.setState('clinchgrab');
+      this.grabSlide = this.facing * slide;
       return true;
     }
     const btn = p.pressed.punch ? 'punch' : p.pressed.kick ? 'kick' : null;
@@ -480,6 +485,7 @@ class Fighter {
     this.clinchTimer = 0;        // fresh lock — start the auto-release clock (setState won't zero it)
     this.inClinch = true;
     this.invuln = Math.max(this.invuln, 4);   // committed — brief ghost on the lock
+    opp.y = CFG.FLOOR_Y; opp.vx = 0; opp.vy = 0;   // pluck a TUMBLING (airborne) body down into the grounded clinch
     opp.enterClinched(this);
     playSfx('throw_grab');
     pushFeed('CLINCH!', this.color);
@@ -666,7 +672,11 @@ class Fighter {
           this.pad.consume('punch');
           this.pad.consume('kick');
           if (canExecute(this, opp)) startExecution(this, opp, game);
-          else this.setState('throwgrab');
+          else {
+            const fwd = (this.facing === 1 && this.pad.held.right) || (this.facing === -1 && this.pad.held.left);
+            this.setState('throwgrab');
+            this.grabSlide = fwd ? this.facing * CFG.GRAB_SLIDE_WALK : 0;   // holding forward → the throw lunges in
+          }
           break;
         }
         // tap JUMP during knee/uppercut startup (in range) → flying version
@@ -783,10 +793,16 @@ class Fighter {
       case 'slip':
         break;   // Phase 3's counter sequencer (runCounter in main.js) drives this body
       case 'throwgrab': {
-        // the grab reaches on frame 5; miss = long, punishable whiff
+        // a forward lunge carried into the reach (extends range on a committed throw)
+        if (this.f <= 5 && this.grabSlide) {
+          this.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, this.x + this.grabSlide));
+          this.grabSlide *= CFG.GRAB_SLIDE_DECAY;
+        }
+        // the grab reaches on frame 5; miss = long, punishable whiff. A TUMBLING
+        // (launched) body is grabbable — snatch them out of the air and slam them.
         if (this.f === 5) {
-          const ok = !opp.isAirborne() && opp.invuln <= 0
-            && !['downed', 'fallheavy', 'thrown', 'getup'].includes(opp.state)
+          const ok = opp.invuln <= 0
+            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup'].includes(opp.state)
             && Math.abs(opp.x - this.x) <= CFG.THROW_RANGE;
           if (ok) {
             this.setState('throwanim');
@@ -840,10 +856,16 @@ class Fighter {
         break;
       }
       case 'clinchgrab': {
-        // mirrors throwgrab: the reach lands on CLINCH_REACH_FRAME or it's a whiff
+        // carry the walk/dash momentum into the reach (extends effective range)
+        if (this.f <= CFG.CLINCH_REACH_FRAME && this.grabSlide) {
+          this.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, this.x + this.grabSlide));
+          this.grabSlide *= CFG.GRAB_SLIDE_DECAY;
+        }
+        // mirrors throwgrab: the reach lands on CLINCH_REACH_FRAME or it's a whiff.
+        // A tumbling (launched) body counts — only true jump/air states are ungrabbable.
         if (this.f === CFG.CLINCH_REACH_FRAME) {
-          const ok = !opp.isAirborne() && opp.invuln <= 0
-            && !['downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)
+          const ok = opp.invuln <= 0
+            && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched'].includes(opp.state)
             && Math.abs(opp.x - this.x) <= CFG.CLINCH_GRAB_RANGE;
           if (ok) { this.beginClinch(opp); break; }
         }

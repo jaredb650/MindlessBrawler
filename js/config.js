@@ -200,7 +200,7 @@ const CFG = {
   ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into an airborne victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
 
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
-  THROW_RANGE: 95,
+  THROW_RANGE: 120,
   THROW_DMG: 50,
   THROW_FRAMES: 26,             // canned arc over your head
 
@@ -215,7 +215,11 @@ const CFG = {
 
   // Clinch — neutral P+K locks the bodies together: dirty boxing, body knees,
   // a judo throw off BACK, and a mash-escape for the victim. Auto-releases.
-  CLINCH_GRAB_RANGE: 100,        // reach at the lock frame (a touch longer than THROW_RANGE)
+  CLINCH_GRAB_RANGE: 125,        // reach at the lock frame (a touch longer than THROW_RANGE)
+  // grabs slide INTO the reach with leftover momentum → a walk/dash grab reaches further
+  GRAB_SLIDE_WALK: 4.5,          // forward px/frame a grab carries when started from a walk
+  GRAB_SLIDE_RUN: 8.5,           // ...and from a dash (run) — a real lunging snatch
+  GRAB_SLIDE_DECAY: 0.82,        // the slide bleeds off across the reach frames
   CLINCH_REACH_FRAME: 6,        // 'clinchgrab' tests the lock on this frame
   CLINCH_WHIFF_RECOVERY: 22,    // whiffed grab eats this many frames
   CLINCH_MAX_FRAMES: 150,       // auto-release timer on the hold (~2.5s)
