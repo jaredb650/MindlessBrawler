@@ -61,6 +61,11 @@ const CFG = {
   PRESS_DRIFT: 1.6,             // px/frame advancing while striking (hold toward)
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
   FLOW_CANCEL_RECOVERY: 4,      // on a clean HIT recovery caps at this — block rides FULL recovery (negative on block), whiffs eat it all
+
+  // MAGIC PUNCH COMBO — jab→cross→uppercut→cross: an inescapable, magnetic grounded string.
+  MAGNET_DIST: 76,              // px the attacker latches at (just outside the pushbox so bodies don't separate)
+  MAGNET_PULL: 0.5,            // how hard it snaps to that range each frame
+  MAGNET_HITSTUN: 15,          // re-stun on each magic-combo hit — covers the next link → inescapable
   CANCEL_WINDOW_PAD: 12,        // frames past a move's active window you can still chain-cancel (flow leniency)
 
   // Defense

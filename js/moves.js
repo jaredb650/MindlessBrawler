@@ -66,6 +66,7 @@ const MOVES = {
     guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 12, y: -185, w: 55, h: 80 },
     launcher: true, launchVy: -13.5, heavy: true, popsGround: true, flyConvert: 'flyuppercut',
+    cancels: ['cross'],   // uppercut → forward+P → cross (the magic-combo link; combat.js keeps it grounded)
   },
   // back+P: spinning backfist — slower, more range, lunges forward to cover distance.
   backfist: {

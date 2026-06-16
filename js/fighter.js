@@ -124,6 +124,7 @@ class Fighter {
     this.comboStrike = 'punch';// super-combo flurry: which strike the current teleport hit shows (render)
     this.swordWind = false;    // super-combo finisher: blade in the windup (raised) vs a live swipe (render)
     this.decapitated = false;  // sword-finisher KO: head detached → body renders headless
+    this.punchChain = 0;       // magic punch combo progress: jab(1)→cross(2)→uppercut(3)→cross(4)
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
@@ -144,7 +145,7 @@ class Fighter {
     if (FLASH_ON_ENTER.has(name)) this.hitFlash = CFG.HIT_FLASH;   // white impact frame on every fallheavy/wallsplat/launched/hitstun entry
 
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; this.punchChain = 0; }
     if (name === 'getup') { this.invuln = CFG.GETUP_FRAMES + CFG.GETUP_INVULN_EXTRA; this.groundHits = 0; playSfx('getup'); }
     if (name === 'backroll') { this.invuln = CFG.BACKROLL_INVULN; this.groundHits = 0; playSfx('tech'); }
     if (name === 'kipup') { this.invuln = CFG.KIPUP_INVULN; this.groundHits = 0; playSfx('getup'); }
@@ -228,6 +229,14 @@ class Fighter {
   startMove(name, isAir = false) {
     const mv = MOVES[name];
     this.stamina = Math.max(0, this.stamina - mv.stamina);
+    // MAGIC PUNCH COMBO chain: jab → cross → uppercut → cross. Once it connects (chain>=2)
+    // the hits go grounded/re-stun (inescapable, no launch) and the attacker latches (combat.js).
+    const pc = this.punchChain;
+    this.punchChain = name === 'jab' ? 1
+      : (name === 'cross' && pc === 1) ? 2
+      : (name === 'uppercut' && pc === 2) ? 3
+      : (name === 'cross' && pc === 3) ? 4
+      : 0;
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
@@ -711,6 +720,13 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // MAGIC PUNCH COMBO: once the chain has confirmed (>=2), the attacker LATCHES to the
+        // opponent — glides to strike range every frame so the inescapable string never drops.
+        if (this.punchChain >= 2) {
+          const want = opp.x - this.facing * CFG.MAGNET_DIST;
+          this.x += (want - this.x) * CFG.MAGNET_PULL;
+          this.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, this.x));
+        }
         // AUTO machine-gun: count each CONNECTING jab once (the auto-convert below
         // turns the 3rd into the burst on its own — no extra press).
         if (this.moveName === 'jab' && this.madeContact && !this.jabCounted) {
