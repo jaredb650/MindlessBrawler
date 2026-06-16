@@ -114,7 +114,7 @@ const VESPER_MOVES = {
   shotgun: { anim: 'shotgun', startup: 11, active: 4, recovery: 32, damage: 52, hitstun: 0, blockstun: 18, stamina: 13,
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, weapon: 'shotgun', label: 'SHOTGUN',
     hitbox: { x: 16, y: -168, w: 188, h: 78 }, blast: true, sideSpike: true, sideSpikeAir: true, heavy: true, noFlowCancel: true,
-    planted: true, rackFrame: 25 },
+    planted: true, rackFrame: 25, bulletArts: false },   // already a gun — no bullet-arts off it
   // low sweep → hard knockdown ender (oki).
   lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
     guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, gun: true, label: 'SWEEP',
@@ -136,6 +136,7 @@ CHARACTERS.vesper = {
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
   doubleJump: true,                                 // a second jump in the air
   wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)
+  bulletArts: true,                                 // hold P/K after a connected strike → trailing gunfire (fighter.js)
   // physical feel — the rushdown identity: less HP, faster on the ground, snappier/less-floaty jump.
   stats: {
     maxHp: 820,                                     // glass cannon

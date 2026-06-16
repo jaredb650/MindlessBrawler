@@ -69,6 +69,13 @@ const CFG = {
   WALL_JUMP_VX: 9,              // horizontal kick off the wall
   WALL_JUMP_REACH: 54,          // how close to a wall counts as "on it"
   WALL_JUMP_COST: 5,            // stamina; a wall jump REFRESHES her double jump + air-dash
+  // BULLET ARTS (Vesper): hold P/K after a CONNECTED strike → trailing gunfire (small bullets).
+  BULLET_SPEED: 26,             // px/frame forward
+  BULLET_DMG: 6,                // per bullet (combo chip)
+  BULLET_HITSTUN: 12,           // brief re-stun — combo glue, no knockdown
+  BULLET_INTERVAL: 4,           // frames between rounds while held
+  BULLET_MAX: 3,                // rounds per strike
+  BULLET_COST: 3,               // stamina per round
   // BLEED (Vesper's knife DoT): each knife hit adds stacks + refreshes the timer; ticks while it lasts.
   MAX_BLEED: 6,                 // stack cap
   BLEED_DURATION: 150,          // frames a fresh knife hit keeps them bleeding (~2.5s)

@@ -44,6 +44,8 @@ const SUPER_MOVE = {
   popsGround: true, popVy: -12,   // a 20mm shell absolutely moves a downed body
 };
 const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() direction/height checks
+// A Bullet-Arts round: tiny gun hit that re-stuns briefly (combo glue), no knockdown/launch.
+const BULLET_MOVE = { anim: 'bullet', damage: CFG.BULLET_DMG, guard: 'mid', blockstun: 6, hitstun: CFG.BULLET_HITSTUN, hitstop: 2, kbx: 0, kind: 'gun', label: 'BULLET' };
 
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -442,6 +444,19 @@ function spawnCannon(owner) {
   });
 }
 
+// A Bullet-Arts round — small, fast, chest height. Carries BULLET_MOVE for the collision.
+function spawnBullet(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 46,
+    y: CFG.FLOOR_Y - 128 + (Math.random() - 0.5) * 12,
+    vx: d * CFG.BULLET_SPEED,
+    w: 22, h: 8,
+    owner, move: BULLET_MOVE, kind: 'bullet', dead: false, age: 0,
+  });
+  playSfx('hit_med');   // a gunshot pop (placeholder until a dedicated round sfx)
+}
+
 // The OVERDRIVE BEAM: while the forward-super fighter is in its firing window, a giant
 // hitbox engulfs a big chunk of the screen in front of them, multi-hitting the opponent,
 // dragging them to the wall, then DETONATING on the final frame. Driven entirely off the
@@ -517,18 +532,20 @@ function updateProjectiles(f1, f2, game) {
     p.age++;
     p.x += p.vx;
     const vic = p.owner === f1 ? f2 : f1;
+    const move = p.move || SUPER_MOVE;
+    const isB = p.kind === 'bullet';
     const rect = { x: p.x - p.w / 2, y: p.y, w: p.w, h: p.h };
     if (vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && rectsOverlap(rect, vic.hurtbox())) {
-      landAttack(p.owner, vic, SUPER_MOVE, game, p.x - p.vx * 2, { x: p.x + Math.sign(p.vx) * p.w / 2, y: p.y + p.h / 2 });
-      // Override chip: a 20mm shell hurts through a guard.
-      if (vic.state === 'blockstun') {
+      landAttack(p.owner, vic, move, game, p.x - p.vx * 2, { x: p.x + Math.sign(p.vx) * p.w / 2, y: p.y + p.h / 2 });
+      // Override chip: a 20mm shell hurts through a guard (cannon only — bullets chip via landAttack).
+      if (!isB && vic.state === 'blockstun') {
         vic.hp = Math.max(CFG.CHIP_FLOOR, vic.hp - (CFG.SUPER_CHIP - Math.round(CFG.SUPER_DMG * CFG.CHIP_RATIO)));
         vic.pushVel = Math.sign(p.vx) * 14;
       }
       p.dead = true;
-      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 3);
-      spawnSpark(p.x + Math.sign(p.vx) * p.w / 2, p.y + p.h / 2, 'hit');
-      playSfx('explosion');
+      game.shake = Math.max(game.shake, isB ? CFG.SHAKE_LIGHT : CFG.SHAKE_HEAVY + 3);
+      spawnSpark(p.x + Math.sign(p.vx) * p.w / 2, p.y + p.h / 2, 'hit', isB ? 0 : 2);
+      if (!isB) playSfx('explosion');
     }
     if (p.x < -200 || p.x > CFG.STAGE_W + 200) p.dead = true;
   }

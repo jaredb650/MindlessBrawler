@@ -123,6 +123,8 @@ class Fighter {
     this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
+    this.bulletsFired = 0;     // bullet-arts rounds fired this strike (Vesper)
+    this.lastBulletF = -99;
     this.thrownFrom = 0;       // clinch-throw arc endpoints
     this.thrownTo = 0;
     this.thrower = null;       // set while thrown — the body to reset on a throw tech
@@ -282,6 +284,7 @@ class Fighter {
     this.madeHit = false;                    // reset per move — set true only on a CLEAN hit (combat.js), drives the flow cancel
     this.hitCount = 0;
     this.lastHitF = -99;
+    this.bulletsFired = 0;                    // bullet-arts rounds reset per strike
     this.jabCounted = false;                 // this move's connecting-jab tally (machine-gun chain)
     if (name !== 'jab') this.jabChain = 0;   // only a jab→jab→jab string builds the burst
     this.crouchjabCounted = false;           // this move's connecting-crouchjab tally (liver-shot chain)
@@ -803,6 +806,19 @@ class Fighter {
           spawnShell(this.x - this.facing * 4, CFG.FLOOR_Y - CFG.BODY_H * 0.62, -this.facing * 2.4 + (Math.random() - 0.5) * 1.6, -6 - Math.random() * 2);
           playSfx('whoosh_heavy');   // the rack/chk-chk (placeholder until a dedicated shell sfx)
         }
+        // BULLET ARTS (Vesper): keep HOLDING P/K after a CONNECTED strike → she trails gunfire that
+        // extends the combo. Fires after the active frames, capped per strike, costs stamina.
+        if (this.char.bulletArts && mv.bulletArts !== false && this.madeContact
+            && this.f > mv.startup + (mv.active || 0)
+            && (this.pad.held.punch || this.pad.held.kick)
+            && this.bulletsFired < CFG.BULLET_MAX
+            && this.f - this.lastBulletF >= CFG.BULLET_INTERVAL
+            && this.stamina >= CFG.BULLET_COST) {
+          this.bulletsFired++;
+          this.lastBulletF = this.f;
+          this.stamina -= CFG.BULLET_COST;
+          spawnBullet(this);
+        }
         // MAGIC PUNCH COMBO: once the chain has confirmed (>=2), the attacker LATCHES to the
         // opponent — glides to strike range every frame so the inescapable string never drops.
         if (this.punchChain >= 2) {
@@ -926,7 +942,13 @@ class Fighter {
           // noFlowCancel moves (backkick, axe kick) ride out their FULL recovery
           // even on hit — the spin/chop plays to completion, never snapped short.
           const flowCancelable = this.madeHit && !m.noFlowCancel;
-          if (this.f >= total || (flowCancelable && this.f >= flowEnd)) this.endMove();
+          // BULLET ARTS extends the move: while she's still feeding rounds (held + budget left),
+          // the strike doesn't end — she keeps gunning. It ends once the rounds/stamina run out
+          // or the button is released (or she cancels into another move).
+          const firingBA = this.char.bulletArts && m.bulletArts !== false && this.madeContact
+            && (this.pad.held.punch || this.pad.held.kick) && this.bulletsFired < CFG.BULLET_MAX
+            && this.stamina >= CFG.BULLET_COST && this.f >= m.startup + (m.active || 0);
+          if (!firingBA && (this.f >= total || (flowCancelable && this.f >= flowEnd))) this.endMove();
         }
         break;
       }

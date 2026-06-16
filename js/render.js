@@ -1330,6 +1330,12 @@ function drawMech(ctx, f, alpha) {
 
 function drawProjectile(ctx, p) {
   const d = Math.sign(p.vx);
+  if (p.kind === 'bullet') {   // a small bright round + a short streak trailing it
+    ctx.strokeStyle = 'rgba(255,238,170,0.7)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(p.x, p.y + p.h / 2); ctx.lineTo(p.x - d * 30, p.y + p.h / 2); ctx.stroke();   // tracer
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(p.x, p.y + p.h / 2, 4, 0, Math.PI * 2); ctx.fill();   // round
+    return;
+  }
   for (let i = 3; i >= 1; i--) {
     ctx.globalAlpha = 0.12 * (4 - i);
     ctx.fillStyle = '#ffb74d';
