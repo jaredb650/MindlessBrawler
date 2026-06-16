@@ -17,6 +17,7 @@ const GAME_CODES = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'Arro
 
 window.addEventListener('keydown', e => {
   if (GAME_CODES.has(e.code)) e.preventDefault();
+  if (typeof unlockAudio === 'function') unlockAudio();   // resume + pre-decode SFX on the first gesture (sfx.js)
   if (!e.repeat) KeyQueue.push(e.code);
   RawKeys[e.code] = true;
 });

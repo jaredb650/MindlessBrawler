@@ -1,20 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 // SFX + MUSIC engine.
 //
-//   Drop sound files into  assets/sfx/<name>.<ext>   (mp3 / ogg / wav)
-//   Drop music loops into  assets/music/<name>.<ext>
-//   First extension that loads wins. MISSING FILES FAIL SILENT — the
-//   game runs fine with zero, some, or all sounds present.
+//   Drop SFX into   assets/sfx/<name>.<ext>    (m4a / mp3 / ogg / wav)
+//   Drop music into assets/music/<name>.<ext>
+//   Missing files fail silent. Shopping-list → assets/SOUND-LIST.md
 //
-//   Full shopping-list of every name the game fires, with descriptions:
-//   → assets/SOUND-LIST.md
+// SFX use the WEB AUDIO API: every sound is fetched + DECODED into memory
+// up front (on the first keypress), then played from a BufferSource with
+// near-zero latency — no per-play load hitch, no "first hit is silent".
+// Music streams through a looping <audio> element (latency doesn't matter
+// for a loop, and it keeps a long track out of memory).
 //
-// Features: per-category + master volume, mute (M key), subtle random
-// pitch on every hit (cheap variety), optional multi-file VARIANTS,
-// rapid-repeat throttling, and looping music with track switching.
+// Features: master + sfx + music volume, mute (M), subtle random pitch on
+// every hit (variety), rapid-repeat throttling, looping music switching.
 // ─────────────────────────────────────────────────────────────
 
-const SFX_EXTS = ['m4a', 'mp3', 'ogg', 'wav'];   // m4a first (our normalized files); mp3/ogg/wav also work
+const SFX_EXTS = ['m4a', 'mp3', 'ogg', 'wav'];   // m4a first (our normalized files)
 
 const SFX = {
   enabled: true,
@@ -23,14 +24,15 @@ const SFX = {
   sfxVol: 1.0,          // sound-effects bus
   musicVol: 0.45,       // music bus
   pitchVary: 0.06,      // ±6% random playbackRate on every sfx → no two hits sound identical
-  throttleMs: 32,       // don't re-stack the SAME sound faster than this (stops machine-gun roar)
-  cache: {},            // name → { audio, tries } | null (known-missing)
-  variants: {},         // name → N : after you add name_1..name_N.mp3, set this to rotate them at random
+  throttleMs: 32,       // don't re-stack the SAME sound faster than this
+  ctx: null,            // AudioContext (lazy)
+  masterGain: null,     // master GainNode → destination
+  buffers: {},          // name → AudioBuffer | null (missing) | Promise (decoding)
   last: {},             // name → last-play timestamp (throttle)
-  music: { name: null, audio: null },
+  music: { name: null, el: null },
+  _preloaded: false,
 };
 
-// Every sound the game fires, grouped (this is also the preload + doc manifest).
 const SOUND_MANIFEST = {
   impacts:   ['hit_light', 'hit_med', 'hit_heavy', 'body_blow', 'block', 'parry', 'bounce', 'body_slam', 'ground_pop', 'wall_splat'],
   swings:    ['whoosh_light', 'whoosh_heavy', 'fly_takeoff'],
@@ -47,93 +49,131 @@ const SOUND_MANIFEST = {
 };
 
 function _now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+function _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
-// Lazy-load a sound by name, trying each extension; cache the hit (or the miss).
-function _loadSfx(name, onReady) {
-  let e = SFX.cache[name];
-  if (e === null) return;                 // known-missing → stay silent
-  if (!e) {
-    e = SFX.cache[name] = { audio: null, tries: 0 };
-    const tryNext = () => {
-      if (e.tries >= SFX_EXTS.length) { SFX.cache[name] = null; return; }   // gave up → mark missing
-      const a = new Audio('assets/sfx/' + name + '.' + SFX_EXTS[e.tries++]);
-      a.addEventListener('canplaythrough', () => { e.audio = a; }, { once: true });
-      a.addEventListener('error', tryNext, { once: true });
-    };
-    tryNext();
-  }
-  if (e.audio && onReady) onReady(e.audio);
+// Lazily create the AudioContext + master gain. Returns null where Web Audio
+// isn't available (e.g. headless test harness) so everything no-ops safely.
+function _ctx() {
+  if (SFX.ctx) return SFX.ctx;
+  const AC = (typeof window !== 'undefined') && (window.AudioContext || window.webkitAudioContext);
+  if (!AC) return null;
+  const c = new AC();
+  SFX.ctx = c;
+  SFX.masterGain = c.createGain();
+  SFX.masterGain.gain.value = SFX.muted ? 0 : SFX.master;
+  SFX.masterGain.connect(c.destination);
+  return c;
 }
 
-// Fire a one-shot sound effect. opts: { vol, pitch } (both optional).
+// Fetch + decode one sound into an AudioBuffer (first extension that works).
+function _loadBuffer(name) {
+  const have = SFX.buffers[name];
+  if (have !== undefined) return have;     // AudioBuffer | null | Promise
+  const c = _ctx();
+  if (!c || typeof fetch === 'undefined') { SFX.buffers[name] = null; return null; }
+  const p = (async () => {
+    for (const ext of SFX_EXTS) {
+      try {
+        const res = await fetch('assets/sfx/' + name + '.' + ext);
+        if (!res.ok) continue;
+        const data = await res.arrayBuffer();
+        const buf = await c.decodeAudioData(data);
+        SFX.buffers[name] = buf;
+        return buf;
+      } catch (e) { /* try next ext */ }
+    }
+    SFX.buffers[name] = null;               // missing/undecodable → silent forever
+    return null;
+  })();
+  SFX.buffers[name] = p;                     // mark "decoding"
+  return p;
+}
+
+function _spawn(buf, opts) {
+  const c = SFX.ctx;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const pv = (opts && opts.pitch != null) ? opts.pitch : SFX.pitchVary;
+  src.playbackRate.value = 1 + (Math.random() - 0.5) * 2 * pv;
+  const g = c.createGain();
+  g.gain.value = Math.max(0, (opts && opts.vol != null ? opts.vol : 1) * SFX.sfxVol);
+  src.connect(g); g.connect(SFX.masterGain);
+  src.start();
+}
+
+// Fire a one-shot SFX. opts: { vol, pitch } (optional). Instant if preloaded.
 function playSfx(name, opts) {
   if (!SFX.enabled || SFX.muted || !name) return;
+  const c = _ctx();
+  if (!c) return;                            // no Web Audio (headless) → silent
+  if (c.state === 'suspended') { c.resume(); return; }   // not unlocked by a gesture yet
   const now = _now();
   if (SFX.last[name] && now - SFX.last[name] < SFX.throttleMs) return;   // throttle identical rapid plays
-  SFX.last[name] = now;
-
-  let key = name;
-  const nv = SFX.variants[name];
-  if (nv > 1) key = name + '_' + (1 + ((Math.random() * nv) | 0));       // rotate name_1..name_N if configured
-
-  const vol = (opts && opts.vol != null) ? opts.vol : 1;
-  const pv = (opts && opts.pitch != null) ? opts.pitch : SFX.pitchVary;
-  _loadSfx(key, (audio) => {
-    const a = audio.cloneNode();                       // clone so overlapping plays don't cut each other off
-    a.volume = Math.max(0, Math.min(1, vol * SFX.sfxVol * SFX.master));
-    a.preservesPitch = false; a.webkitPreservesPitch = false;            // let playbackRate actually shift pitch
-    a.playbackRate = 1 + (Math.random() - 0.5) * 2 * pv;
-    a.play().catch(() => {});
-  });
+  const buf = SFX.buffers[name];
+  if (buf && !buf.then) {                     // a decoded AudioBuffer (not a Promise, not null)
+    SFX.last[name] = now;
+    _spawn(buf, opts);
+  } else if (buf === undefined) {
+    _loadBuffer(name);                        // kick a decode for next time (don't play late)
+  }
+  // a Promise (still decoding) or null (missing) → skip this play
 }
 
-// Loop a music track. Idempotent: calling with the SAME name every frame is cheap
-// and also retries play() once the browser's autoplay gate opens (first key press).
+// Call on the first user gesture (wired in input.js): resumes the context and
+// PRE-DECODES every sound so the first real play is instant + audible.
+function unlockAudio() {
+  const c = _ctx();
+  if (c && c.state === 'suspended') c.resume();
+  if (!SFX._preloaded) { SFX._preloaded = true; preloadSounds(); }
+  if (SFX.music.el && SFX.music.el.paused && !SFX.muted) SFX.music.el.play().catch(() => {});
+}
+
+function preloadSounds() {
+  for (const cat in SOUND_MANIFEST) {
+    if (cat === 'music') continue;
+    for (const name of SOUND_MANIFEST[cat]) _loadBuffer(name);
+  }
+}
+
+// ── music: a streamed, looping <audio> element ──
 function playMusic(name) {
   if (!name) return;
   if (SFX.music.name === name) {
-    const a = SFX.music.audio;
-    if (a && a.paused && !SFX.muted) a.play().catch(() => {});
+    const el = SFX.music.el;
+    if (el && el.paused && !SFX.muted) el.play().catch(() => {});   // retry past the autoplay gate
     return;
   }
   stopMusic();
-  SFX.music.name = name;                               // set first so same-name calls early-out while it loads
+  SFX.music.name = name;
+  if (typeof Audio === 'undefined') return;
   let tries = 0;
   const tryNext = () => {
     if (tries >= SFX_EXTS.length) return;
-    const a = new Audio('assets/music/' + name + '.' + SFX_EXTS[tries++]);
-    a.loop = true;
-    a.volume = SFX.musicVol * SFX.master;
-    a.addEventListener('canplaythrough', () => {
-      if (SFX.music.name !== name) return;             // a newer track was requested while this loaded
-      SFX.music.audio = a;
-      if (!SFX.muted) a.play().catch(() => {});
+    const el = new Audio('assets/music/' + name + '.' + SFX_EXTS[tries++]);
+    el.loop = true;
+    el.volume = SFX.musicVol * SFX.master;
+    el.addEventListener('canplaythrough', () => {
+      if (SFX.music.name !== name) return;
+      SFX.music.el = el;
+      if (!SFX.muted) el.play().catch(() => {});
     }, { once: true });
-    a.addEventListener('error', tryNext, { once: true });
+    el.addEventListener('error', tryNext, { once: true });
   };
   tryNext();
 }
 
 function stopMusic() {
-  if (SFX.music.audio) { try { SFX.music.audio.pause(); } catch (e) {} }
-  SFX.music.audio = null; SFX.music.name = null;
+  if (SFX.music.el) { try { SFX.music.el.pause(); } catch (e) {} }
+  SFX.music.el = null; SFX.music.name = null;
 }
 
-function setMasterVolume(v) { SFX.master = Math.max(0, Math.min(1, v)); if (SFX.music.audio) SFX.music.audio.volume = SFX.musicVol * SFX.master; }
-function setMusicVolume(v) { SFX.musicVol = Math.max(0, Math.min(1, v)); if (SFX.music.audio) SFX.music.audio.volume = SFX.musicVol * SFX.master; }
+function setMasterVolume(v) { SFX.master = _clamp01(v); if (SFX.masterGain && !SFX.muted) SFX.masterGain.gain.value = SFX.master; if (SFX.music.el) SFX.music.el.volume = SFX.musicVol * SFX.master; }
+function setMusicVolume(v) { SFX.musicVol = _clamp01(v); if (SFX.music.el) SFX.music.el.volume = SFX.musicVol * SFX.master; }
 
 // M key toggles this (wired in main.js). Returns the new muted state.
 function toggleMute() {
   SFX.muted = !SFX.muted;
-  if (SFX.music.audio) { if (SFX.muted) SFX.music.audio.pause(); else SFX.music.audio.play().catch(() => {}); }
+  if (SFX.masterGain) SFX.masterGain.gain.value = SFX.muted ? 0 : SFX.master;
+  if (SFX.music.el) { if (SFX.muted) SFX.music.el.pause(); else SFX.music.el.play().catch(() => {}); }
   return SFX.muted;
-}
-
-// Optional: front-load every manifest sound so the first play has no hitch.
-// Call this AFTER files exist (it 404s on names you haven't added yet).
-function preloadSounds() {
-  for (const cat in SOUND_MANIFEST) {
-    if (cat === 'music') continue;
-    for (const name of SOUND_MANIFEST[cat]) _loadSfx(name);
-  }
 }
