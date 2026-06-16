@@ -308,7 +308,9 @@ class Fighter {
       p.consume('super');
       this.meter = 0;
       // FORWARD + super = the OVERDRIVE BEAM; any other direction = the Mech Cannon.
-      const fwd = (this.facing === 1 && p.held.right) || (this.facing === -1 && p.held.left);
+      // Resolve against the PRESS-TIME snap (like every other directional action) so a
+      // buffered forward+super isn't mis-routed to the cannon if the stick was released.
+      const fwd = this.dirCategory(opp, p.snap.super) === 'forward';
       this.superKind = fwd ? 'beam' : 'cannon';
       this.setState('superstart');
       this.superFlash = true;

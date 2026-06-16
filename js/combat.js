@@ -374,12 +374,14 @@ function updateBeam(att, vic, game) {
   const FIRE1 = CFG.BEAM_CHARGE + CFG.BEAM_ACTIVE;
   if (att.f < FIRE0 || att.f >= FIRE1) return;          // charge + recovery: no beam
   game.shake = Math.max(game.shake, CFG.SHAKE_MED);     // the whole screen rumbles while it fires
+  if (att.f === FIRE0) { playSfx('explosion'); playSfx('beam_fire'); }   // BLAST-OUT — the beam erupts (layered)
 
   const dir = att.facing;
   const cy = CFG.FLOOR_Y - 130;
   const ox = att.x + dir * 56;                          // beam origin = the cupped hands
   const beam = { x: dir === 1 ? ox : ox - CFG.BEAM_LEN, y: cy - CFG.BEAM_H / 2, w: CFG.BEAM_LEN, h: CFG.BEAM_H };
-  const engulfed = vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && rectsOverlap(beam, vic.hurtbox());
+  // a downed/fallen body is left alone (don't yank it up into the beam); everyone else can be engulfed
+  const engulfed = vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && vic.state !== 'downed' && rectsOverlap(beam, vic.hurtbox());
   if (!engulfed) return;
 
   const blocking = canBlock(vic, att.x, BEAM_MOVE);
@@ -387,6 +389,17 @@ function updateBeam(att, vic, game) {
   const tick = (att.f - FIRE0) % CFG.BEAM_HIT_INTERVAL === 0;
 
   if (last) {
+    if (blocking) {
+      // a clean guard SURVIVES the detonation — heavy chip (still floored, chip can't KO) + a hard shove, no launch
+      vic.hp = Math.max(CFG.CHIP_FLOOR, vic.hp - CFG.BEAM_TICK_CHIP * 3);
+      vic.receiveBlockstun(16);
+      vic.pushVel = dir * CFG.BEAM_BLOCK_PUSH * 1.6;
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_MED);
+      spawnSpark(vic.x - dir * CFG.BODY_W / 2, cy, 'block');
+      playSfx('explosion');
+      return;
+    }
     vic.hp = Math.max(0, vic.hp - CFG.BEAM_FINISH_DMG);
     vic.setLaunched(dir * CFG.BEAM_FINISH_VX, CFG.BEAM_FINISH_VY, true);
     if (vic.hp <= 0) vic.noTech = true;                  // can't tech your own erasure

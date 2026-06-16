@@ -1107,8 +1107,8 @@ function render(ctx, game, alpha) {
   const order = a.move && !b.move ? [b, a] : [a, b];
   for (const f of order) drawFighter(ctx, f, game);
 
-  // OVERDRIVE BEAM pours out OVER the fighters for maximum drama
-  for (const f of game.fighters) if (f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
+  // OVERDRIVE BEAM pours out OVER the fighters for maximum drama (the freeze overlay owns the charge visual)
+  for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
 
   for (const p of Particles) {
     ctx.globalAlpha = Math.max(0, p.life / p.maxLife);

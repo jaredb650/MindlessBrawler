@@ -424,7 +424,7 @@ function logicStep() {
       if (f.state === 'superstart') {
         game.superFreeze = CFG.SUPER_FREEZE;
         game.superWho = f;
-        playSfx('super_freeze');
+        playSfx(f.superKind === 'beam' ? 'beam_activate' : 'super_freeze');   // electric twinkle for the beam charge
       }
     }
   }
