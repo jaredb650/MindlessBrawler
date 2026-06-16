@@ -32,6 +32,7 @@ const game = {
   flashMax: 0,            // the seed the live flash started from — render divides by it
   cine: null,             // ONE canned-cinematic slot: { kind:'suplex'|'groundpound'|'flatliner', att, vic, f, data }
   flatlinerKill: false,   // KO banner reads FLATLINED instead of K.O./EXECUTED
+  comboKill: false,       // KO banner reads FINISHED — the back-super sword finisher
   feed: [],               // strike feed (newest first), drawn by ui.js
   koFreeze: 0,            // KO cinematic: frames the world holds on black + white silhouettes before the launch
   muted: false,           // mirror of SFX.muted (toggled with M)
@@ -292,7 +293,87 @@ function runFlatlinerCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine };
+// SUPER COMBO (back+super): the starter punch landed → an inescapable, accelerating
+// 16-hit teleport flurry (the attacker zips around the victim hitting from all angles),
+// then a 3-swipe SWORD finisher that KILLS. Owns both bodies via the shared cine harness.
+function startSuperCombo(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  startCine('supercombo', att, vic, game, {
+    startHp: vic.hp, vicX: vic.x, hits: 0, phase: 'flurry',
+    nextHit: CFG.COMBO_START_DELAY, interval: CFG.COMBO_START_INTERVAL, poseF0: 0,
+    swipe: 0, swordAt: 0,
+  });
+  att.setState('supercombo'); att.comboStrike = 'punch';
+  vic.setState('executed');
+  game.hitstop = Math.max(game.hitstop, 6);
+  game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'hit', 2);
+  playSfx('hit_heavy');
+  pushFeed('SUPER COMBO!!', att.color);
+}
+
+function runSuperComboCine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y;   // pin the victim; the attacker orbits them
+  att.f = Math.max(0, ex.f - data.poseF0);  // strike/swipe pose animates from each teleport/swipe
+
+  if (data.phase === 'flurry') {
+    if (data.hits < CFG.COMBO_HITS && ex.f >= data.nextHit) {
+      data.hits++;
+      const side = (data.hits % 2 === 0) ? 1 : -1;
+      const aerial = (data.hits % 3 === 0);
+      const r = CFG.COMBO_RADIUS * (0.62 + (data.hits % 4) * 0.13);
+      const ghostX = att.x, ghostY = att.y;                          // afterimage from the vacated spot
+      att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x + side * r));
+      att.y = aerial ? CFG.FLOOR_Y - 64 - (data.hits % 2) * 42 : CFG.FLOOR_Y;
+      att.facing = Math.sign(vic.x - att.x) || att.facing;
+      att.comboStrike = (data.hits % 2 === 0) ? 'kick' : 'punch';
+      data.poseF0 = ex.f;
+      vic.hp = Math.max(1, Math.round(data.startHp * (1 - data.hits / (CFG.COMBO_HITS + 5))));   // chunk them low (sword finishes)
+      spawnSpark(vic.x + (Math.random() - 0.5) * 44, CFG.FLOOR_Y - 80 - Math.random() * 70, 'hit', 1);
+      spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 5);           // teleport streak off the old spot
+      spawnDust(att.x, CFG.FLOOR_Y, 4);
+      game.shake = Math.max(game.shake, 3 + data.hits * 0.4);
+      playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
+      data.interval = Math.max(CFG.COMBO_MIN_INTERVAL, data.interval - CFG.COMBO_ACCEL);
+      data.nextHit = ex.f + Math.round(data.interval);
+    } else if (data.hits >= CFG.COMBO_HITS && ex.f >= data.nextHit) {
+      // → the SWORD finisher: reappear beside them and draw the blade
+      data.phase = 'sword'; data.poseF0 = ex.f; data.swipe = 0; data.swordAt = ex.f + CFG.SWORD_WINDUP;
+      att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x - att.facing * 80));
+      att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
+      att.setState('swordfinish');
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+      game.hitstop = Math.max(game.hitstop, 8);
+      playSfx('whoosh_heavy');
+    }
+  } else {   // sword: 3 slashes, the last one KILLS
+    if (data.swipe < CFG.SWORD_SWIPES && ex.f >= data.swordAt) {
+      data.swipe++; data.poseF0 = ex.f;
+      const last = data.swipe >= CFG.SWORD_SWIPES;
+      const cy = CFG.FLOOR_Y - 110;
+      spawnSpark(vic.x, cy + (Math.random() - 0.5) * 70, 'parry');   // bright slash flash
+      spawnBlood(vic.x, cy, att.facing, last ? 44 : 14);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + (last ? 6 : 2));
+      game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 8);
+      playSfx('hit_heavy');
+      if (!last) {
+        vic.hp = Math.max(1, vic.hp - Math.round(data.startHp * 0.12));
+        data.swordAt = ex.f + CFG.SWORD_SWIPE_FRAMES;
+      } else {
+        // FINISH HIM — the kill (logicStep's KO block fires slow-mo + flash next frame)
+        vic.hp = 0;
+        vic.setLaunched(att.facing * 13, -11, true); vic.noTech = true;
+        att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+        game.comboKill = true;
+        game.cine = null;
+        pushFeed('FINISHED!!', att.color);
+      }
+    }
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine };
 
 function runCine(game) {
   const ex = game.cine;
@@ -320,6 +401,7 @@ function resetMatch() {
   game.flashMax = 0;
   game.cine = null;
   game.flatlinerKill = false;
+  game.comboKill = false;
   game.koFreeze = 0;
   game.feed = [];
   cpu = new CPU();
@@ -443,7 +525,7 @@ function logicStep() {
     game.matchState = 'ko';
     // the freeze-frame beat — but the bespoke finishers (execution / flatliner) already
     // have their own dramatic freeze, so only normal KOs + super get this one.
-    if (!game.executionKill && !game.flatlinerKill) { game.koFreeze = CFG.KO_FREEZE; playSfx('ko_freeze'); }   // electric stinger on the silhouette freeze
+    if (!game.executionKill && !game.flatlinerKill && !game.comboKill) { game.koFreeze = CFG.KO_FREEZE; playSfx('ko_freeze'); }   // electric stinger on the silhouette freeze (finishers own their own climax)
     game.slowmo = CFG.KO_SLOWMO_FRAMES;
     game.flash = CFG.KO_FLASH; game.flashMax = CFG.KO_FLASH;   // EVERY KO flashes — shared KO juice, zero per-move wiring
     // blood on EVERY kill — a gout from each downed fighter, in their launch direction
@@ -455,7 +537,7 @@ function logicStep() {
     const winner = f1.hp <= 0 ? (f2.hp <= 0 ? null : f2) : f1;
     game.banner = {
       // a double KO is a DRAW — the finisher's owner died too, so don't crown it FLATLINED/EXECUTED
-      text: !winner ? 'DOUBLE K.O.' : game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
+      text: !winner ? 'DOUBLE K.O.' : game.comboKill ? 'FINISHED!!' : game.flatlinerKill ? 'FLATLINED.' : game.executionKill ? 'EXECUTED.' : 'K.O.',
       sub: winner ? `${winner.name} WINS — press jump to rematch` : 'DOUBLE K.O. — press jump to rematch',
       timer: 999999,
     };

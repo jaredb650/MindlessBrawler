@@ -283,6 +283,19 @@ const CFG = {
   SUPER_RECOVERY: 34,
   SUPER_SHOT_SPEED: 22,
 
+  // BACK + super → the SUPER COMBO: pose-freeze → a starter punch; if it LANDS, an
+  // inescapable 16-hit teleporting flurry (accelerating) → a 3-swipe sword finisher KO.
+  COMBO_STARTER_RANGE: 155,     // reach of the starter punch (whiff = wasted meter)
+  COMBO_HITS: 16,               // hits in the teleport flurry
+  COMBO_START_DELAY: 8,         // frames after the starter connects before the flurry opens
+  COMBO_START_INTERVAL: 9,      // initial frames between flurry hits...
+  COMBO_MIN_INTERVAL: 2,        // ...accelerating down to this
+  COMBO_ACCEL: 0.5,             // interval shrinks by this each hit
+  COMBO_RADIUS: 128,            // how far around the victim the attacker teleports
+  SWORD_WINDUP: 22,             // beat to pull the sword after the flurry
+  SWORD_SWIPE_FRAMES: 15,       // frames per slash
+  SWORD_SWIPES: 3,
+
   // FORWARD + super → the OVERDRIVE BEAM (neutral/back super stays the Mech Cannon).
   // A charge-up, then a giant multi-hit beam that engulfs a big chunk of the screen,
   // drags the body to the wall, and detonates.

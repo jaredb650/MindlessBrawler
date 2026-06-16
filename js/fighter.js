@@ -120,7 +120,8 @@ class Fighter {
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
-    this.superKind = 'cannon'; // 'cannon' (neutral super) | 'beam' (forward super)
+    this.superKind = 'cannon'; // 'cannon' (neutral) | 'beam' (forward) | 'combo' (back)
+    this.comboStrike = 'punch';// super-combo flurry: which strike the current teleport hit shows (render)
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
@@ -312,11 +313,10 @@ class Fighter {
     if (p.pressed.super && this.meter >= CFG.SUPER_COST) {
       p.consume('super');
       this.meter = 0;
-      // FORWARD + super = the OVERDRIVE BEAM; any other direction = the Mech Cannon.
-      // Resolve against the PRESS-TIME snap (like every other directional action) so a
-      // buffered forward+super isn't mis-routed to the cannon if the stick was released.
-      const fwd = this.dirCategory(opp, p.snap.super) === 'forward';
-      this.superKind = fwd ? 'beam' : 'cannon';
+      // Directional super (resolved against the PRESS-TIME snap): FORWARD = OVERDRIVE BEAM,
+      // BACK = the SUPER COMBO, anything else (neutral/up/down) = the Mech Cannon.
+      const sdir = this.dirCategory(opp, p.snap.super);
+      this.superKind = sdir === 'forward' ? 'beam' : sdir === 'back' ? 'combo' : 'cannon';
       this.setState('superstart');
       this.superFlash = true;
       return true;
@@ -1114,6 +1114,15 @@ class Fighter {
         if (this.superKind === 'beam') {
           // charge → fire (the beam's multi-hits resolve in combat.js updateBeam) → recovery → idle
           if (this.f >= CFG.BEAM_CHARGE + CFG.BEAM_ACTIVE + CFG.BEAM_RECOVERY) this.setState('idle');
+        } else if (this.superKind === 'combo') {
+          // the starter punch to his side — if it REACHES, the inescapable combo begins (main.js)
+          if (this.f === CFG.SUPER_STARTUP) {
+            const grounded = !opp.isAirborne() && !['downed', 'fallheavy', 'getup'].includes(opp.state);
+            if (opp.hp > 0 && opp.invuln <= 0 && grounded && Math.abs(opp.x - this.x) <= CFG.COMBO_STARTER_RANGE) {
+              startSuperCombo(this, opp, game);
+            }
+          }
+          if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');   // whiffed starter → recover (meter spent)
         } else {
           if (this.f === CFG.SUPER_STARTUP) this.spawnShot = true;
           if (this.f >= CFG.SUPER_STARTUP + CFG.SUPER_RECOVERY) this.setState('idle');

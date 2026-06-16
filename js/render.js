@@ -214,6 +214,30 @@ function drawActionLines(ctx, x, y, dir) {
   ctx.restore();
 }
 
+// The SWORD (super-combo finisher): a long bright blade from the lead hand, sweeping
+// through a slash arc. `f` = frames into the current swipe (poseF0 resets it per slash).
+function drawSword(ctx, hx, hy, f) {
+  const t = Math.min(1, f / CFG.SWORD_SWIPE_FRAMES);
+  const ang = -1.5 + t * 2.7;                 // arcs from up-and-back down across the front
+  const len = 100;
+  const tx = hx + Math.cos(ang) * len, ty = hy + Math.sin(ang) * len;
+  ctx.save();
+  ctx.lineCap = 'round';
+  if (f < CFG.SWORD_SWIPE_FRAMES) {           // bright slash trail behind the tip
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(210,242,255,0.65)'; ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.arc(hx, hy, len, ang - 1.0, ang, false); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 9;                 // blade outline
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.strokeStyle = '#cfe9ff'; ctx.lineWidth = 5;              // steel
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;             // hot edge
+  ctx.beginPath(); ctx.moveTo(hx + Math.cos(ang) * 14, hy + Math.sin(ang) * 14); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.restore();
+}
+
 // FX run even during hitstop — the freeze is for bodies, not sparks.
 function updateFx() {
   for (let i = Particles.length - 1; i >= 0; i--) {
@@ -577,6 +601,13 @@ function drawFighter(ctx, f, game) {
         }
         P.footF.x = 28; P.footR.x = -26;
         P.faceMood = 1;
+      } else if (f.superKind === 'combo') {
+        // coiled battle stance — rear fist drawn way back, ready to explode forward
+        lean(P, 0.16);
+        P.handR = { x: -20, y: -118 }; P.handF = { x: 34, y: -130 };
+        P.armBendR = 1;
+        P.footF.x = 32; P.footR.x = -28;
+        P.faceMood = 1;
       } else {
         lean(P, 0.12); guardUp(P); P.faceMood = 1;
       }
@@ -653,6 +684,24 @@ function drawFighter(ctx, f, game) {
       P.handF = { x: -22, y: -86 }; P.handR = { x: -12, y: -110 };
       P.armBendF = -1; P.armBendR = -1;
       P.faceMood = -1;
+      break;
+    }
+    // SUPER COMBO (attacker): a hard committed strike at each teleport — punch or kick.
+    case 'supercombo': {
+      lean(P, 0.44);
+      const tgt = f.comboStrike === 'kick' ? { x: 80, y: -96 } : { x: 80, y: -128 };
+      strikeTo(P, tgt, f.comboStrike === 'kick' ? 'kick' : 'punch');
+      P.trail = { to: tgt, isLeg: f.comboStrike === 'kick' };
+      P.faceMood = 1;
+      break;
+    }
+    // SUPER COMBO finisher (attacker): two-hand grip slashing the blade (drawn after the skeleton).
+    case 'swordfinish': {
+      lean(P, 0.28);
+      P.handF = { x: 46, y: -118 }; P.handR = { x: 30, y: -130 };
+      P.armBendF = 1; P.armBendR = 1;
+      P.footF.x = 30; P.footR.x = -26;
+      P.faceMood = 1;
       break;
     }
     // SUPLEX thrower: arching BACKWARD into the bridge — hips thrust, shoulders drop
@@ -928,7 +977,7 @@ function drawFighter(ctx, f, game) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9) });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
@@ -937,6 +986,7 @@ function drawFighter(ctx, f, game) {
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.8, 30, 3);
   }
   if (key === 'machinegun') { drawActionLines(ctx, P.handF.x, P.handF.y, 1); drawActionLines(ctx, P.handR.x, P.handR.y, 1); }
+  if (key === 'swordfinish') drawSword(ctx, P.handF.x, P.handF.y, f.f);   // the blade + slash sweep
 
   ctx.restore();
 }
@@ -1287,7 +1337,8 @@ function render(ctx, game, alpha) {
     const who = game.superWho;
     const prog = Math.min(1, (CFG.SUPER_FREEZE - game.superFreeze) / 8);
     const beam = who && who.superKind === 'beam';
-    if (who && !beam) drawMech(ctx, who, prog);
+    const combo = who && who.superKind === 'combo';
+    if (who && !beam && !combo) drawMech(ctx, who, prog);
     if (who) drawFighter(ctx, who, game);
     if (who && beam) {                              // a swelling charge aura during the freeze
       const cy = CFG.FLOOR_Y - 130, ox = who.x + who.facing * 56;
@@ -1298,10 +1349,16 @@ function render(ctx, game, alpha) {
       ball(ctx, ox, cy, 6 + prog * 18, '#ffffff');
       ctx.restore();
     }
-    ctx.fillStyle = beam ? '#8fe9ff' : '#ffe082';
+    if (who && combo) {                             // a red battle aura behind the coiled pose
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      radialGlow(ctx, who.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, 80 + prog * 130, 'rgba(255,82,82,0.4)');
+      ctx.restore();
+    }
+    ctx.fillStyle = combo ? '#ff7b7b' : beam ? '#8fe9ff' : '#ffe082';
     ctx.font = 'bold 64px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(beam ? 'OVERDRIVE BEAM' : 'MECH CANNON', CFG.STAGE_W / 2, 200);
+    ctx.fillText(combo ? 'SUPER COMBO' : beam ? 'OVERDRIVE BEAM' : 'MECH CANNON', CFG.STAGE_W / 2, 200);
   }
 
   // counter-hit cinematic: dim the room, the two of them on top of the slip
