@@ -14,7 +14,7 @@
 // rapid-repeat throttling, and looping music with track switching.
 // ─────────────────────────────────────────────────────────────
 
-const SFX_EXTS = ['mp3', 'ogg', 'wav'];
+const SFX_EXTS = ['m4a', 'mp3', 'ogg', 'wav'];   // m4a first (our normalized files); mp3/ogg/wav also work
 
 const SFX = {
   enabled: true,

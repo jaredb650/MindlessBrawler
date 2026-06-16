@@ -11,8 +11,23 @@ and it plays automatically** — missing files are silent, so add them in any or
   `SFX.variants.hit_heavy = 3` in `js/sfx.js` — it'll rotate them at random.
 - **M** mutes/unmutes in-game. Volumes live in `js/sfx.js` (`master`, `sfxVol`, `musicVol`).
 
-Format tips: short SFX as **mp3 or ogg**, keep them punchy (trim silence). Aim ~−6 dB
-so nothing clips when several stack. Music as a seamless **loop**.
+Format tips: short SFX as **mp3 / m4a / ogg**, keep them punchy (trim silence). Music
+as a seamless **loop**. When I add a batch I **loudness-normalize** them (boost the
+quiet, cut the loud) so everything sits at a consistent level — drop new ones in raw
+and I'll level them.
+
+---
+
+## Status (what's in / what's still needed)
+
+**✅ In (27, normalized to ~−4 dBFS peak):** all impacts · all swings · all movement ·
+all grapples · gassed · super_freeze · explosion · meter_ready · counter_slip ·
+counter_hit · ko.
+
+**⬜ Still needed (12 SFX + 2 music):**
+`exec_grab` `exec_punch` `exec_riser` `exec_blast` (execution cinematic) ·
+`flatliner_freeze` `flatliner_hit` `flatliner_drop` `flatliner_ko` (the one-punch KO) ·
+`fight_start` · `ui_move` `ui_confirm` `ui_back` (menus) · `music_menu` `music_fight`.
 
 ---
 
