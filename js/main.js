@@ -32,6 +32,7 @@ const game = {
   flatlinerKill: false,   // KO banner reads FLATLINED instead of K.O./EXECUTED
   feed: [],               // strike feed (newest first), drawn by ui.js
   koFreeze: 0,            // KO cinematic: frames the world holds on black + white silhouettes before the launch
+  muted: false,           // mirror of SFX.muted (toggled with M)
   scene: 'title',         // front-end scene: title | mode | movelist | fight | paused (driven by menu.js)
   menu: { sel: 0, scroll: 0, t: 0, returnTo: 'mode' },
 };
@@ -337,6 +338,8 @@ function dummyInputs() {
 }
 
 function logicStep() {
+  // global: M toggles mute in ANY scene (pulled before the scene branch drains the queue)
+  for (let i = KeyQueue.length - 1; i >= 0; i--) if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
   // SCENE layer (menu.js): the title / mode-select / move-list / pause screens run
   // their own step and never touch the fight. In the fight, a pause keypress (Esc /
   // Enter / P) lifts us to the pause screen before any fight logic runs.
@@ -454,6 +457,9 @@ function frame(now) {
     logicStep();
     acc -= STEP;
   }
+  // music: fight loop in a match, menu loop everywhere else (idempotent — also retries
+  // play() once the browser autoplay gate opens on the first keypress)
+  playMusic((game.scene === 'fight' || game.scene === 'paused') ? 'music_fight' : 'music_menu');
   if (game.scene === 'title' || game.scene === 'mode' || game.scene === 'movelist') {
     drawMenu(ctx, game);
   } else {

@@ -88,16 +88,16 @@ function menuStep(game) {
   game.menu.t = (game.menu.t || 0) + 1;
   const k = menuKeys();
   const m = game.menu;
-  const move = (n) => { if (k.down) m.sel = (m.sel + 1) % n; if (k.up) m.sel = (m.sel - 1 + n) % n; if (k.up || k.down) playSfx('whoosh_light'); };
+  const move = (n) => { if (k.down) m.sel = (m.sel + 1) % n; if (k.up) m.sel = (m.sel - 1 + n) % n; if (k.up || k.down) playSfx('ui_move'); };
 
   if (game.scene === 'title') {
-    if (k.confirm) { game.scene = 'mode'; m.sel = 0; playSfx('getup'); }
+    if (k.confirm) { game.scene = 'mode'; m.sel = 0; playSfx('ui_confirm'); }
 
   } else if (game.scene === 'mode') {
     move(MODE_OPTS.length);
-    if (k.back) { game.scene = 'title'; }
+    if (k.back) { game.scene = 'title'; playSfx('ui_back'); }
     if (k.confirm) {
-      playSfx('meter_ready');
+      playSfx('ui_confirm');
       if (m.sel === 0) startFight(game, 3);        // 1P vs CPU
       else if (m.sel === 1) startFight(game, 0);   // 2P local
       else if (m.sel === 2) startFight(game, 1);   // training (idle dummy; 1/2/3 switch in-fight)
@@ -107,12 +107,13 @@ function menuStep(game) {
   } else if (game.scene === 'movelist') {
     if (k.up) m.scroll = Math.max(0, m.scroll - 1);
     if (k.down) m.scroll = m.scroll + 1;           // clamped in draw
-    if (k.back || k.confirm) { game.scene = m.returnTo || 'mode'; m.sel = 0; }
+    if (k.back || k.confirm) { game.scene = m.returnTo || 'mode'; m.sel = 0; playSfx('ui_back'); }
 
   } else if (game.scene === 'paused') {
     move(PAUSE_OPTS.length);
-    if (k.back) { game.scene = 'fight'; }           // Esc resumes
+    if (k.back) { game.scene = 'fight'; playSfx('ui_back'); }           // Esc resumes
     if (k.confirm) {
+      playSfx('ui_confirm');
       if (m.sel === 0) game.scene = 'fight';                                   // resume
       else if (m.sel === 1) { m.returnTo = 'paused'; m.scroll = 0; game.scene = 'movelist'; }
       else if (m.sel === 2) { resetMatch(); game.scene = 'fight'; }            // rematch

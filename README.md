@@ -43,24 +43,18 @@ System keys: `1` P2 human · `2` P2 idle dummy · `3` P2 auto-block dummy ·
 A kill-feed of landed strikes (top center) names everything that connects —
 blocked hits, parries, judo tosses, tip-knee gas-outs, executions included.
 
-## Sound effects
+## Sound
 
-Drop files into `assets/sfx/<name>.mp3` (or `.wav`/`.ogg`) and they play
-automatically — missing files are silent, so add them in any order. Names the
-game fires:
+`js/sfx.js` is a small SFX + music engine. **Drop a file named `<name>.mp3` into
+`assets/sfx/` (SFX) or `assets/music/` (loops) and it plays automatically** —
+missing files are silent. `.ogg`/`.wav` also work; first that loads wins.
 
-| Category | Names |
-|---|---|
-| Impacts | `hit_light` `hit_med` `hit_heavy` `body_blow` (knee) `block` `parry` |
-| Swings | `whoosh_light` `whoosh_heavy` `fly_takeoff` |
-| Movement | `jump` `dash` (run/backdash) `getup` |
-| Bodies | `bounce` `body_slam` `ground_pop` `throw_grab` `throw_slam` |
-| Stamina | `gassed` |
-| Super | `super_freeze` `cannon_fire` `explosion` `meter_ready` |
-| Execution | `exec_grab` `exec_punch` `exec_riser` `exec_blast` |
-| Match | `fight_start` `ko` |
+The full **shopping-list of every sound the game fires, with descriptions**, is in
+[`assets/SOUND-LIST.md`](assets/SOUND-LIST.md) (~40 SFX + 2 music loops).
 
-Nice-to-haves (not wired yet): footsteps, crowd loop, music, announcer.
+Engine: per-category + master volume, subtle random pitch on every hit (variety
+from a single file), optional multi-file variants (`name_1`, `name_2`, …),
+rapid-repeat throttling, looping music with track switching, and **M to mute**.
 
 ## Move list (both characters share a kit for now)
 
