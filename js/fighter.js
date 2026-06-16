@@ -229,16 +229,9 @@ class Fighter {
   startMove(name, isAir = false) {
     const mv = MOVES[name];
     this.stamina = Math.max(0, this.stamina - mv.stamina);
-    // MAGIC PUNCH COMBO chain: jab → cross → uppercut → cross. Each link must land CLEAN
-    // (this.madeHit on the move we're canceling FROM) — a blocked/whiffed link breaks it, so the
-    // string is genuinely earned. Once confirmed (chain>=2) the hits go grounded/re-stun
-    // (inescapable, no launch) and the attacker latches (combat.js).
-    const pc = this.punchChain, linked = this.madeHit;
-    this.punchChain = name === 'jab' ? 1
-      : (name === 'cross' && pc === 1 && linked) ? 2
-      : (name === 'uppercut' && pc === 2 && linked) ? 3
-      : (name === 'cross' && pc === 3 && linked) ? 4
-      : 0;
+    // (MAGIC PUNCH COMBO chain is tracked on the CLEAN HIT in combat.js, not on input —
+    // so it's earned without a cancel-timing race. A non-jab move start can't ADVANCE it,
+    // but it shouldn't drop it mid-string either; the hit-tracker + NEUTRAL_RESET own that.)
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
