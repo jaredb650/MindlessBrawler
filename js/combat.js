@@ -515,6 +515,7 @@ function separateBodies(f1, f2) {
 }
 
 function combatUpdate(f1, f2, game) {
+  if (game.cine) return;   // a cine spun up mid-fighter-update owns both bodies — no stray melee/projectile this frame
   // Snapshot both hitboxes AND moves before resolving so simultaneous hits trade fairly.
   const box1 = f1.activeHitbox(), move1 = f1.move;
   const box2 = f2.activeHitbox(), move2 = f2.move;

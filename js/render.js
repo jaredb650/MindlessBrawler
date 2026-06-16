@@ -216,14 +216,20 @@ function drawActionLines(ctx, x, y, dir) {
 
 // The SWORD (super-combo finisher): a long bright blade from the lead hand, sweeping
 // through a slash arc. `f` = frames into the current swipe (poseF0 resets it per slash).
-function drawSword(ctx, hx, hy, f) {
-  const t = Math.min(1, f / CFG.SWORD_SWIPE_FRAMES);
-  const ang = -1.5 + t * 2.7;                 // arcs from up-and-back down across the front
+function drawSword(ctx, hx, hy, f, winding) {
+  let ang, slashing;
+  if (winding) {                              // windup: blade held RAISED & back, faint quiver — no slash
+    ang = -1.75 + Math.sin(f * 0.3) * 0.12;
+    slashing = false;
+  } else {                                    // a swipe: arc from up-and-back down across the front
+    ang = -1.5 + Math.min(1, f / CFG.SWORD_SWIPE_FRAMES) * 2.7;
+    slashing = f < CFG.SWORD_SWIPE_FRAMES;
+  }
   const len = 100;
   const tx = hx + Math.cos(ang) * len, ty = hy + Math.sin(ang) * len;
   ctx.save();
   ctx.lineCap = 'round';
-  if (f < CFG.SWORD_SWIPE_FRAMES) {           // bright slash trail behind the tip
+  if (slashing) {                             // bright slash trail behind the tip
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = 'rgba(210,242,255,0.65)'; ctx.lineWidth = 12;
     ctx.beginPath(); ctx.arc(hx, hy, len, ang - 1.0, ang, false); ctx.stroke();
@@ -986,7 +992,7 @@ function drawFighter(ctx, f, game) {
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.8, 30, 3);
   }
   if (key === 'machinegun') { drawActionLines(ctx, P.handF.x, P.handF.y, 1); drawActionLines(ctx, P.handR.x, P.handR.y, 1); }
-  if (key === 'swordfinish') drawSword(ctx, P.handF.x, P.handF.y, f.f);   // the blade + slash sweep
+  if (key === 'swordfinish') drawSword(ctx, P.handF.x, P.handF.y, f.f, f.swordWind);   // the blade + slash sweep
 
   ctx.restore();
 }

@@ -298,8 +298,10 @@ function runFlatlinerCine(game, ex) {
 // then a 3-swipe SWORD finisher that KILLS. Owns both bodies via the shared cine harness.
 function startSuperCombo(att, vic, game) {
   att.facing = Math.sign(vic.x - att.x) || att.facing;
+  // pin the victim off the walls so BOTH orbit sides always have room (no on-top-of-them clamp in the corner)
+  const vicX = Math.max(CFG.WALL_L + 40 + CFG.COMBO_RADIUS, Math.min(CFG.WALL_R - 40 - CFG.COMBO_RADIUS, vic.x));
   startCine('supercombo', att, vic, game, {
-    startHp: vic.hp, vicX: vic.x, hits: 0, phase: 'flurry',
+    startHp: vic.hp, vicX, hits: 0, phase: 'flurry',
     nextHit: CFG.COMBO_START_DELAY, interval: CFG.COMBO_START_INTERVAL, poseF0: 0,
     swipe: 0, swordAt: 0,
   });
@@ -342,14 +344,14 @@ function runSuperComboCine(game, ex) {
       data.phase = 'sword'; data.poseF0 = ex.f; data.swipe = 0; data.swordAt = ex.f + CFG.SWORD_WINDUP;
       att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x - att.facing * 80));
       att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
-      att.setState('swordfinish');
+      att.setState('swordfinish'); att.swordWind = true;   // blade RAISED through the windup (the slash only plays on a real swipe)
       game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
       game.hitstop = Math.max(game.hitstop, 8);
       playSfx('whoosh_heavy');
     }
   } else {   // sword: 3 slashes, the last one KILLS
     if (data.swipe < CFG.SWORD_SWIPES && ex.f >= data.swordAt) {
-      data.swipe++; data.poseF0 = ex.f;
+      data.swipe++; data.poseF0 = ex.f; att.swordWind = false;   // a real swipe → the slash sweep
       const last = data.swipe >= CFG.SWORD_SWIPES;
       const cy = CFG.FLOOR_Y - 110;
       spawnSpark(vic.x, cy + (Math.random() - 0.5) * 70, 'parry');   // bright slash flash
