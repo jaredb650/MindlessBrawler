@@ -59,6 +59,10 @@ const CFG = {
   // Forward pressure — never stop dead to throw hands.
   MOMENTUM_KEEP: 0.6,           // fraction of walk/run speed carried into a strike
   PRESS_DRIFT: 1.6,             // px/frame advancing while striking (hold toward)
+  // Air-dash (Vesper, gated on char.airDash): a double-tap in the air blinks her horizontally once per jump.
+  AIR_DASH_VX: 13,              // horizontal blink speed
+  AIR_DASH_VY: -2,              // slight lift so it reads as a dash, not a fall
+  AIR_DASH_COST: 8,             // stamina
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
   FLOW_CANCEL_RECOVERY: 4,      // on a clean HIT recovery caps at this — block rides FULL recovery (negative on block), whiffs eat it all
 

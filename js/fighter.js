@@ -130,6 +130,7 @@ class Fighter {
     this.reversalWhiff = false;// a reversal in progress: whiff = death-on-whiff recovery tax
     this.getupDelay = 0;       // frames of delayed-getup extension banked while downed
     this.usedAirAttack = false;
+    this.usedAirDash = false;   // one air-dash per jump (Vesper)
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
@@ -728,12 +729,22 @@ class Fighter {
           this.vx = dir === 0 ? 0 : dir * (dir === toward ? this.stats.jumpDriftFwd : this.stats.jumpDriftBack);
           this.vy = this.stats.jumpVel;
           this.usedAirAttack = false;
+          this.usedAirDash = false;
           this.setState('air');
           playSfx('jump');
         }
         break;
       }
       case 'air': {
+        // AIR-DASH (Vesper): a double-tap in the air blinks her horizontally, once per jump.
+        if (this.char.airDash && this.pad.tapDir !== 0 && !this.usedAirDash && this.stamina >= CFG.AIR_DASH_COST) {
+          this.usedAirDash = true;
+          this.vx = this.pad.tapDir * CFG.AIR_DASH_VX;
+          this.vy = Math.min(this.vy, CFG.AIR_DASH_VY);   // slight lift so it reads as a dash
+          this.stamina -= CFG.AIR_DASH_COST;
+          spawnDust(this.x, this.y, 6);
+          playSfx('jump');
+        }
         const btn = this.pad.pressed.punch ? 'punch' : this.pad.pressed.kick ? 'kick' : null;
         if (!this.usedAirAttack && btn && this.stamina > 0) {
           this.pad.consume(btn);
