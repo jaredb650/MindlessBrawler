@@ -126,6 +126,7 @@ class Fighter {
     this.decapitated = false;  // sword-finisher KO: head detached → body renders headless
     this.punchChain = 0;       // magic punch combo progress: jab(1)→cross(2)→uppercut(3)→cross(4)
     this.punchChainTimer = 0;  // grace frames the chain stays armed between links (input-driven, decays in update)
+    this.swordReady = 0;       // window (after the auto-combo) where a back kick triggers the sword combo
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
     this.counterCD = 0;        // frames until this fighter can trigger another counter
@@ -631,6 +632,7 @@ class Fighter {
     // by a grace timer so loose timing between links survives — but it expires, so a lone jab can't
     // arm the magnet on a much-later poke. An off-sequence move start zeroes it directly.
     if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
+    if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
 
     // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
     // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.

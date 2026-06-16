@@ -306,7 +306,12 @@ const CFG = {
   MAGIC_COMBO_ACCEL: 1.5,       // interval shrinks by this each hit
   MAGIC_COMBO_RADIUS: 116,      // teleport orbit radius around the victim
   MAGIC_COMBO_DMG: 26,          // damage per teleport hit (4 hits — strong but not a one-touch kill)
-  MAGIC_COMBO_END_HITSTUN: 24,  // hitstun the victim is LEFT standing in (no launch) → loop into more
+  MAGIC_COMBO_END_HITSTUN: 30,  // hitstun the victim is LEFT standing in (no launch) → loop / sword followup
+  // ── SWORD-COMBO followup: a BACK KICK thrown out of the auto-combo (within the window) → this ──
+  SWORD_FOLLOWUP_WINDOW: 45,    // frames after the auto-combo a back kick still triggers the sword combo
+  SWORD_COMBO_SWIPES: 2,        // 2 slashes; the 2nd SIDE-SPIKES
+  SWORD_COMBO_WINDUP: 12,       // snappy beat before the first slash
+  SWORD_COMBO_DMG: 40,          // damage per slash (2nd also side-spikes → wall splat can finish)
   SWORD_WINDUP: 22,             // beat to pull the sword after the flurry
   SWORD_SWIPE_FRAMES: 15,       // frames per slash
   SWORD_SWIPES: 3,

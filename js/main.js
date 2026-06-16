@@ -451,6 +451,7 @@ function runMagicComboCine(game, ex) {
     att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * CFG.MAGNET_DIST));
     att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
     att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    att.swordReady = CFG.SWORD_FOLLOWUP_WINDOW;   // open the back-kick → sword-combo window
     vic.setState('hitstun'); vic.stunFrames = CFG.MAGIC_COMBO_END_HITSTUN; vic.vx = 0; vic.vy = 0;
     vic.comboHits = 0;   // a fresh combo opportunity opens
     game.hitstop = Math.max(game.hitstop, 4);
@@ -458,7 +459,63 @@ function runMagicComboCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine };
+// SWORD COMBO followup: a BACK KICK thrown out of the auto-combo (combat.js, swordReady window) hands
+// both bodies here — a snappy 2-slash sword combo drenched in blood whose FINAL slash SIDE-SPIKES the
+// victim flat across the stage (a wall splat there can finish them). Owns both bodies via the harness.
+function startSwordCombo(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, vic.x));
+  startCine('swordcombo', att, vic, game, { vicX, swipe: 0, swordAt: CFG.SWORD_COMBO_WINDUP, poseF0: 0 });
+  att.setState('swordfinish'); att.swordWind = true; att.swordReady = 0;
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 8);
+  game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+  game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+  playSfx('whoosh_heavy');
+  pushFeed('SWORD COMBO!!', att.color);
+}
+
+function runSwordComboCine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y;
+  att.f = Math.max(0, ex.f - data.poseF0);
+
+  if (data.swipe < CFG.SWORD_COMBO_SWIPES && ex.f >= data.swordAt) {
+    data.swipe++; data.poseF0 = ex.f; att.swordWind = false;   // a real swipe → the slash sweep
+    const last = data.swipe >= CFG.SWORD_COMBO_SWIPES;
+    const side = data.swipe % 2 === 1 ? -1 : 1;   // teleport to alternating flanks for each slash
+    att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, data.vicX + side * 84));
+    att.y = CFG.FLOOR_Y; att.facing = Math.sign(data.vicX - att.x) || att.facing;
+    spawnElectric(att.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, 5);   // teleport streak off the new spot
+    spawnDust(att.x, CFG.FLOOR_Y, 4);
+    const cy = CFG.FLOOR_Y - 110;
+    spawnSpark(vic.x, cy + (Math.random() - 0.5) * 70, 'parry');         // bright slash flash
+    // A LOT of blood splatter — gouts from both sides of the cut
+    spawnBlood(vic.x, cy, att.facing, last ? 60 : 42);
+    spawnBlood(vic.x, cy + 22, -att.facing, last ? 40 : 26);
+    spawnBlood(vic.x, cy - 18, att.facing, 22);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + (last ? 6 : 2));
+    game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 8);
+    playSfx('hit_heavy');
+    if (!last) {
+      vic.hp = Math.max(1, vic.hp - CFG.SWORD_COMBO_DMG);
+      data.swordAt = ex.f + CFG.SWORD_SWIPE_FRAMES;
+    } else {
+      // FINAL slash → SIDE SPIKE: blast them dead-flat across the stage (a wall splat there can finish)
+      vic.hp = Math.max(1, vic.hp - CFG.SWORD_COMBO_DMG);   // floored so the side-spike always plays
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      const away = Math.sign(vic.x - att.x) || att.facing;
+      vic.receiveSideSpike(away, game);   // sets 'launched' + the flat-flight window
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+      game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
+      game.cine = null;
+      pushFeed('SIDE SPIKE!!', att.color);
+    }
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine };
 
 function runCine(game) {
   const ex = game.cine;

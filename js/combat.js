@@ -204,6 +204,15 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
+  // ── SWORD COMBO followup ──
+  // A BACK KICK connecting within the swordReady window (opened when the auto-combo ended) hands
+  // both bodies to the 2-slash sword cinematic (main.js). Also before the KO check so it always plays.
+  if (live && move.anim === 'backkick' && att.swordReady > 0 && att.state === 'attack'
+      && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startSwordCombo(att, vic, game);   // clears att.swordReady
+    return;
+  }
+
   if (vic.hp <= 0) {
     // A primed just-frame overhand ALWAYS plays the Flatliner cinematic, even when its
     // own damage was lethal — otherwise the signature finisher silently downgrades to
