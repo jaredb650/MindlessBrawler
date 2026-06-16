@@ -271,6 +271,7 @@ class Fighter {
       else if (this.state === 'walk') this.attackDrift = heldDir * this.stats.walkSpeed * this.stats.momentumKeep;
       else if (this.state !== 'attack') this.attackDrift = 0;
       if (mv.slide) this.attackDrift = (this.runDir || this.facing) * CFG.SLIDE_TACKLE_SPEED;   // the slide tackle glides hard
+      if (mv.planted) this.attackDrift = 0;   // a planted move (shotgun) kills all carried momentum — she stands and fires
     }
     this.setState(isAir ? 'airattack' : 'attack');
     this.move = mv;
@@ -771,6 +772,11 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // SHOTGUN: eject the spent shell (a physics object) on the rack frame.
+        if (mv.rackFrame && this.f === mv.rackFrame) {
+          spawnShell(this.x - this.facing * 4, CFG.FLOOR_Y - CFG.BODY_H * 0.62, -this.facing * 2.4 + (Math.random() - 0.5) * 1.6, -6 - Math.random() * 2);
+          playSfx('whoosh_heavy');   // the rack/chk-chk (placeholder until a dedicated shell sfx)
+        }
         // MAGIC PUNCH COMBO: once the chain has confirmed (>=2), the attacker LATCHES to the
         // opponent — glides to strike range every frame so the inescapable string never drops.
         if (this.punchChain >= 2) {

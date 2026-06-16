@@ -531,6 +531,7 @@ function resetMatch() {
   FloatTexts.length = 0;
   clearStains();   // fresh arena each fight (clears decals + the ring-buffer cursor)
   Heads.length = 0;   // clear severed heads
+  Shells.length = 0;  // clear ejected shotgun shells
   UIState.trail = [game.fighters[0].stats.maxHp, game.fighters[1].stats.maxHp];
   game.hitstop = 0;
   game.superFreeze = 0;

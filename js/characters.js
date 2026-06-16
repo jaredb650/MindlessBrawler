@@ -102,16 +102,19 @@ const VESPER_MOVES = {
   heelshot: { anim: 'frontkick', startup: 5, active: 4, recovery: 11, damage: 38, hitstun: 17, blockstun: 10, stamina: 4,
     guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, gun: true, label: 'HEEL SHOT', popsGround: true,
     hitbox: { x: 30, y: -140, w: 90, h: 36 },
-    cancels: ['upshot', 'pirouette', 'lowsweep'] },
+    cancels: ['upshot', 'shotgun', 'lowsweep'] },
   // rising knee-kick → JUGGLE KEEPER (low launch): the air-combo filler. Flow into a shot.
   upshot: { anim: 'knee', startup: 7, active: 3, recovery: 14, damage: 34, hitstun: 0, blockstun: 12, stamina: 7,
     guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'UPSHOT',
     hitbox: { x: 12, y: -158, w: 56, h: 66 }, launcher: true, launchVy: -10, popsGround: true,
     cancels: ['pistol'] },
-  // spinning gun-kata heel → her big ENDER: blasts grounded, SIDE-SPIKES airborne/tumbling.
-  pirouette: { anim: 'backkick', startup: 11, active: 4, recovery: 24, damage: 64, hitstun: 0, blockstun: 16, stamina: 11,
-    guard: 'mid', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER, gun: true, label: 'PIROUETTE',
-    hitbox: { x: 24, y: -150, w: 96, h: 46 }, lungeVx: 7, heavy: true, popsGround: true, blast: true, sideSpikeAir: true, noFlowCancel: true },
+  // ◀K: SHOTGUN BLAST — she PLANTS (no movement), pulls a shotgun and fires a long-range blast,
+  // then RACKS it (the spent shell ejects as a physics object). A clean hit SIDE-SPIKES them flat
+  // across the stage. Big range + damage, but the long rack recovery is SUPER punishable on whiff.
+  shotgun: { anim: 'shotgun', startup: 11, active: 4, recovery: 32, damage: 52, hitstun: 0, blockstun: 18, stamina: 13,
+    guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, weapon: 'shotgun', label: 'SHOTGUN',
+    hitbox: { x: 16, y: -168, w: 188, h: 78 }, blast: true, sideSpike: true, sideSpikeAir: true, heavy: true, noFlowCancel: true,
+    planted: true, rackFrame: 25 },
   // low sweep → hard knockdown ender (oki).
   lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
     guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, gun: true, label: 'SWEEP',
@@ -124,7 +127,7 @@ CHARACTERS.vesper = {
   moves: VESPER_MOVES,
   neutralMap: {
     punch: { up: 'risingslash', down: 'hamstring', forward: 'thrust', back: 'pistol', neutral: 'slash' },
-    kick:  { up: 'upshot', down: 'lowsweep', forward: 'heelshot', back: 'pirouette', neutral: 'gunkick' },
+    kick:  { up: 'upshot', down: 'lowsweep', forward: 'heelshot', back: 'shotgun', neutral: 'gunkick' },
   },
   airMap: CHARACTERS.brawler.airMap,                // TEMP — air knife/gun later
   dashMap: CHARACTERS.brawler.dashMap,              // TEMP

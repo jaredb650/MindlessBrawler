@@ -40,6 +40,36 @@ function drawHeads(ctx) {
   }
 }
 
+// ── ejected shotgun shells: small brass casings that arc, bounce, settle, and self-clean. ──
+const Shells = [];
+function spawnShell(x, y, vx, vy) {
+  Shells.push({ x, y, vx, vy, rot: (Math.random() - 0.5) * 2, vrot: (Math.random() - 0.5) * 0.9, life: 200 });
+  if (Shells.length > 14) Shells.shift();   // bounded
+}
+function updateShells() {
+  for (let i = Shells.length - 1; i >= 0; i--) {
+    const s = Shells[i];
+    s.vy += 0.55; s.x += s.vx; s.y += s.vy; s.rot += s.vrot;
+    if (s.x < CFG.WALL_L + 8) { s.x = CFG.WALL_L + 8; s.vx = -s.vx * 0.4; }
+    if (s.x > CFG.WALL_R - 8) { s.x = CFG.WALL_R - 8; s.vx = -s.vx * 0.4; }
+    if (s.y >= CFG.FLOOR_Y - 2) {
+      s.y = CFG.FLOOR_Y - 2;
+      if (s.vy > 1.4) { s.vy = -s.vy * 0.38; s.vx *= 0.6; s.vrot *= 0.7; }   // tinny bounce
+      else { s.vy = 0; s.vx *= 0.7; s.vrot *= 0.6; }
+    }
+    if (--s.life <= 0) Shells.splice(i, 1);   // self-cleanup
+  }
+}
+function drawShells(ctx) {
+  for (const s of Shells) {
+    const a = s.life < 40 ? s.life / 40 : 1;   // fade out at the end
+    ctx.save(); ctx.globalAlpha *= a; ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+    ctx.fillStyle = '#a83227'; ctx.fillRect(-5, -2.5, 10, 5);     // red plastic hull
+    ctx.fillStyle = '#e0ac4c'; ctx.fillRect(-5, -2.5, 3.5, 5);    // brass base
+    ctx.restore();
+  }
+}
+
 // `power` (hits only): 0 light · 1 med · 2 heavy → scales the burst so heavies READ heavy.
 // Callers that omit it default to med, so existing spark calls look ~unchanged.
 function spawnSpark(x, y, kind, power) {
@@ -279,6 +309,7 @@ function drawSword(ctx, hx, hy, f, winding) {
 // FX run even during hitstop — the freeze is for bodies, not sparks.
 function updateFx() {
   updateHeads();
+  updateShells();
   for (let i = Particles.length - 1; i >= 0; i--) {
     const p = Particles[i];
     p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--;
@@ -751,6 +782,14 @@ function drawFighterBrawler(ctx, f, game, look) {
       break;
     }
     // SUPER COMBO (attacker): a hard committed strike at each teleport — punch or kick.
+    // SHOTGUN (Vesper): planted brace — both hands grip the gun forward, no movement. Gun drawn after.
+    case 'shotgun': {
+      lean(P, 0.16);
+      P.handF = { x: 70, y: -148 };   // lead hand on the fore-end (forward)
+      P.handR = { x: 34, y: -140 };   // rear hand on the stock/trigger
+      P.faceMood = 1;
+      break;
+    }
     case 'supercombo':
     case 'magiccombo': {   // same teleport strike pose; magiccombo is the shorter auto-flurry
       lean(P, 0.44);
@@ -1227,6 +1266,20 @@ function drawSkeleton(ctx, P, c) {
     let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
     capsule(ctx, hx, hy, hx + ux * 15, hy + uy * 15, 5.5, c.flash ? '#ffffff' : '#24242c');   // slide/barrel
     capsule(ctx, hx, hy, hx - ux * 4 + uy * 9, hy - uy * 4 - ux * 9, 4.5, c.flash ? '#ffffff' : '#15151b');   // grip
+  } else if (activeW === 'shotgun') {
+    // a long pump shotgun gripped in both hands, pointed FORWARD (+x). Big blast on the active frames.
+    const fx = P.handF.x, fy = P.handF.y, rx = P.handR.x, ry = P.handR.y;
+    const tipx = fx + 46, tipy = fy - 2;
+    capsule(ctx, rx - 6, ry + 6, fx + 4, fy + 4, 9, c.flash ? '#ffffff' : '#6b4a30');   // wood stock + fore-end
+    capsule(ctx, rx, ry, tipx, tipy, 6.5, c.flash ? '#ffffff' : '#2b2b32');             // steel barrel
+    capsule(ctx, rx + 4, ry + 4, tipx - 16, tipy + 4, 4, c.flash ? '#ffffff' : '#23232a'); // pump/tube
+    if (c.mvActive) {   // THE BLAST — big muzzle flash + a wide forward spread cone (its long range)
+      ctx.fillStyle = c.flash ? '#ffffff' : '#ffe27a'; ctx.beginPath(); ctx.arc(tipx, tipy, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,220,120,0.92)'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+      for (const a of [-0.5, -0.22, 0, 0.22, 0.5]) { ctx.beginPath(); ctx.moveTo(tipx, tipy); ctx.lineTo(tipx + Math.cos(a) * 165, tipy + Math.sin(a) * 165); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,240,180,0.5)';
+      for (let k = 0; k < 10; k++) { const a = (Math.random() - 0.5), r = 40 + Math.random() * 130; ctx.beginPath(); ctx.arc(tipx + Math.cos(a) * r, tipy + Math.sin(a) * r, 2.2, 0, Math.PI * 2); ctx.fill(); }
+    }
   }
   // off-hand sidearm: a small pistol resting in the rear hand (always, so she reads as armed)
   if (L.dualWield) {
@@ -1452,6 +1505,7 @@ function render(ctx, game, alpha) {
   const order = a.move && !b.move ? [b, a] : [a, b];
   for (const f of order) drawFighter(ctx, f, game);
   drawHeads(ctx);   // severed heads fly/roll over the bodies
+  drawShells(ctx);  // ejected shotgun shells
 
   // OVERDRIVE BEAM pours out OVER the fighters for maximum drama (the freeze overlay owns the charge visual)
   for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
