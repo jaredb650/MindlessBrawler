@@ -1589,8 +1589,14 @@ function render(ctx, game, alpha) {
     const prog = Math.min(1, (CFG.SUPER_FREEZE - game.superFreeze) / 8);
     const beam = who && who.superKind === 'beam';
     const combo = who && who.superKind === 'combo';
-    if (who && !beam && !combo) drawMech(ctx, who, prog);
+    if (who && who.superKind === 'cannon') drawMech(ctx, who, prog);   // mech ONLY for the brawler's cannon super
     if (who) drawFighter(ctx, who, game);
+    if (who && who.charType === 'vesper') {   // her supers charge with a violet muzzle aura, no mech
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      radialGlow(ctx, who.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, 70 + prog * 150, 'rgba(170,90,230,0.45)');
+      ball(ctx, who.x + who.facing * 40, CFG.FLOOR_Y - 130, 6 + prog * 16, '#f0e0ff');
+      ctx.restore();
+    }
     if (who && beam) {                              // a swelling charge aura during the freeze
       const cy = CFG.FLOOR_Y - 130, ox = who.x + who.facing * 56;
       ctx.save();

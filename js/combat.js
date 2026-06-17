@@ -519,13 +519,13 @@ function spawnClimaxVolley(owner) {
   const d = owner.facing;
   for (let i = 0; i < 2; i++) {
     Projectiles.push({
-      x: owner.x + d * 46,
+      x: owner.x + d * 50,
       y: CFG.FLOOR_Y - 60 - Math.random() * 120,        // spread across the body height
-      vx: d * (CFG.BULLET_SPEED + Math.random() * 6),
-      w: 22, h: 8, owner, move: BULLET_MOVE, kind: 'bullet', dead: false, age: 0,
+      vx: d * (CFG.RIFLE_ROUND_SPEED * 0.8 + Math.random() * 8),   // FAST rifle rounds
+      w: 34, h: 14, owner, move: AR_BULLET_MOVE, kind: 'bullet', dead: false, age: 0,   // big rifle bullets (juggle)
     });
   }
-  playSfx('hit_med');
+  playSfx('rifle_shot');
 }
 
 // The OVERDRIVE BEAM: while the forward-super fighter is in its firing window, a giant
