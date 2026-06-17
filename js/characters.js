@@ -88,7 +88,7 @@ const VESPER_MOVES = {
   // ── PISTOL (off hand, ◀P) — point-blank shot ──
   // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip, NO bleed. Flows on
   // into more knife/kick so a string reads "slash, slash, BANG, kick".
-  pistol: { anim: 'jab', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
+  pistol: { anim: 'pistolaim', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'pistol', gun: true, label: 'PISTOL',
     hitbox: { x: 0, y: -150, w: 0, h: 0 },   // no melee — she fires ONE round downrange (CRUMPLES on hit)
     projectile: 'pistolround', bulletArts: false,
@@ -109,7 +109,7 @@ const VESPER_MOVES = {
   upshot: { anim: 'knee', startup: 7, active: 3, recovery: 16, damage: 34, hitstun: 0, blockstun: 12, stamina: 8,
     guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'UPSHOT',
     hitbox: { x: 12, y: -158, w: 56, h: 66 }, launcher: true, launchVy: -10, popsGround: true,
-    burst: { count: 6, spread: 0.85, speed: 17, up: -11, grav: 0.5, move: 'ar', y: 150 },
+    burst: { count: 8, vertical: true, driftX: 3, speed: 19, move: 'ar', sfx: 'uzi_burst' },   // straight UP and DOWN
     cancels: ['pistol'] },
   // ◀K: SHOTGUN BLAST — she PLANTS (no movement), pulls a shotgun and fires a long-range blast,
   // then RACKS it (the spent shell ejects as a physics object). A clean hit SIDE-SPIKES them flat
@@ -124,11 +124,10 @@ const VESPER_MOVES = {
     hitbox: { x: 18, y: -40, w: 92, h: 32 }, knockdown: true, heavy: true, popsGround: true },
   // ↓K ASSAULT RIFLE: she PLANTS, pulls a rifle and fires a 3-round BURST downrange — damaging
   // rounds that JUGGLE (launch) on hit. No movement; the burst (not a melee) does the work.
-  rifleburst: { anim: 'shotgun', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
-    guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_MED, weapon: 'rifle', label: 'RIFLE BURST',
+  rifleburst: { anim: 'crouchjab', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
+    guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_MED, weapon: 'rifle', crouching: true, label: 'RIFLE',
     hitbox: { x: 0, y: -150, w: 0, h: 0 }, planted: true, bulletArts: false,
-    burst: { count: 3, spread: 0.04, speed: 26, up: 0, move: 'ar', y: 122, trail: 16 },
-    cancels: [] },
+    projectile: 'rifleround', cancels: [] },   // fires ONE big fast round from the crouch
   // ── AIR (knife + gun) ──
   // neutral air P: a basic air knife.
   airslash: { anim: 'airpunch', startup: 4, active: 999, recovery: 0, damage: 16, hitstun: 16, blockstun: 9, stamina: 3,
@@ -142,7 +141,7 @@ const VESPER_MOVES = {
   // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
   airuzi: { anim: 'jumpkick', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, air: true, gun: true,
-    hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, spread: 0.18, speed: 22, up: 0, move: 'uzi' }, label: 'AIR UZI' },
+    hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, spread: 0.18, speed: 22, up: 0, move: 'uzi', sfx: 'uzi_burst' }, label: 'AIR UZI' },
   // air ↓K: AIR SPIKE — a downward knife slash (NO dive, she keeps her arc); SPIKES foes from above.
   airspike: { anim: 'divekick', startup: 5, active: 999, recovery: 0, damage: 32, hitstun: 0, blockstun: 12, stamina: 6,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, air: true, weapon: 'knife', bleed: 1,

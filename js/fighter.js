@@ -808,6 +808,7 @@ class Fighter {
         const mv = this.move;   // air guns fire too (uzi spray, air bullet arts)
         if (mv && this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
+          else if (mv.projectile === 'rifleround') spawnRifleRound(this);
           if (mv.burst) spawnGunBurst(this, mv.burst);
           if (mv.fireSfx) playSfx(mv.fireSfx);
         }
@@ -822,6 +823,7 @@ class Fighter {
         // GUN MOVES: FIRE on the active frame — spawn the round (pistol) + the shot sound.
         if (this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
+          else if (mv.projectile === 'rifleround') spawnRifleRound(this);
           if (mv.burst) spawnGunBurst(this, mv.burst);   // uzi spray / assault-rifle burst
           if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
         }

@@ -782,6 +782,14 @@ function drawFighterBrawler(ctx, f, game, look) {
       break;
     }
     // SUPER COMBO (attacker): a hard committed strike at each teleport — punch or kick.
+    // PISTOL AIM (Vesper ◀P): lead arm punched STRAIGHT out front, sighting down the pistol.
+    case 'pistolaim': {
+      lean(P, 0.12);
+      P.handF = { x: 86, y: -150 };   // lead hand far forward at shoulder height → the IK extends it straight
+      P.handR = { x: 6, y: -138 };    // off hand tucked
+      P.faceMood = 1;
+      break;
+    }
     // SHOTGUN (Vesper): planted brace — both hands grip the gun forward, no movement. Gun drawn after.
     case 'shotgun': {
       lean(P, 0.16);
@@ -1344,10 +1352,12 @@ function drawMech(ctx, f, alpha) {
 
 function drawProjectile(ctx, p) {
   const d = Math.sign(p.vx);
-  if (p.kind === 'bullet') {   // a small bright round + a short streak trailing it
-    ctx.strokeStyle = 'rgba(255,238,170,0.7)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(p.x, p.y + p.h / 2); ctx.lineTo(p.x - d * 30, p.y + p.h / 2); ctx.stroke();   // tracer
-    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(p.x, p.y + p.h / 2, 4, 0, Math.PI * 2); ctx.fill();   // round
+  if (p.kind === 'bullet') {   // a bright round + a streak trailing it (size scales with the round)
+    const r = Math.max(3.5, p.h * 0.5), tlen = Math.max(24, p.w * 1.5);
+    const cy = p.y + p.h / 2, ang = Math.atan2(p.vy || 0, p.vx || (d || 1));
+    ctx.strokeStyle = 'rgba(255,238,170,0.7)'; ctx.lineWidth = r * 0.8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(p.x, cy); ctx.lineTo(p.x - Math.cos(ang) * tlen, cy - Math.sin(ang) * tlen); ctx.stroke();   // tracer behind it
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(p.x, cy, r, 0, Math.PI * 2); ctx.fill();   // round
     return;
   }
   for (let i = 3; i >= 1; i--) {

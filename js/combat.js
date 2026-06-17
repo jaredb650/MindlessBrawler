@@ -48,6 +48,8 @@ const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() 
 const BULLET_MOVE = { anim: 'bullet', damage: CFG.BULLET_DMG, guard: 'mid', blockstun: 6, hitstun: CFG.BULLET_HITSTUN, hitstop: 2, kbx: 0, kind: 'gun', label: 'BULLET' };
 // ◀P PISTOL SHOT round: one projectile that CRUMPLES a grounded victim (a stagger → free follow-up).
 const PISTOL_ROUND_MOVE = { anim: 'bullet', damage: CFG.PISTOL_ROUND_DMG, guard: 'mid', blockstun: 12, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', crumple: 'stand', label: 'PISTOL' };
+// ↓K RIFLE round: one big, fast round — heavy damage + a hard BLAST knockback.
+const RIFLE_ROUND_MOVE = { anim: 'bullet', damage: CFG.RIFLE_ROUND_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 9, kind: 'gun', blast: true, label: 'RIFLE' };
 // Uzi spray round (light, hitstun) + assault-rifle round (heavier, LAUNCHES → juggle).
 const UZI_BULLET_MOVE = { anim: 'bullet', damage: 8, guard: 'mid', blockstun: 6, hitstun: 11, hitstop: 2, kbx: 0, kind: 'gun', label: 'UZI' };
 const AR_BULLET_MOVE = { anim: 'bullet', damage: 16, guard: 'mid', blockstun: 8, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', launcher: true, launchVy: -9, label: 'RIFLE' };
@@ -57,15 +59,17 @@ function spawnGunBurst(owner, b) {
   const d = owner.facing, mv = BURST_MOVES[b.move] || UZI_BULLET_MOVE;
   for (let i = 0; i < b.count; i++) {
     const t = b.count > 1 ? (i / (b.count - 1) - 0.5) : 0;
-    const ang = t * (b.spread || 0);
+    let vx, vy;
+    if (b.vertical) { vx = d * (b.driftX || 0); vy = t * 2 * b.speed; }   // straight UP and DOWN (a vertical column)
+    else { const ang = t * (b.spread || 0); vx = d * b.speed * Math.cos(ang); vy = b.speed * Math.sin(ang) + (b.up || 0); }
     Projectiles.push({
       x: owner.x + d * (46 - i * (b.trail || 0)),
       y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.55 : CFG.FLOOR_Y - (b.y || 120),
-      vx: d * b.speed * Math.cos(ang), vy: b.speed * Math.sin(ang) + (b.up || 0), grav: b.grav || 0,
+      vx, vy, grav: b.vertical ? 0 : (b.grav || 0),
       w: 20, h: 8, owner, move: mv, kind: 'bullet', dead: false, age: 0,
     });
   }
-  playSfx('pistol_shot');
+  playSfx(b.sfx || 'pistol_shot');
 }
 
 function rectsOverlap(a, b) {
@@ -499,6 +503,17 @@ function spawnPistolRound(owner) {
     w: 28, h: 12, owner, move: PISTOL_ROUND_MOVE, kind: 'bullet', dead: false, age: 0,
   });
   playSfx('pistol_shot');
+}
+
+// ↓K RIFLE — one big, fast round fired from the crouch. Heavy damage + a hard blast knockback.
+function spawnRifleRound(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 52, y: CFG.FLOOR_Y - 72,   // crouch height
+    vx: d * CFG.RIFLE_ROUND_SPEED, w: 42, h: 18,
+    owner, move: RIFLE_ROUND_MOVE, kind: 'bullet', dead: false, age: 0,
+  });
+  playSfx('rifle_shot');
 }
 
 // BULLET CLIMAX volley — a few rounds at staggered heights (the barrage wall).
