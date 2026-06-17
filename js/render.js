@@ -5,6 +5,7 @@
 // (fighter.animKey(), f, facing, x, y) and physics state only.
 // ─────────────────────────────────────────────────────────────
 const Particles = [];
+const Slashes = [];      // dramatic slash crescents — bright streaks thrown during the knife auto-combo
 const FloatTexts = [];
 const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
 const Heads = [];        // severed heads — physics objects that fly, bounce, roll (decapitation KO)
@@ -95,6 +96,42 @@ function spawnSpark(x, y, kind, power) {
       blood: kind === 'blood',
     });
   }
+}
+
+// A warm FIREBALL burst — gunpowder detonation (the rifle round exploding on impact).
+function spawnBlast(x, y) {
+  const cols = ['#fff3b0', '#ffd54f', '#ffb74d', '#ff7043', '#ffffff'];
+  for (let i = 0; i < 24; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 9;
+    Particles.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+      life: 12 + Math.random() * 12, maxLife: 24,
+      color: cols[(Math.random() * cols.length) | 0],
+      size: 2.5 + Math.random() * 4, grav: 0.06,
+    });
+  }
+}
+
+// A standalone SLASH CRESCENT — a bright streak thrown for drama (knife auto-combo).
+// Lives a few frames, growing + fading; angle in radians, len = full length in px.
+function spawnSlashFx(x, y, ang, len) {
+  Slashes.push({ x, y, ang, len: len || 120, life: 9, maxLife: 9 });
+  if (Slashes.length > 28) Slashes.shift();
+}
+function drawSlashes(ctx) {
+  ctx.lineCap = 'round';
+  for (const s of Slashes) {
+    const t = s.life / s.maxLife;                  // 1 → 0
+    const half = s.len * 0.5 * (1.2 - t * 0.2);    // the streak grows slightly as it fades out
+    const dx = Math.cos(s.ang) * half, dy = Math.sin(s.ang) * half;
+    ctx.globalAlpha = t * 0.55;                     // outer glow
+    ctx.strokeStyle = 'rgba(200,242,255,0.9)'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(s.x - dx, s.y - dy); ctx.lineTo(s.x + dx, s.y + dy); ctx.stroke();
+    ctx.globalAlpha = t;                            // bright white core
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(s.x - dx, s.y - dy); ctx.lineTo(s.x + dx, s.y + dy); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 // Blood gout — a directional spray (mostly along `dir`) that arcs and falls fast.
@@ -322,6 +359,7 @@ function updateFx() {
     }
     if (p.life <= 0) Particles.splice(i, 1);
   }
+  for (let i = Slashes.length - 1; i >= 0; i--) { if (--Slashes[i].life <= 0) Slashes.splice(i, 1); }
   for (let i = FloatTexts.length - 1; i >= 0; i--) {
     const t = FloatTexts[i];
     t.y -= 0.8; t.life--;
@@ -1556,6 +1594,7 @@ function render(ctx, game, alpha) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  drawSlashes(ctx);   // slash crescents ride on top of the sparks/blood
 
   for (const t of FloatTexts) {
     ctx.globalAlpha = Math.min(1, t.life / 20);

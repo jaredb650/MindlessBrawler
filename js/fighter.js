@@ -126,6 +126,9 @@ class Fighter {
     this.lastHitF = -99;
     this.bulletsFired = 0;     // bullet-arts rounds fired this strike (Vesper)
     this.lastBulletF = -99;
+    this.burstFired = 0;       // streamed gun-burst rounds fired this strike (upshot column / air-uzi line)
+    this.lastBurstF = -99;
+    this.blockedPistolRounds = 0;   // consecutive PISTOL rounds blocked (2 → guard crush; a parry/clean hit resets it)
     this.thrownFrom = 0;       // clinch-throw arc endpoints
     this.thrownTo = 0;
     this.thrower = null;       // set while thrown — the body to reset on a throw tech
@@ -286,6 +289,7 @@ class Fighter {
     this.hitCount = 0;
     this.lastHitF = -99;
     this.bulletsFired = 0;                    // bullet-arts rounds reset per strike
+    this.burstFired = 0; this.lastBurstF = -99;   // streamed gun-burst resets per strike (fresh trail each upshot/air-uzi)
     this.jabCounted = false;                 // this move's connecting-jab tally (machine-gun chain)
     if (name !== 'jab') this.jabChain = 0;   // only a jab→jab→jab string builds the burst
     this.crouchjabCounted = false;           // this move's connecting-crouchjab tally (liver-shot chain)
@@ -657,14 +661,6 @@ class Fighter {
     if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
     if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
     if (this.gibArmed > 0) this.gibArmed--;       // shotgun-gib window
-    // BLEED DoT (Vesper's knife wounds): drips damage while it lasts, then clears. Can bleed out a KO.
-    if (this.bleed > 0) {
-      if (--this.bleedTimer <= 0) { this.bleed = 0; }
-      else if (this.hp > 0 && this.bleedTimer % CFG.BLEED_TICK === 0) {
-        this.hp = Math.max(0, this.hp - CFG.BLEED_DMG * this.bleed);
-        spawnBlood(this.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, -this.facing, 2);   // a small wound drip
-      }
-    }
 
     // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
     // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.
@@ -800,8 +796,13 @@ class Fighter {
         if (mv && this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
           else if (mv.projectile === 'rifleround') spawnRifleRound(this);
-          if (mv.burst) spawnGunBurst(this, mv.burst);
           if (mv.fireSfx) playSfx(mv.fireSfx);
+        }
+        // STREAMED BURST (air uzi): one round every `interval` frames → a forward LINE, not a fan.
+        if (mv && mv.burst && this.burstFired < mv.burst.count && this.f > mv.startup
+            && this.f - this.lastBurstF >= (mv.burst.interval || 2)) {
+          spawnGunBurst(this, mv.burst, this.burstFired);
+          this.burstFired++; this.lastBurstF = this.f;
         }
         break;   // physics carries it; lands into 'land' below
       }
@@ -811,12 +812,18 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
-        // GUN MOVES: FIRE on the active frame — spawn the round (pistol) + the shot sound.
+        // GUN MOVES: FIRE on the active frame — spawn the round (pistol/rifle) + the shot sound.
         if (this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
           else if (mv.projectile === 'rifleround') spawnRifleRound(this);
-          if (mv.burst) spawnGunBurst(this, mv.burst);   // uzi spray / assault-rifle burst
           if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
+        }
+        // STREAMED BURST (upshot AR column): one round every `interval` frames across the active
+        // window → the rounds come out in a TRAIL/line (straight up), not a simultaneous fan.
+        if (mv.burst && this.burstFired < mv.burst.count && this.f > mv.startup
+            && this.f - this.lastBurstF >= (mv.burst.interval || 2)) {
+          spawnGunBurst(this, mv.burst, this.burstFired);
+          this.burstFired++; this.lastBurstF = this.f;
         }
         // SHOTGUN: eject the spent shell (a physics object) on the rack frame.
         if (mv.rackFrame && this.f === mv.rackFrame) {

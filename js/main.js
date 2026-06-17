@@ -584,7 +584,7 @@ function startSlashCombo(att, vic, game, opts) {
   vic.setState('executed');
   vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
   game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
-  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'parry', 1); playSfx('hit_heavy');
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'parry', 1); playSfx('knife_combo');   // the knife-combo activation sting
   if (opts.label) pushFeed(opts.label + '!!', att.color);
 }
 function runSlashComboCine(game, ex) {
@@ -601,13 +601,18 @@ function runSlashComboCine(game, ex) {
     att.y = data.aerial ? vy0 : CFG.FLOOR_Y;
     att.facing = Math.sign(vic.x - att.x) || att.facing;
     data.poseF0 = ex.f;
-    vic.hp = Math.max(1, vic.hp - 22);
+    vic.hp = Math.max(1, vic.hp - 30);   // rushdown buff: the auto-combo cuts hit harder too
     const cy = vy0 - 80;
     spawnSpark(vic.x, cy, 'parry'); spawnBlood(vic.x, cy, att.facing, last ? 28 : 12);
+    // dramatic slash crescents — an alternating diagonal each hit, a crossing flurry on the finisher
+    const sa = (data.hits % 2 === 0) ? 0.7 : -0.7;
+    spawnSlashFx(vic.x, cy, sa, 150);
+    if (last) { spawnSlashFx(vic.x, cy, -sa, 165); spawnSlashFx(vic.x, cy, Math.PI / 2, 150); }
     spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 4); spawnDust(att.x, CFG.FLOOR_Y, 3);
     game.shake = Math.max(game.shake, 4 + data.hits);
     game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 3);
-    playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
+    playSfx('slash_combo_' + (1 + (data.hits - 1) % 3));   // cycle the 3 sword-combo swings across the flurry
+    if (last) playSfx('stab_heavy');                        // the launching cut rips deep
     data.nextHit = ex.f + data.interval;
     if (last) {
       // FINISHER: launch them up for the juggle, hand control back.
@@ -633,6 +638,7 @@ function resetMatch() {
   for (const f of game.fighters) f.reset();
   Projectiles.length = 0;
   Particles.length = 0;
+  Slashes.length = 0;
   FloatTexts.length = 0;
   clearStains();   // fresh arena each fight (clears decals + the ring-buffer cursor)
   Heads.length = 0;   // clear severed heads

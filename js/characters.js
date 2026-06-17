@@ -51,6 +51,7 @@ const CHARACTERS = {
     // magnets + fires the cinematic.) The brawler's jab→cross→uppercut→cross → the magic combo.
     comboChain: ['jab', 'cross', 'uppercut', 'cross'],
     comboFinish: { atChain: 4, kind: 'magiccombo' },
+    grunts: ['grunt_1', 'grunt_2'],   // MALE pained grunts — played when HE is the one taking the hit
   },
 };
 
@@ -114,7 +115,7 @@ const VESPER_MOVES = {
   upshot: { anim: 'knee', startup: 7, active: 3, recovery: 16, damage: 34, hitstun: 0, blockstun: 12, stamina: 8,
     guard: 'mid', kind: 'kick', kbx: 2.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'UPSHOT',
     hitbox: { x: 12, y: -158, w: 56, h: 66 }, launcher: true, launchVy: -10, popsGround: true,
-    burst: { count: 8, vertical: true, driftX: 3, speed: 19, move: 'ar', sfx: 'uzi_burst' },   // straight UP and DOWN
+    burst: { count: 8, vertical: true, driftX: 2, speed: 19, interval: 2, move: 'ar', sfx: 'uzi_burst' },   // streamed STRAIGHT UP → a vertical line/trail (the AR rounds juggle airborne foes)
     cancels: ['pistol'] },
   // ◀K: SHOTGUN BLAST — she PLANTS (no movement), pulls a shotgun and fires a long-range blast,
   // then RACKS it (the spent shell ejects as a physics object). A clean hit SIDE-SPIKES them flat
@@ -146,7 +147,7 @@ const VESPER_MOVES = {
   // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
   airuzi: { anim: 'jumpkick', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, air: true, gun: true,
-    hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, spread: 0.18, speed: 22, up: 0, move: 'uzi', sfx: 'uzi_burst' }, label: 'AIR UZI' },
+    hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, speed: 22, up: 0, interval: 2, move: 'uzi', sfx: 'uzi_burst' }, label: 'AIR UZI' },   // streamed STRAIGHT FORWARD → a horizontal line/trail, not a fan
   // air ↓K: AIR SPIKE — a downward knife slash (NO dive, she keeps her arc); SPIKES foes from above.
   airspike: { anim: 'divekick', startup: 5, active: 999, recovery: 0, damage: 32, hitstun: 0, blockstun: 12, stamina: 6,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, air: true, weapon: 'knife', bleed: 1,
@@ -181,6 +182,9 @@ CHARACTERS.vesper = {
   // guaranteed → the AERIAL RAVE cinematic). Earned + inescapable, exactly like the brawler's.
   comboChain: ['slash', 'thrust', 'risingslash'],
   comboFinish: { atChain: 3, kind: 'slashcombo', opts: { hits: 3, launchVy: -14, aerial: true, label: 'AERIAL RAVE' } },
+  grunts: ['fgrunt_1', 'fgrunt_2', 'fgrunt_3'],     // FEMALE grunts — her voice, played when SHE is the one taking the hit
+  dmgMult: 1.4,                                      // rushdown glass cannon: every hit lands ~40% harder (she trades HP for damage)
+  meterMult: 3.0,                                    // her specials are weaker / whiff more → her meter fills 3x faster
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
   doubleJump: true,                                 // a second jump in the air
   wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)

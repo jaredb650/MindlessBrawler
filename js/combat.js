@@ -31,6 +31,7 @@ function pushFeed(text, color) {
 
 function hitSfx(move) {
   if (move.hitSound) playSfx(move.hitSound);                                                  // optional per-move override
+  else if (move.weapon === 'knife') playSfx(move.hitstop >= CFG.HITSTOP_ENDER ? 'stab_heavy' : 'stab_light');   // knife: heavy stab (upper slash) vs little stab (slash/thrust)
   else if (move.hitstop >= CFG.HITSTOP_ENDER) playSfx(move.kind === 'kick' ? 'hit_heavy2' : 'hit_heavy');   // heavy KICKS = flesh impact, heavy PUNCHES = power punch (variety — hit_heavy was overused)
   else if (move.hitstop >= CFG.HITSTOP_MED) playSfx('hit_med');
   else playSfx('hit_light');
@@ -47,29 +48,29 @@ const BEAM_MOVE = { anim: 'beam', guard: 'mid' };   // only used for canBlock() 
 // A Bullet-Arts round: tiny gun hit that re-stuns briefly (combo glue), no knockdown/launch.
 const BULLET_MOVE = { anim: 'bullet', damage: CFG.BULLET_DMG, guard: 'mid', blockstun: 6, hitstun: CFG.BULLET_HITSTUN, hitstop: 2, kbx: 0, kind: 'gun', label: 'BULLET' };
 // ◀P PISTOL SHOT round: one projectile that CRUMPLES a grounded victim (a stagger → free follow-up).
-const PISTOL_ROUND_MOVE = { anim: 'bullet', damage: CFG.PISTOL_ROUND_DMG, guard: 'mid', blockstun: 12, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', crumple: 'stand', label: 'PISTOL' };
-// ↓K RIFLE round: one big, fast round — heavy damage + a hard BLAST knockback.
-const RIFLE_ROUND_MOVE = { anim: 'bullet', damage: CFG.RIFLE_ROUND_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 9, kind: 'gun', blast: true, label: 'RIFLE' };
+const PISTOL_ROUND_MOVE = { anim: 'bullet', damage: CFG.PISTOL_ROUND_DMG, guard: 'mid', blockstun: 12, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', crumple: 'stand', pistolCrush: true, label: 'PISTOL' };   // 2 BLOCKED in a row → guard crush (a parry resets the count)
+// ↓K RIFLE round: one big, fast round — heavy damage, EXPLODES on impact, BREAKS guards, and SCOOPS a downed body.
+const RIFLE_ROUND_MOVE = { anim: 'bullet', damage: CFG.RIFLE_ROUND_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 9, kind: 'gun', blast: true, popsGround: true, popVy: -11, guardBreak: true, label: 'RIFLE' };
 // Uzi spray round (light, hitstun) + assault-rifle round (heavier, LAUNCHES → juggle).
 const UZI_BULLET_MOVE = { anim: 'bullet', damage: 8, guard: 'mid', blockstun: 6, hitstun: 11, hitstop: 2, kbx: 0, kind: 'gun', label: 'UZI' };
-const AR_BULLET_MOVE = { anim: 'bullet', damage: 16, guard: 'mid', blockstun: 8, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', launcher: true, launchVy: -9, label: 'RIFLE' };
+const AR_BULLET_MOVE = { anim: 'bullet', damage: 16, guard: 'mid', blockstun: 8, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', launcher: true, launchVy: -9, airHitCap: 10, label: 'RIFLE' };   // raised juggle cap so the upshot column reliably keeps an airborne foe up for a combo
 const BURST_MOVES = { uzi: UZI_BULLET_MOVE, ar: AR_BULLET_MOVE };
-// Fire a fanned BURST of rounds. b = { count, spread (rad), speed, up (vy bias, -=up), grav, move, y }.
-function spawnGunBurst(owner, b) {
+// Fire ONE round of a STREAMING burst. The fighter fire-hook calls this once every `b.interval`
+// frames, passing the running shot index `i` (0..count-1). Every round flies STRAIGHT — the
+// trail/line emerges from the time between shots, NOT a per-bullet fan.
+//   b = { count, interval, speed, vertical, driftX (vertical lean), up (vy bias, forward), grav, move, y, sfx }
+function spawnGunBurst(owner, b, i) {
   const d = owner.facing, mv = BURST_MOVES[b.move] || UZI_BULLET_MOVE;
-  for (let i = 0; i < b.count; i++) {
-    const t = b.count > 1 ? (i / (b.count - 1) - 0.5) : 0;
-    let vx, vy;
-    if (b.vertical) { vx = d * (b.driftX || 0); vy = t * 2 * b.speed; }   // straight UP and DOWN (a vertical column)
-    else { const ang = t * (b.spread || 0); vx = d * b.speed * Math.cos(ang); vy = b.speed * Math.sin(ang) + (b.up || 0); }
-    Projectiles.push({
-      x: owner.x + d * (46 - i * (b.trail || 0)),
-      y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.55 : CFG.FLOOR_Y - (b.y || 120),
-      vx, vy, grav: b.vertical ? 0 : (b.grav || 0),
-      w: 20, h: 8, owner, move: mv, kind: 'bullet', dead: false, age: 0,
-    });
-  }
-  playSfx(b.sfx || 'pistol_shot');
+  let vx, vy;
+  if (b.vertical) { vx = d * (b.driftX || 0); vy = -b.speed; }   // straight UP → streamed into a vertical line
+  else { vx = d * b.speed; vy = (b.up || 0); }                   // straight FORWARD → streamed into a horizontal line
+  Projectiles.push({
+    x: owner.x + d * 46,
+    y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.55 : CFG.FLOOR_Y - (b.y || 120),
+    vx, vy, grav: b.vertical ? 0 : (b.grav || 0),
+    w: 20, h: 8, owner, move: mv, kind: 'bullet', dead: false, age: 0,
+  });
+  if (!i) playSfx(b.sfx || 'pistol_shot');   // one burst sting at the head of the stream
 }
 
 function rectsOverlap(a, b) {
@@ -164,7 +165,33 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'PARRY!', '#ffe082');
       playSfx('parry');
       pushFeed('PARRY!', vic.color);
+      if (move.pistolCrush) vic.blockedPistolRounds = 0;   // a parried pistol round spares the guard → reset the crush counter
       return;
+    }
+    // GUARD CRUSH — RIFLE round detonates THROUGH the block (still parryable via the fresh-block branch above).
+    if (move.guardBreak) {
+      vic.hp = Math.max(1, vic.hp - Math.round(move.damage * CFG.CHIP_RATIO));
+      spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'GUARD CRUSH!', '#ff5252');
+      game.hitstop = Math.max(game.hitstop, move.hitstop);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+      vic.setLaunched(away * 13, -7, true);   // blasted out of the broken guard (the round's impact FX detonates in updateProjectiles)
+      if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
+      return;
+    }
+    // GUARD CRUSH — the SECOND pistol round BLOCKED in a row breaks the guard into a crumple (a parry above resets the count).
+    if (move.pistolCrush) {
+      vic.blockedPistolRounds = (vic.blockedPistolRounds || 0) + 1;
+      if (vic.blockedPistolRounds >= 2) {
+        vic.blockedPistolRounds = 0;
+        vic.hp = Math.max(1, vic.hp - Math.round(move.damage * CFG.CHIP_RATIO));
+        spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'GUARD CRUSH!', '#ff5252');
+        playSfx('crumple');
+        game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_MED);
+        game.shake = Math.max(game.shake, CFG.SHAKE_MED);
+        vic.receiveCrumple(move.crumpleFrames || CFG.CRUMPLE_FRAMES, move.crumple || 'stand');
+        if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
+        return;
+      }
     }
     const chip = Math.round(move.damage * CFG.CHIP_RATIO);
     vic.hp = Math.max(CFG.CHIP_FLOOR, vic.hp - chip);
@@ -197,20 +224,24 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
   if (vic.inHitState()) vic.comboHits++;
-  else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; }
+  else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; vic.blockedPistolRounds = 0; }   // a clean hit breaks the consecutive-block chain
   const hits = vic.comboHits;
   const sameCount = vic.comboMoves[move.anim] || 0;
   vic.comboMoves[move.anim] = sameCount + 1;
 
   const dmgScale = Math.max(CFG.MIN_DMG_SCALE, 1 - CFG.DMG_SCALE_PER_HIT * (hits - 1));
-  const dmg = Math.max(1, Math.round(move.damage * dmgScale));
+  const dmg = Math.max(1, Math.round(move.damage * dmgScale * (att.char.dmgMult || 1)));   // per-character damage scaling (Vesper's rushdown hits harder)
   vic.hp -= dmg;
-  // a pained grunt on a meaty hit — random, and skipped on crumple moves (those already grunt)
-  if (dmg >= CFG.GRUNT_DMG && !move.crumple && Math.random() < CFG.GRUNT_CHANCE) playSfx(Math.random() < 0.5 ? 'grunt_1' : 'grunt_2');
+  // a pained grunt on a meaty hit — random, skipped on crumple moves (those already grunt). The
+  // grunt is the VICTIM'S voice: female grunts when Vesper is hit, male grunts when the brawler is hit.
+  if (dmg >= CFG.GRUNT_DMG && !move.crumple && Math.random() < CFG.GRUNT_CHANCE) {
+    const gr = (vic.char && vic.char.grunts) || ['grunt_1', 'grunt_2'];
+    playSfx(gr[(Math.random() * gr.length) | 0]);
+  }
   // body shots break the will to fight: knee drains the gas tank directly
   if (move.staminaDrain) vic.stamina = Math.max(0, vic.stamina - move.staminaDrain * dmgScale);
   const meterBefore = att.meter;
-  att.meter = Math.min(CFG.MAX_METER, att.meter + dmg * CFG.METER_PER_DAMAGE);
+  att.meter = Math.min(CFG.MAX_METER, att.meter + dmg * CFG.METER_PER_DAMAGE * (att.char.meterMult || 1));   // per-character meter gain (Vesper builds 3x faster)
   if (meterBefore < CFG.MAX_METER && att.meter >= CFG.MAX_METER) playSfx('meter_ready');
   if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }   // madeHit = a CLEAN hit (not block) → only this caps recovery (flow cancel)
   game.hitstop = Math.max(game.hitstop, move.hitstop);
@@ -218,14 +249,10 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   game.shake = Math.max(game.shake, pw === 2 ? CFG.SHAKE_HEAVY : pw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
   spawnSpark(contactPoint.x, contactPoint.y, 'hit', pw);
   if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
+  else if (move.weapon === 'knife') spawnBlood(contactPoint.x, contactPoint.y, away, 7);   // a knife cut always draws blood (the DoT debuff is gone, but the spurts stay)
   hitSfx(move);
   pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
 
-  // BLEED (Vesper's knife): a clean knife hit adds stacks + refreshes the bleed timer (DoT in fighter.update).
-  if (live && move.bleed) {
-    vic.bleed = Math.min(CFG.MAX_BLEED, vic.bleed + move.bleed);
-    vic.bleedTimer = CFG.BLEED_DURATION;
-  }
   if (move.gib) vic.gibArmed = 90;   // shotgun — a KO within this window gibs the head (main.js)
 
   // ── SIGNATURE COMBO-CHAIN payoff (per-character) ──
@@ -388,7 +415,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     vic.airHits++;
     // a 20mm shell ALWAYS blasts the body — exempt the super from the juggle cap so it
     // never lands as a dud (damage but no reaction) on an already over-juggled body.
-    if (move.isSuper || vic.airHits <= CFG.MAX_AIR_HITS) vic.setLaunched(away * Math.max(2, move.kbx), Math.min(vic.vy, -7) - 2, false);
+    if (move.isSuper || vic.airHits <= (move.airHitCap || CFG.MAX_AIR_HITS)) vic.setLaunched(away * Math.max(2, move.kbx), Math.min(vic.vy, -7) - 2, false);   // per-move juggle cap (AR rounds raise it so the upshot column keeps them up)
     return;
   }
 
@@ -619,6 +646,15 @@ function updateProjectiles(f1, f2, game) {
       game.shake = Math.max(game.shake, isB ? CFG.SHAKE_LIGHT : CFG.SHAKE_HEAVY + 3);
       spawnSpark(p.x + Math.sign(p.vx) * p.w / 2, p.y + p.h / 2, 'hit', isB ? 0 : 2);
       if (!isB) playSfx('explosion');
+      // the RIFLE round (the only blast-class bullet) DETONATES on impact — a real explosion.
+      if (isB && move.blast) {
+        const ix = p.x + Math.sign(p.vx) * p.w / 2, iy = p.y + p.h / 2;
+        spawnBlast(ix, iy);
+        spawnSpark(ix, iy, 'hit', 2);
+        game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 2);
+        game.flash = Math.max(game.flash, 5); game.flashMax = Math.max(game.flashMax, 5);
+        playSfx('explosion');
+      }
     }
     if (p.x < -200 || p.x > CFG.STAGE_W + 200 || p.y < -260 || p.y > CFG.FLOOR_Y + 60) p.dead = true;
   }
