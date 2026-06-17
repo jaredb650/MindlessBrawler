@@ -122,7 +122,6 @@ class Fighter {
     this.bleed = 0;            // bleed stacks (Vesper's knife DoT)
     this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
     this.gibArmed = 0;         // hit by a gib move (shotgun) recently → a KO decapitates
-    this.vesperChain = 0; this.vesperChainTimer = 0;   // slash→thrust→rising chain (aerial rave)
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
     this.bulletsFired = 0;     // bullet-arts rounds fired this strike (Vesper)
@@ -261,20 +260,13 @@ class Fighter {
     // breaks it; a grace timer (update()) lets it survive loose timing between links but expires so
     // a stale jab can't arm it later. The combat.js override only fires on a CLEAN hit, so blocking
     // the string still defends — you just get latched, not comboed.
+    const chain = this.char.comboChain;   // per-character (brawler: jab→cross→uppercut→cross; vesper: slash→thrust→rising)
     const pc = this.punchChain;
-    this.punchChain = name === 'jab' ? 1
-      : (name === 'cross' && pc === 1) ? 2
-      : (name === 'uppercut' && pc === 2) ? 3
-      : (name === 'cross' && pc === 3) ? 4
+    this.punchChain = !chain ? 0
+      : name === chain[0] ? 1
+      : (pc > 0 && pc < chain.length && name === chain[pc]) ? pc + 1
       : 0;
     if (this.punchChain > 0) this.punchChainTimer = CFG.PUNCHCHAIN_GRACE;
-    // VESPER aerial-rave chain: slash → thrust → rising slash. At 3 the rising slash hit fires the
-    // aerial juggle cinematic (combat.js). Held by the same grace window.
-    if (this.charType === 'vesper') {
-      const vc = this.vesperChain || 0;
-      this.vesperChain = name === 'slash' ? 1 : (name === 'thrust' && vc === 1) ? 2 : (name === 'risingslash' && vc === 2) ? 3 : 0;
-      if (this.vesperChain > 0) this.vesperChainTimer = CFG.PUNCHCHAIN_GRACE;
-    }
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
     if (!isAir) {
@@ -665,7 +657,6 @@ class Fighter {
     if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
     if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
     if (this.gibArmed > 0) this.gibArmed--;       // shotgun-gib window
-    if (this.vesperChain > 0 && --this.vesperChainTimer <= 0) this.vesperChain = 0;
     // BLEED DoT (Vesper's knife wounds): drips damage while it lasts, then clears. Can bleed out a KO.
     if (this.bleed > 0) {
       if (--this.bleedTimer <= 0) { this.bleed = 0; }

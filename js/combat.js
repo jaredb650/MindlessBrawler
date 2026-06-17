@@ -228,23 +228,21 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   }
   if (move.gib) vic.gibArmed = 90;   // shotgun — a KO within this window gibs the head (main.js)
 
-  // ── MAGIC PUNCH COMBO payoff ──
-  // The 4th link (final cross) of the jab→cross→uppercut→cross STARTER connecting hands both bodies
-  // to the automatic teleport-flurry cinematic (main.js). Fired BEFORE the KO check so it plays even
-  // when this hit would have been lethal — the cine resolves the kill itself if the flurry finishes it.
-  if (live && att.punchChain >= 4 && att.state === 'attack'
+  // ── SIGNATURE COMBO-CHAIN payoff (per-character) ──
+  // The chain reaching `comboFinish.atChain` (brawler 4, vesper 3) hands both bodies to the finish
+  // cinematic. Fired BEFORE the KO check so it plays even on a lethal hit (the cine resolves the kill).
+  const cf = att.char.comboFinish;
+  if (live && cf && att.punchChain >= cf.atChain && att.state === 'attack'
       && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
-    startMagicCombo(att, vic, game);   // clears att.punchChain
+    att.punchChain = 0;
+    if (cf.kind === 'slashcombo') startSlashCombo(att, vic, game, cf.opts);
+    else startMagicCombo(att, vic, game);
     return;
   }
 
-  // ── VESPER slash-combo cinematics ──
-  // A move carrying `slashCombo` (dive grab / slide tackle / tele-slash) OR the slash→thrust→rising
-  // chain (vesperChain 3) hands both bodies to the scripted slash-flurry cinematic (main.js).
-  if (live && (move.slashCombo || (att.charType === 'vesper' && att.moveName === 'risingslash' && att.vesperChain >= 3))
-      && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
-    att.vesperChain = 0;
-    startSlashCombo(att, vic, game, move.slashCombo || { hits: 3, launchVy: -14, aerial: true, label: 'AERIAL RAVE' });
+  // Move-carried slash combos (Vesper's dive grab / slide tackle / tele-slash) → the slash cinematic.
+  if (live && move.slashCombo && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startSlashCombo(att, vic, game, move.slashCombo);
     return;
   }
 

@@ -46,6 +46,11 @@ const CHARACTERS = {
     // directional super → kind (resolved against the press-time snap; 'neutral' is the fallback
     // for neutral/up/down). The kind drives the superstart behavior + cinematics.
     superMap: { forward: 'beam', back: 'combo', neutral: 'cannon' },
+    // The signature COMBO CHAIN: land the sequence and from link 2 the magnet latches the victim so
+    // the rest connects for free → the finish fires at `atChain`. (fighter.js advances it; combat.js
+    // magnets + fires the cinematic.) The brawler's jab→cross→uppercut→cross → the magic combo.
+    comboChain: ['jab', 'cross', 'uppercut', 'cross'],
+    comboFinish: { atChain: 4, kind: 'magiccombo' },
   },
 };
 
@@ -68,7 +73,7 @@ const VESPER_MOVES = {
   slash: { anim: 'jab', startup: 2, active: 5, recovery: 5, damage: 9, hitstun: 13, blockstun: 7, stamina: 2,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'knife', bleed: 1, label: 'SLASH',
     hitbox: { x: 22, y: -150, w: 90, h: 30 }, multihit: { times: 2, interval: 2 },
-    cancels: ['slash', 'thrust', 'hamstring', 'risingslash', 'pistol', 'gunkick', 'heelshot', 'rifleburst'] },
+    cancels: ['slash', 'thrust', 'hamstring', 'gunkick', 'heelshot', 'rifleburst'] },   // launcher comes via thrust (the spine)
   // advancing lunge DOUBLE-stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
   thrust: { anim: 'cross', startup: 4, active: 6, recovery: 9, damage: 16, hitstun: 16, blockstun: 10, stamina: 4,
     guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'THRUST', lungeVx: 6,
@@ -124,7 +129,7 @@ const VESPER_MOVES = {
     hitbox: { x: 18, y: -40, w: 92, h: 32 }, knockdown: true, heavy: true, popsGround: true },
   // ↓K ASSAULT RIFLE: she PLANTS, pulls a rifle and fires a 3-round BURST downrange — damaging
   // rounds that JUGGLE (launch) on hit. No movement; the burst (not a melee) does the work.
-  rifleburst: { anim: 'crouchjab', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
+  rifleburst: { anim: 'rifleaim', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_MED, weapon: 'rifle', crouching: true, label: 'RIFLE',
     hitbox: { x: 0, y: -150, w: 0, h: 0 }, planted: true, bulletArts: false,
     projectile: 'rifleround', cancels: [] },   // fires ONE big fast round from the crouch
@@ -172,6 +177,10 @@ CHARACTERS.vesper = {
   dashMap: CHARACTERS.brawler.dashMap,              // TEMP
   otgKickForward: CHARACTERS.brawler.otgKickForward,
   superMap: { forward: 'tango', back: 'witchtime', neutral: 'climax' },   // her 3 supers (Phase C)
+  // Vesper's signature chain: slash → thrust → rising slash (land 2 cuts → the launcher is magnet-
+  // guaranteed → the AERIAL RAVE cinematic). Earned + inescapable, exactly like the brawler's.
+  comboChain: ['slash', 'thrust', 'risingslash'],
+  comboFinish: { atChain: 3, kind: 'slashcombo', opts: { hits: 3, launchVy: -14, aerial: true, label: 'AERIAL RAVE' } },
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
   doubleJump: true,                                 // a second jump in the air
   wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)

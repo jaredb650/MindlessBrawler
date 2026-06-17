@@ -790,6 +790,14 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
+    // RIFLE (Vesper ↓K): drops to a KNEE, rifle braced forward and low.
+    case 'rifleaim': {
+      P.hip.y = -38; P.sho = { x: 6, y: -88 }; P.head = { x: 12, y: -106 };
+      P.handF = { x: 72, y: -80 }; P.handR = { x: 40, y: -74 };   // both hands forward on the rifle, low
+      P.footF.x = 32; P.footR.x = -36;                            // wide kneel stance
+      P.faceMood = 1;
+      break;
+    }
     // SHOTGUN (Vesper): planted brace — both hands grip the gun forward, no movement. Gun drawn after.
     case 'shotgun': {
       lean(P, 0.16);
@@ -1620,6 +1628,16 @@ function render(ctx, game, alpha) {
     ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
     drawFighter(ctx, game.cine.vic, game);
     drawFighter(ctx, game.cine.att, game);
+  }
+
+  // WITCH TIME: the whole world goes violet + crawls while she stays full speed.
+  if (game.witchTime > 0) {
+    const a = 0.17 + 0.06 * Math.sin(game.frame * 0.3);
+    ctx.fillStyle = `rgba(120,40,180,${a})`;
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+    const g = ctx.createRadialGradient(CFG.STAGE_W / 2, CFG.STAGE_H / 2, CFG.STAGE_H * 0.32, CFG.STAGE_W / 2, CFG.STAGE_H / 2, CFG.STAGE_H * 0.78);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(80,15,130,0.42)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
   }
 
   // white flash — counter-hit read OR any KO. Divides by whichever seed fired
