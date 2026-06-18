@@ -55,6 +55,60 @@ const RIFLE_ROUND_MOVE = { anim: 'bullet', damage: CFG.RIFLE_ROUND_DMG, guard: '
 const UZI_BULLET_MOVE = { anim: 'bullet', damage: 8, guard: 'mid', blockstun: 6, hitstun: 11, hitstop: 2, kbx: 0, kind: 'gun', label: 'UZI' };
 const AR_BULLET_MOVE = { anim: 'bullet', damage: 16, guard: 'mid', blockstun: 8, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'gun', launcher: true, launchVy: -9, airHitCap: 10, label: 'RIFLE' };   // raised juggle cap so the upshot column reliably keeps an airborne foe up for a combo
 const BURST_MOVES = { uzi: UZI_BULLET_MOVE, ar: AR_BULLET_MOVE };
+// Xamora MAGIC: a drifting orb (wisp, her ranged poke) + a low traveling shockwave (tremor). Resolve like a hit.
+const WISP_MOVE = { anim: 'bullet', damage: CFG.WISP_DMG, guard: 'mid', blockstun: 12, hitstun: CFG.BULLET_HITSTUN, hitstop: CFG.HITSTOP_MED, kbx: 4, kind: 'magic', label: 'WISP' };
+const TREMOR_MOVE = { anim: 'bullet', damage: CFG.TREMOR_DMG, guard: 'low', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 0, kind: 'magic', launcher: true, launchVy: -9, label: 'TREMOR' };
+// SHOCKWAVE — Rising Pole's projectile: behaves EXACTLY like the tremor wave (travels, launches, detonates),
+// just rendered as a rolling shock front instead of an orb.
+const SHOCKWAVE_MOVE = { anim: 'bullet', damage: CFG.TREMOR_DMG, guard: 'low', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 0, kind: 'magic', launcher: true, launchVy: -9, label: 'SHOCKWAVE' };
+// VACUUM — the gap-closer orb. kbx:0 so the generic knockback never fires; the `pull` reaction (landAttack)
+// YANKS the victim toward the caster instead. Low damage on purpose: its job is to drag you into slam range.
+const VACUUM_MOVE = { anim: 'bullet', damage: CFG.VACUUM_DMG, guard: 'mid', blockstun: 12, hitstun: CFG.MAGNET_HITSTUN, hitstop: CFG.HITSTOP_MED, kbx: 0, kind: 'magic', pull: true, pullVx: CFG.VACUUM_PULL, label: 'VACUUM' };
+// LANTERN — a placed TRAP: hangs stationary in space, detonates on contact, pops them UP (her juggle/grab follow).
+// The zoning-with-teeth tool: own a chunk of screen, cover her slow recovery, set oki on a knockdown.
+const LANTERN_MOVE = { anim: 'bullet', damage: CFG.LANTERN_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 0, kind: 'magic', launcher: true, launchVy: -12, lanternBlast: true, label: 'LANTERN' };
+function spawnWisp(owner, down) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 40, y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.5 : CFG.FLOOR_Y - 150,
+    vx: down ? 0 : d * CFG.WISP_SPEED, vy: down ? CFG.WISP_SPEED : 0, grav: 0,
+    w: 30, h: 30, owner, move: WISP_MOVE, kind: 'magic', hue: 'wisp', dead: false, age: 0,
+  });
+  playSfx('beam_fire');
+}
+function spawnTremor(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 46, y: CFG.FLOOR_Y - 26, vx: d * CFG.TREMOR_SPEED, vy: 0, grav: 0,
+    w: 52, h: 50, owner, move: TREMOR_MOVE, kind: 'magic', hue: 'tremor', dead: false, age: 0,
+  });
+  playSfx('ground_pop');
+}
+function spawnShockwave(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 46, y: CFG.FLOOR_Y - 30, vx: d * CFG.TREMOR_SPEED, vy: 0, grav: 0,
+    w: 54, h: 58, owner, move: SHOCKWAVE_MOVE, kind: 'magic', hue: 'shockwave', dead: false, age: 0,
+  });
+  playSfx('ground_pop');
+}
+function spawnVacuum(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 46, y: owner.isAirborne() ? owner.y - CFG.BODY_H * 0.4 : CFG.FLOOR_Y - 96,
+    vx: d * CFG.VACUUM_SPEED, vy: 0, grav: 0,
+    w: 40, h: 56, owner, move: VACUUM_MOVE, kind: 'magic', hue: 'wisp', dead: false, age: 0,
+  });
+  playSfx('beam_fire');
+}
+function spawnLantern(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 74, y: CFG.FLOOR_Y - 92, vx: 0, vy: 0, grav: 0,   // PLANTED: hangs where cast, doesn't travel
+    w: 42, h: 76, owner, move: LANTERN_MOVE, kind: 'magic', hue: 'tremor', dead: false, age: 0, armDelay: CFG.LANTERN_ARM,
+  });
+  playSfx('ground_pop');
+}
 // Fire ONE round of a STREAMING burst. The fighter fire-hook calls this once every `b.interval`
 // frames, passing the running shot index `i` (0..count-1). Every round flies STRAIGHT — the
 // trail/line emerges from the time between shots, NOT a per-bullet fan.
@@ -104,6 +158,60 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // parry stagger) only applies when `move` is the attacker's LIVE move — a cannon
   // round landing later must not corrupt whatever its owner is doing by then.
   const live = att.move === move;
+
+  // ELECTROCUTED victims are HITTABLE but UNBREAKABLE: a hit registers damage + a white flash, but it
+  // CANNOT pop them out of the seize (the electrified state-update re-locks them every frame). No block.
+  if (vic.state === 'electrified' && !move.clinchHit) {
+    const edmg = Math.max(1, Math.round(move.damage * (att.char.dmgMult || 1)));
+    vic.hp -= edmg;
+    vic.hitFlash = CFG.HIT_FLASH;   // light up white for a beat
+    game.hitstop = Math.max(game.hitstop, Math.min(move.hitstop || CFG.HITSTOP_LIGHT, CFG.HITSTOP_MED));
+    spawnSpark(contactPoint.x, contactPoint.y, 'hit', 1);
+    if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
+    if (vic.hp <= 0) { vic.hp = 0; vic.electrified = 0; vic.setLaunched(away * 7, -12, true); vic.noTech = true; }
+    return;
+  }
+
+  // SUPER-ARMOR (Xamora the heavy): she EATS a hit instead of being interrupted — on a flagged
+  // commital windup (move.armor:N hits) OR while walking the foe down (stamina-priced). Mirrors the
+  // electrified early-out: apply REDUCED damage, juice, return with NO reaction funnel so her move
+  // keeps running. COUNTERPLAY is structural: THROWS skip this entirely (a grab overwrites her
+  // 'attack' state before it ever reaches here), MULTI-HIT breaks it (the N cap → ARMOR BREAK kneel),
+  // and an `armorBreak:true` move blows straight through (clears the tally, falls to the real funnel).
+  const armorOnMove = vic.char.id === 'xamora' && vic.state === 'attack' && vic.move && vic.move.armor
+    && vic.f <= vic.move.startup + (vic.move.active || 0);
+  const armorOnWalk = vic.char.id === 'xamora' && vic.state === 'walk' && vic.stamina > CFG.ARMOR_WALK_STAMINA
+    && ((away === 1 && vic.pad.held.left) || (away === -1 && vic.pad.held.right));   // walking INTO the attacker
+  if (move.kind && !move.clinchHit && !vic.isAirborne() && (armorOnMove || armorOnWalk)) {
+    if (move.armorBreak) { vic.armorHits = 0; vic.armorDamage = 0; }   // armor-breaker: clear the tally + fall through to the full reaction
+    else {
+      const admg = Math.max(1, Math.round(move.damage * (att.char.dmgMult || 1) * CFG.ARMOR_CHIP));
+      vic.hp -= admg;
+      vic.hitFlash = CFG.HIT_FLASH;
+      vic.armorHits++; vic.armorDamage += admg;
+      if (armorOnWalk) vic.stamina = Math.max(0, vic.stamina - CFG.ARMOR_WALK_STAMINA);   // the advance costs gas → self-limits to ~2 hits
+      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_LIGHT);
+      game.shake = Math.max(game.shake, CFG.SHAKE_LIGHT);
+      spawnSpark(contactPoint.x, contactPoint.y, 'block');   // a guard-clang flare reads "that bounced off"
+      spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'ARMOR!', '#ffd54a');
+      playSfx('block');
+      att.meter = Math.min(CFG.MAX_METER, att.meter + admg * CFG.METER_PER_DAMAGE * (att.char.meterMult || 1));
+      if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
+      if (vic.hp <= 0) { vic.hp = 0; vic.armorHits = 0; vic.armorDamage = 0; vic.setLaunched(away * 7, -12, true); vic.noTech = true; return; }   // armor can't save you from a lethal blow
+      // ARMOR BREAK: she absorbs N hits (move.armor) and KEEPS attacking — the hit that EXCEEDS the
+      // budget buckles her to a knee (the punish window). So armor:1 eats one poke and the slam still
+      // lands; a 2-hit string blows through. Walk-armor self-limits on stamina, so only moves break here.
+      if (armorOnMove && vic.armorHits > vic.move.armor) {
+        vic.armorHits = 0; vic.armorDamage = 0;
+        spawnFloatText(vic.x, vic.y - CFG.BODY_H - 50, 'ARMOR BREAK!', '#ff5252');
+        playSfx('crumple');
+        game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_MED);
+        game.shake = Math.max(game.shake, CFG.SHAKE_MED);
+        vic.receiveCrumple(CFG.CRUMPLE_FRAMES, 'kneel');
+      }
+      return;
+    }
+  }
 
   // Clinch strike: damage + drain + juice, but the victim NEVER leaves 'clinched'.
   // No block/parry, no combo scaling, no knockback — the bodies stay pinned.
@@ -229,7 +337,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   const sameCount = vic.comboMoves[move.anim] || 0;
   vic.comboMoves[move.anim] = sameCount + 1;
 
-  const dmgScale = Math.max(CFG.MIN_DMG_SCALE, 1 - CFG.DMG_SCALE_PER_HIT * (hits - 1));
+  // per-character combo scaling: Vesper's many-hit juggles decay gentler + floor higher so her
+  // rushdown pressure actually converts (the brawler keeps the global defaults → byte-identical).
+  const dmgScale = Math.max(att.char.minDmgScale || CFG.MIN_DMG_SCALE, 1 - (att.char.dmgScalePerHit || CFG.DMG_SCALE_PER_HIT) * (hits - 1));
   const dmg = Math.max(1, Math.round(move.damage * dmgScale * (att.char.dmgMult || 1)));   // per-character damage scaling (Vesper's rushdown hits harder)
   vic.hp -= dmg;
   // a pained grunt on a meaty hit — random, skipped on crumple moves (those already grunt). The
@@ -255,21 +365,40 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
 
   if (move.gib) vic.gibArmed = 90;   // shotgun — a KO within this window gibs the head (main.js)
 
-  // ── SIGNATURE COMBO-CHAIN payoff (per-character) ──
-  // The chain reaching `comboFinish.atChain` (brawler 4, vesper 3) hands both bodies to the finish
-  // cinematic. Fired BEFORE the KO check so it plays even on a lethal hit (the cine resolves the kill).
-  const cf = att.char.comboFinish;
-  if (live && cf && att.punchChain >= cf.atChain && att.state === 'attack'
+  // ── SIGNATURE COMBO-CHAIN payoff (per-character, multi-chain) ──
+  // A completed MELEE chain (pendingFinish set in fighter.startMove) hands both bodies to its finish
+  // cinematic on the CLEAN hit of the final link. Fired BEFORE the KO check so it plays even on a lethal
+  // hit. (Vesper's EXECUTION/SKEET gun-ender chains are command grabs fired at the gun fire-frame, not here.)
+  const cf = att.pendingFinish;
+  if (live && cf && att.state === 'attack'
       && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
-    att.punchChain = 0;
-    if (cf.kind === 'slashcombo') startSlashCombo(att, vic, game, cf.opts);
-    else startMagicCombo(att, vic, game);
-    return;
+    if (cf.kind === 'slashcombo') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startSlashCombo(att, vic, game, cf.opts); return; }
+    if (cf.kind === 'magiccombo') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startMagicCombo(att, vic, game); return; }
+    if (cf.kind === 'kebab') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startKebab(att, vic, game); return; }   // SHISH KEBAB: carry → wall pin
+    // execution / skeet are command grabs handled at the gun fire-frame (fighter.js) — not fired here
   }
 
   // Move-carried slash combos (Vesper's dive grab / slide tackle / tele-slash) → the slash cinematic.
   if (live && move.slashCombo && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     startSlashCombo(att, vic, game, move.slashCombo);
+    return;
+  }
+
+  // Air SCISSOR KICK command grab → the SCISSOR TAKEDOWN cinematic (she holds airborne, spikes them down).
+  if (live && move.scissorGrab && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startScissorTake(att, vic, game);
+    return;
+  }
+
+  // Xamora air ↑K SKY TALON command grab → the SKY TALON cinematic (she snatches a jumping foe, hurls them down).
+  if (live && move.skyTalon && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startSkyTalon(att, vic, game);
+    return;
+  }
+
+  // Auto two-hit ground kicks: a clean gunkick / heelshot triggers its follow-up (heel-spike / side-kick).
+  if (live && move.kickFollow && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
+    startKickCombo(att, vic, game, move.kickFollow);
     return;
   }
 
@@ -291,6 +420,29 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     vic.setLaunched(away * 7, -12, true);   // KO: dramatic launch, main takes it from here
     vic.noTech = true;                       // can't tech your own death — set AFTER setLaunched clears it
     return;
+  }
+
+  // ── PULL / VACUUM — yank the victim TOWARD the caster (inverse knockback): the slow zoner's "get over here" ──
+  // Anchor the direction on the ATTACKER (att.x), NOT the passed sourceX — a projectile's sourceX is the
+  // round's position, but we always want "toward the caster". A minGap clamp stops her pulling them PAST her.
+  // Grounded → pushVel (auto wall-clamped + separateBodies'd); airborne → vx (separateBodies skips air, so the
+  // clamp is the only guard). Blocked hits never reach here (block returns earlier) → block is the counterplay.
+  if (move.pull && vic.state !== 'downed') {
+    const pAway = Math.sign(vic.x - att.x) || att.facing;          // attacker→victim; -pAway = victim→attacker
+    const room = Math.max(0, Math.abs(vic.x - att.x) - CFG.BODY_W);   // never drag them PAST / into her
+    if (vic.isAirborne()) {
+      // air has NO friction → a persistent vx would fling a juggled foe straight past her. Drag via a ONE-SHOT
+      // position snap (clamped to `room` so it can never cross her) and ZERO the residual so there's no drift.
+      vic.x += -pAway * Math.min((move.pullVx || 12) * 2, room);
+      vic.vx = 0;
+    } else {
+      vic.receiveHitstun(Math.round(move.hitstun || CFG.MAGNET_HITSTUN));   // lock them so they ride the drag (zeroes vx/vy)
+      vic.pushVel = -pAway * Math.min(move.pullVx || 12, room);     // ground channel: pushVel decays + separateBodies clamps
+    }
+    game.hitstop = Math.max(game.hitstop, move.hitstop || CFG.HITSTOP_MED);
+    spawnSpark(contactPoint.x, contactPoint.y, 'hit', 1);
+    if (live) { att.moveHitDone = true; att.madeContact = true; att.madeHit = true; }
+    return;   // skip the generic away-knockback funnel
   }
 
   // ── MAGIC PUNCH COMBO starter glue (the middle links: cross @2, uppercut @3) ──
@@ -336,6 +488,51 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       spawnFloatText(vic.x, vic.y - CFG.BODY_H - 40, 'GASSED!', '#ff5252');
       pushFeed('TIP KNEE — GASSED OUT!', '#ff5252');
     }
+    return;
+  }
+
+  // EXTEND THRUST sweet-spot (TIPPED): caught on the very tip of the spear → an explosive pop that knocks
+  // the wind out of them — they get up with ZERO stamina (held at 0 by staminaLock).
+  if (live && move.tipSpot && Math.abs(vic.x - att.x) >= move.tipSpot && !vic.isAirborne() && vic.state !== 'downed') {
+    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER + 6);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 3);
+    game.flash = Math.max(game.flash, 7); game.flashMax = Math.max(game.flashMax, 7);
+    spawnBlast(contactPoint.x, contactPoint.y); spawnSpark(contactPoint.x, contactPoint.y, 'hit', 2);
+    spawnFloatText(vic.x, vic.y - CFG.BODY_H - 36, 'TIPPED!', '#ffd54f');
+    playSfx('explosion');
+    vic.stamina = 0; vic.staminaLock = CFG.TIPPED_STAMINA_LOCK;   // winded — no stamina on wakeup
+    vic.setLaunched(away * 8, -11, true); vic.noTech = true;
+    return;
+  }
+
+  // SMITE: the bolt SEIZES them in place — electrocution (a hittable-but-unbreakable stun; see the top of landAttack).
+  if (live && move.electrocute && !vic.isAirborne() && vic.state !== 'downed' && vic.state !== 'electrified') {
+    vic.electrified = CFG.ELECTRIC_FRAMES;
+    vic.setState('electrified');
+    spawnElectric(contactPoint.x, contactPoint.y, CFG.ELECTRIC_BURST);
+    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+    playSfx('electrocute');
+    spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'ZAP!', '#9fe8ff');
+    return;
+  }
+
+  // CRESCENT SLAM direct hit — the world STOPS, the ground ERUPTS like a wall-spike, then they BOUNCE sky-high.
+  // Fires on AIRBORNE victims too (a combo into the slam still devastates — it slams them out of the air).
+  if (live && move.crescentSlam && vic.state !== 'downed') {
+    vic.hp = Math.max(0, vic.hp - CFG.CRESCENT_BONUS);          // on top of the base damage already applied → devastating
+    vic.y = CFG.FLOOR_Y;                                        // SLAMMED to the floor
+    game.hitstop = Math.max(game.hitstop, CFG.CRESCENT_FREEZE); // the world stops for a beat
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 8);
+    game.flash = Math.max(game.flash, CFG.KO_FLASH); game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);
+    spawnSpike(vic.x, away);                                    // the ground erupts (energy lance + splash)
+    spawnRumble(vic.x, CFG.FLOOR_Y - 30, 1); spawnRumble(vic.x, CFG.FLOOR_Y - 30, -1);
+    spawnBlast(vic.x, CFG.FLOOR_Y - 50); spawnBlood(vic.x, CFG.FLOOR_Y - 24, away, 28); spawnDust(vic.x, CFG.FLOOR_Y, 22);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 60, 'hit', 2);
+    playSfx('wall_spike'); playSfx('explosion');
+    spawnFloatText(vic.x, CFG.FLOOR_Y - CFG.BODY_H - 30, 'SLAM!!', '#ffd54f');
+    pushFeed('CRESCENT SLAM!!', att.color);
+    vic.setLaunched(away * 3, CFG.CRESCENT_BOUNCE_VY, true); vic.noTech = true;   // rocket them VERY high off the ground
     return;
   }
 
@@ -542,6 +739,24 @@ function spawnRifleRound(owner) {
 }
 
 // BULLET CLIMAX volley — a few rounds at staggered heights (the barrage wall).
+// WRATH OF GOD meteor — a magic rock that falls from the heavens (kind:'magic' so it resolves through landAttack).
+const WRATH_MOVE = { anim: 'bullet', damage: CFG.WRATH_DMG, guard: 'mid', blockstun: 10, hitstun: 0, hitstop: 3, kbx: 0, kind: 'magic', launcher: true, launchVy: -8, airHitCap: 12, label: 'WRATH' };   // LOW hitstop so the barrage flows (a storm, not a stutter)
+function spawnWrathVolley(owner) {
+  const opp = owner.opp;
+  const targetX = opp ? opp.x : owner.x;
+  for (let i = 0; i < 3; i++) {
+    // most meteors CONVERGE on the foe (reliable damage); one scatters wide (the screen-filling wrath look)
+    const mx = i === 0
+      ? CFG.WALL_L + 40 + Math.random() * (CFG.WALL_R - CFG.WALL_L - 80)
+      : targetX + (Math.random() - 0.5) * 170;
+    Projectiles.push({
+      x: Math.max(CFG.WALL_L + 20, Math.min(CFG.WALL_R - 20, mx)),
+      y: -60 - Math.random() * 150, vx: 0, vy: CFG.WRATH_SPEED, grav: CFG.WRATH_GRAV,
+      w: 40, h: 54, owner, move: WRATH_MOVE, kind: 'magic', hue: 'tremor', dead: false, age: 0,
+    });
+  }
+  playSfx('explosion');
+}
 function spawnClimaxVolley(owner) {
   const d = owner.facing;
   for (let i = 0; i < 2; i++) {
@@ -633,9 +848,10 @@ function updateProjectiles(f1, f2, game) {
     if (p.grav) p.vy += p.grav;
     const vic = p.owner === f1 ? f2 : f1;
     const move = p.move || SUPER_MOVE;
-    const isB = p.kind === 'bullet';
+    const isB = p.kind === 'bullet' || p.kind === 'magic';   // magic orbs get the light bullet FX, not the cannon blast
     const rect = { x: p.x - p.w / 2, y: p.y, w: p.w, h: p.h };
-    if (vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && rectsOverlap(rect, vic.hurtbox())) {
+    // armDelay: a placed TRAP (lantern) is inert for its first few frames so it can't be cast AS a melee.
+    if (vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && p.age >= (p.armDelay || 0) && rectsOverlap(rect, vic.hurtbox())) {
       landAttack(p.owner, vic, move, game, p.x - p.vx * 2, { x: p.x + Math.sign(p.vx) * p.w / 2, y: p.y + p.h / 2 });
       // Override chip: a 20mm shell hurts through a guard (cannon only — bullets chip via landAttack).
       if (!isB && vic.state === 'blockstun') {
@@ -655,7 +871,28 @@ function updateProjectiles(f1, f2, game) {
         game.flash = Math.max(game.flash, 5); game.flashMax = Math.max(game.flashMax, 5);
         playSfx('explosion');
       }
+      // TREMOR (Xamora) DETONATES into a HUGE ground blast — fire + debris + billowing smoke.
+      if (p.kind === 'magic' && (move === TREMOR_MOVE || move === SHOCKWAVE_MOVE)) {
+        const ix = p.x, dir = Math.sign(p.vx) || 1;
+        spawnBlast(ix, CFG.FLOOR_Y - 52); spawnBlast(ix, CFG.FLOOR_Y - 92);
+        spawnSpike(ix, dir);
+        spawnRumble(ix, CFG.FLOOR_Y - 30, dir); spawnRumble(ix, CFG.FLOOR_Y - 30, -dir);
+        spawnDust(ix, CFG.FLOOR_Y, 20); spawnDust(ix - 44, CFG.FLOOR_Y, 10); spawnDust(ix + 44, CFG.FLOOR_Y, 10);   // billowing smoke
+        spawnSpark(ix, CFG.FLOOR_Y - 50, 'hit', 2);
+        game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5);
+        game.flash = Math.max(game.flash, 9); game.flashMax = Math.max(game.flashMax, 9);
+        playSfx('explosion');
+      }
+      // LANTERN (Xamora) DETONATES where it hangs — a contained magic burst that pops them up.
+      if (p.kind === 'magic' && move === LANTERN_MOVE) {
+        spawnBlast(p.x, p.y + p.h * 0.4); spawnSpark(p.x, p.y + p.h * 0.3, 'hit', 2);
+        game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+        game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+        playSfx('explosion');
+      }
     }
+    // the lantern is STATIONARY (never goes off-screen) — fizzle it on its own timer instead.
+    if (p.move === LANTERN_MOVE && p.age > CFG.LANTERN_LIFE) { spawnDust(p.x, p.y + p.h * 0.4, 6); p.dead = true; }
     if (p.x < -200 || p.x > CFG.STAGE_W + 200 || p.y < -260 || p.y > CFG.FLOOR_Y + 60) p.dead = true;
   }
   for (let i = Projectiles.length - 1; i >= 0; i--) if (Projectiles[i].dead) Projectiles.splice(i, 1);

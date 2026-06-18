@@ -110,6 +110,8 @@ class Fighter {
     this.jabCounted = false;   // whether the current jab has been tallied into jabChain
     this.crouchjabChain = 0;   // consecutive CONNECTED crouch jabs → a 2nd (connected) down+P upgrades into the liver shot
     this.crouchjabCounted = false; // whether the current crouch jab has been tallied into crouchjabChain
+    this.rekkaChain = 0;       // consecutive CONNECTED rekka hits → same-button N-hit string (char.rekka: Vesper slash 1-2-3, Xamora staff swat)
+    this.rekkaCounted = false; // whether the current rekka move has been tallied
     this.bounced = false;
     this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
@@ -118,6 +120,9 @@ class Fighter {
     this.sideSpikeFrames = 0;  // electric overhand: reduced-gravity flat-flight window
     this.pendingElectric = 0;  // electrocution queued by the side spike — converts to `electrified` on landing
     this.electrified = 0;      // electrocution seize timer: locked + convulsing + passive DoT
+    this.staminaLock = 0;      // frames stamina is FORCED to 0 (Xamora's tip sweet-spot — winded, gassed on wakeup)
+    this.armorHits = 0;        // hits absorbed by super-armor on the CURRENT armored move (Xamora) — caps at move.armor → ARMOR BREAK
+    this.armorDamage = 0;      // damage soaked through armor this move (bookkeeping / future armor-damage cap)
     this.wallSpiked = false;   // a wall-spike wallsplat → slow slide down the wall + blood trail
     this.bleed = 0;            // bleed stacks (Vesper's knife DoT)
     this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
@@ -140,6 +145,7 @@ class Fighter {
     this.usedAirAttack = false;
     this.usedAirDash = false;   // one air-dash per jump (Vesper)
     this.usedDoubleJump = false; // one double jump per airtime (Vesper)
+    this.gliding = false;        // Xamora's wings: slow-fall glide active this frame
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
     this.superFlash = false;   // main consumes → triggers cinematic freeze
@@ -149,6 +155,8 @@ class Fighter {
     this.decapitated = false;  // sword-finisher KO: head detached → body renders headless
     this.punchChain = 0;       // magic punch combo progress: jab(1)→cross(2)→uppercut(3)→cross(4)
     this.punchChainTimer = 0;  // grace frames the chain stays armed between links (input-driven, decays in update)
+    this.activeChains = [];    // live multi-chain candidates [{idx,pos}] (Vesper tracks several at once)
+    this.pendingFinish = null; // the finish of a completed chain, awaiting its clean hit / gun fire-frame
     this.swordReady = 0;       // window (after the auto-combo) where a back kick triggers the sword combo
     this.spawnShot = false;    // combat consumes → spawns the cannon round
     this.counterKind = null;   // 'punch'|'kick' of the counter blow (render reads it)
@@ -170,7 +178,7 @@ class Fighter {
     if (FLASH_ON_ENTER.has(name)) this.hitFlash = CFG.HIT_FLASH;   // white impact frame on every fallheavy/wallsplat/launched/hitstun entry
 
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; this.rekkaChain = 0; }
     // (punchChain is deliberately NOT cleared on neutral: a magic-combo link recovers to idle
     //  between hits while the victim is still in hitstun, so the chain's lifetime is the VICTIM's
     //  combo — cleared in update() when the opponent leaves their hit state, not when WE idle.)
@@ -211,7 +219,7 @@ class Fighter {
 
   pushbox() {
     // clinch/clinched are pinned bodies — null pushbox so a stray push-apart can't shove them
-    if (['downed', 'fallheavy', 'getup', 'thrown', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled', 'clinch', 'clinched', 'electrified'].includes(this.state)) return null;
+    if (['downed', 'fallheavy', 'getup', 'thrown', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled', 'clinch', 'clinched'].includes(this.state)) return null;   // electrified IS hittable (unbreakable seize)
     return { x: this.x - CFG.PUSHBOX_W / 2, y: this.y - CFG.BODY_H, w: CFG.PUSHBOX_W, h: CFG.BODY_H };
   }
 
@@ -263,12 +271,26 @@ class Fighter {
     // breaks it; a grace timer (update()) lets it survive loose timing between links but expires so
     // a stale jab can't arm it later. The combat.js override only fires on a CLEAN hit, so blocking
     // the string still defends — you just get latched, not comboed.
-    const chain = this.char.comboChain;   // per-character (brawler: jab→cross→uppercut→cross; vesper: slash→thrust→rising)
-    const pc = this.punchChain;
-    this.punchChain = !chain ? 0
-      : name === chain[0] ? 1
-      : (pc > 0 && pc < chain.length && name === chain[pc]) ? pc + 1
-      : 0;
+    // MULTI-CHAIN tracking: a character can have several signature chains, tracked at once — a token may
+    // belong to more than one (Vesper's 'thrust' seeds both the EXECUTION and SKEET chains). punchChain
+    // stays the MAX progress across live candidates so the magnet/mid-link glue (>=2) are unchanged;
+    // pendingFinish holds the finish of the first completed chain (consumed in combat.js / the gun fire-hook).
+    const chains = comboChainsOf(this.char);
+    const prevCands = this.activeChains || [];
+    const nextCands = [];
+    chains.forEach((c, idx) => {
+      const seq = c.sequence;
+      const p = prevCands.find(e => e.idx === idx);
+      if (p && p.pos < seq.length && name === seq[p.pos]) nextCands.push({ idx, pos: p.pos + 1 });   // continue this chain
+      else if (name === seq[0]) nextCands.push({ idx, pos: 1 });                                      // (re)start this chain
+    });
+    this.activeChains = nextCands;
+    this.punchChain = nextCands.reduce((m, e) => Math.max(m, e.pos), 0);
+    this.pendingFinish = null;
+    for (const e of nextCands) {
+      const c = chains[e.idx];
+      if (e.pos >= (c.finish.atChain || c.sequence.length)) { this.pendingFinish = c.finish; break; }
+    }
     if (this.punchChain > 0) this.punchChainTimer = CFG.PUNCHCHAIN_GRACE;
     // No dead-stops: strikes carry a chunk of your locomotion into them.
     // Chains ('attack' → 'attack') keep whatever flow is already going.
@@ -294,6 +316,9 @@ class Fighter {
     if (name !== 'jab') this.jabChain = 0;   // only a jab→jab→jab string builds the burst
     this.crouchjabCounted = false;           // this move's connecting-crouchjab tally (liver-shot chain)
     if (name !== 'crouchjab' && name !== 'livershot') this.crouchjabChain = 0;   // only a crouchjab string (→ livershot) builds it
+    this.rekkaCounted = false;               // this move's connecting-rekka tally
+    { const rk = this.char.rekka; if (!rk || rk.steps.indexOf(name) < 0) this.rekkaChain = 0; }   // only the char's rekka string builds it
+    this.armorHits = 0; this.armorDamage = 0;   // fresh super-armor budget per move (the N-hit cap is per-move, not persistent)
     this.flatlinerPrimed = false;            // every move starts un-primed; the just-frame remap re-sets it AFTER this returns
     // Dive bomb: a `dive` field redirects the jump arc steeply down-forward on
     // start (e.g. divekick). vy is positive = downward; vx is signed by facing.
@@ -427,6 +452,9 @@ class Fighter {
       if (cand === 'cross' && this.moveName === 'frontkick' && mv.cancels.includes('superman')) cand = 'superman';
       // LIVER SHOT: a CONNECTED crouchjab → down+P AGAIN.
       if (cand === 'crouchjab' && this.moveName === 'crouchjab' && this.crouchjabChain >= 1 && mv.cancels.includes('livershot')) cand = 'livershot';
+      // VESPER SLASH REKKA: a CONNECTED neutral-P advances stab→arc→rising-cut (cand stays 'slash'; the moveName + count pick the link).
+      // REKKA: a CONNECTED repeat of the trigger button advances the same-button string (char.rekka.steps).
+      { const rk = this.char.rekka; if (rk && cand === rk.trigger) { const i = rk.steps.indexOf(this.moveName); const nxt = rk.steps[i + 1]; if (i >= 0 && nxt && this.rekkaChain >= i + 1 && mv.cancels.includes(nxt)) cand = nxt; } }
       // GAZELLE HOOK: jab→jab (jabChain===2) → forward+P.
       if (cand === 'cross' && this.moveName === 'jab' && this.jabChain >= 2 && mv.cancels.includes('gazelle')) cand = 'gazelle';
       // SPINNING ELBOW: backfist → forward+P, or cross → back+P.
@@ -658,15 +686,15 @@ class Fighter {
     // MAGIC PUNCH COMBO lifetime: the chain is armed by the input sequence (startMove) and held
     // by a grace timer so loose timing between links survives — but it expires, so a lone jab can't
     // arm the magnet on a much-later poke. An off-sequence move start zeroes it directly.
-    if (this.punchChain > 0 && --this.punchChainTimer <= 0) this.punchChain = 0;
+    if (this.punchChain > 0 && --this.punchChainTimer <= 0) { this.punchChain = 0; this.activeChains = []; this.pendingFinish = null; }
     if (this.swordReady > 0) this.swordReady--;   // back-kick→sword-combo window (set when the auto-combo ends)
     if (this.gibArmed > 0) this.gibArmed--;       // shotgun-gib window
 
-    // ELECTROCUTION seize (electric overhand): locked, convulsing, taking passive DoT.
-    // Fully owns the body and refreshes invuln so the shock can't be knocked out of it.
+    // ELECTROCUTION seize (electric overhand / Xamora's Smite): locked, convulsing, taking passive DoT.
+    // HITTABLE but UNBREAKABLE — no invuln, so hits land (damage + white flash), but every frame re-locks
+    // the body to 'electrified' so a hit can't pop them out (combat.js applies the damage without a reaction).
     if (this.electrified > 0) {
       this.electrified--;
-      this.invuln = Math.max(this.invuln, 2);
       if (this.state !== 'electrified') this.setState('electrified');
       this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
       if (this.hp > 0 && this.electrified % CFG.ELECTRIC_TICK === 0) {
@@ -680,7 +708,8 @@ class Fighter {
     if (this.groundpoundCD > 0) this.groundpoundCD--;
 
     const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip', 'crumple', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled']);
-    if (!NO_REGEN.has(this.state)) this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen);
+    if (this.staminaLock > 0) { this.staminaLock--; this.stamina = 0; }   // winded by the spear tip — no stamina until the lock expires
+    else if (!NO_REGEN.has(this.state)) this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen);
 
     // Parry timing: how *fresh* is the block? Holding back forever never parries.
     const away = Math.sign(this.x - opp.x) || -this.facing;
@@ -736,7 +765,7 @@ class Fighter {
         break;
       }
       case 'prejump': {
-        if (this.f >= CFG.PREJUMP_FRAMES) {
+        if (this.f >= (this.stats.prejumpFrames || CFG.PREJUMP_FRAMES)) {   // per-char load (Xamora charges a high jump)
           const dir = this.pad.held.right ? 1 : this.pad.held.left ? -1 : 0;
           const toward = Math.sign(opp.x - this.x) || this.facing;
           this.vx = dir === 0 ? 0 : dir * (dir === toward ? this.stats.jumpDriftFwd : this.stats.jumpDriftBack);
@@ -796,6 +825,12 @@ class Fighter {
         if (mv && this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
           else if (mv.projectile === 'rifleround') spawnRifleRound(this);
+          else if (mv.projectile === 'wisp') spawnWisp(this, 0);
+          else if (mv.projectile === 'wispdown') spawnWisp(this, 1);
+          else if (mv.projectile === 'tremor') spawnTremor(this);
+          else if (mv.projectile === 'shockwave') spawnShockwave(this);
+          else if (mv.projectile === 'vacuum') spawnVacuum(this);
+          else if (mv.projectile === 'lantern') spawnLantern(this);
           if (mv.fireSfx) playSfx(mv.fireSfx);
         }
         // STREAMED BURST (air uzi): one round every `interval` frames → a forward LINE, not a fan.
@@ -812,11 +847,47 @@ class Fighter {
       }
       case 'attack': {
         const mv = this.move;
+        // CHAIN COMMAND-GRAB FINISHERS: a completed thrust→hamstring→pistol/shotgun chain CATCHES the
+        // opponent into a cinematic (EXECUTION / SKEET) at the gun's fire frame — BEFORE the gun fires.
+        if (this.f === mv.startup + 1 && this.pendingFinish
+            && (this.pendingFinish.kind === 'execution' || this.pendingFinish.kind === 'skeet')) {
+          const pf = this.pendingFinish;
+          this.pendingFinish = null; this.punchChain = 0; this.activeChains = [];   // commit point (consumed either way)
+          if (opp && opp.hp > 0 && opp.invuln <= 0 && Math.abs(opp.x - this.x) <= CFG.CMDGRAB_RANGE
+              && !['downed', 'fallheavy', 'wallsplat', 'thrown', 'clinch', 'clinched'].includes(opp.state)) {
+            if (pf.kind === 'execution') startExecution3(this, opp, game); else startSkeet(this, opp, game);
+            break;   // the cinematic owns both bodies now
+          }
+          // out of range → fall through and just fire the gun normally
+        }
         // GUN MOVES: FIRE on the active frame — spawn the round (pistol/rifle) + the shot sound.
         if (this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
           else if (mv.projectile === 'rifleround') spawnRifleRound(this);
+          else if (mv.projectile === 'wisp') spawnWisp(this, 0);
+          else if (mv.projectile === 'wispdown') spawnWisp(this, 1);
+          else if (mv.projectile === 'tremor') spawnTremor(this);
+          else if (mv.projectile === 'shockwave') spawnShockwave(this);
+          else if (mv.projectile === 'vacuum') spawnVacuum(this);
+          else if (mv.projectile === 'lantern') spawnLantern(this);
           if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
+        }
+        // CRESCENT SLAM: power gathers on the raised spear during the windup; a WHIFFED slam erupts the
+        // GROUND on impact → an AoE shockwave that knocks nearby foes back (direct hits go through landAttack).
+        if (this.moveName === 'crescentslam') {
+          if (this.f < mv.startup && this.f % 2 === 0) spawnElectric(this.x + this.facing * 6, CFG.FLOOR_Y - 250, Math.min(2 + ((this.f / 4) | 0), 6));   // charging glow overhead
+          if (this.f === mv.startup + mv.active && !this.madeContact) {   // WHIFF → slam the empty ground
+            const sx = this.x + this.facing * 70;
+            spawnSpike(sx, this.facing); spawnRumble(sx, CFG.FLOOR_Y - 30, 1); spawnRumble(sx, CFG.FLOOR_Y - 30, -1);
+            spawnBlast(sx, CFG.FLOOR_Y - 44); spawnDust(sx, CFG.FLOOR_Y, 18);
+            game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4); game.flash = Math.max(game.flash, 7); game.flashMax = Math.max(game.flashMax, 7);
+            playSfx('wall_spike'); playSfx('explosion'); pushFeed('SLAM!', this.color);
+            if (opp && opp.hp > 0 && !opp.isAirborne() && !['downed', 'fallheavy', 'wallsplat', 'thrown', 'clinch', 'clinched', 'electrified'].includes(opp.state) && Math.abs(opp.x - sx) <= CFG.CRESCENT_AOE_RANGE) {
+              opp.hp = Math.max(1, opp.hp - CFG.CRESCENT_AOE_DMG);
+              opp.setLaunched((Math.sign(opp.x - sx) || this.facing) * 11, -5, true);   // shockwave knockback
+              spawnSpark(opp.x, CFG.FLOOR_Y - 90, 'hit', 1);
+            }
+          }
         }
         // STREAMED BURST (upshot AR column): one round every `interval` frames across the active
         // window → the rounds come out in a TRAIL/line (straight up), not a simultaneous fan.
@@ -862,6 +933,11 @@ class Fighter {
           this.crouchjabCounted = true;
           this.crouchjabChain = (this.crouchjabChain || 0) + 1;
         }
+        // Vesper's neutral-P 1-2-3 rekka: each CONNECTED slash advances the chain (stab→arc→rising cut).
+        { const rk = this.char.rekka; if (rk && rk.steps.indexOf(this.moveName) >= 0 && this.madeContact && !this.rekkaCounted) {
+          this.rekkaCounted = true;
+          this.rekkaChain = (this.rekkaChain || 0) + 1;
+        } }
         // FEINT: cancel a NON-convertible move's startup back into neutral for a
         // stamina cost — bait a parry, then whiff-punish. BACK + JUMP during startup.
         // (flyConvert moves keep JUMP for their conversion, so they can't feint.)
@@ -914,7 +990,7 @@ class Fighter {
             this.setState('flyattack');
             this.move = fm;
             this.moveName = mv.flyConvert;
-            this.punchChain = 0;   // jumping out of the chain (e.g. uppercut→flyuppercut) breaks the magic combo
+            this.punchChain = 0; this.activeChains = []; this.pendingFinish = null;   // jumping out of the chain (e.g. uppercut→flyuppercut) breaks the magic combo
             this.moveHitDone = false;
             this.madeContact = false;
             this.hitCount = 0;
@@ -1109,6 +1185,14 @@ class Fighter {
           const ok = opp.hp > 0 && opp.invuln <= 0
             && !['air', 'airattack', 'flyattack', 'downed', 'fallheavy', 'thrown', 'getup', 'clinch', 'clinched', 'wallsplat'].includes(opp.state)
             && Math.abs(opp.x - this.x) <= CFG.CLINCH_GRAB_RANGE;
+          // Xamora's P+K is her signature UNBLOCKABLE command grab — TALON SNATCH — instead of the clinch
+          // loop (gated by char id so brawler/vesper keep the clinch → byte-identical). Her way to crack a turtle.
+          if (ok && this.char.id === 'xamora') {
+            // THROW PROTECTION: can't command-grab a foe in hit/block-stun. This closes the guaranteed
+            // vacuum→Talon setup — the pull now sets up a MIXUP (grab vs strike vs block), not an unreactable grab.
+            if (opp.state !== 'hitstun' && opp.state !== 'blockstun') startTalonSnatch(this, opp, game);
+            break;   // her P+K is Talon Snatch — she never falls through to the generic clinch
+          }
           if (ok) { this.beginClinch(opp); break; }
         }
         if (this.f >= CFG.CLINCH_WHIFF_RECOVERY) this.setState('idle');
@@ -1280,6 +1364,13 @@ class Fighter {
             game.shake = Math.max(game.shake, CFG.SHAKE_LIGHT);
           }
           if (this.f >= CFG.SUPER_STARTUP + CFG.CLIMAX_FRAMES + CFG.SUPER_RECOVERY) this.setState('idle');
+        } else if (this.superKind === 'wrath') {
+          // WRATH OF GOD: she raises the staff and the SKY FALLS — meteors rain across the arena over the window.
+          if (this.f >= CFG.SUPER_STARTUP && this.f < CFG.SUPER_STARTUP + CFG.WRATH_FRAMES && (this.f - CFG.SUPER_STARTUP) % CFG.WRATH_INTERVAL === 0) {
+            spawnWrathVolley(this);
+            game.shake = Math.max(game.shake, CFG.SHAKE_MED);
+          }
+          if (this.f >= CFG.SUPER_STARTUP + CFG.WRATH_FRAMES + CFG.SUPER_RECOVERY) this.setState('idle');
         } else if (this.superKind === 'tango') {
           // KILLER TANGO: a teleport-slash rush — if a grounded opp is in range it starts the cinematic.
           if (this.f === CFG.SUPER_STARTUP) {
@@ -1319,7 +1410,15 @@ class Fighter {
       if (this.sideSpikeFrames > 0) {
         this.vy += this.stats.gravity * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--;
         spawnSideTrail(this.x, this.y - CFG.BODY_H * 0.5);   // a particle trail streaming off the flying body
-      } else this.vy += this.stats.gravity;
+      } else {
+        // GLIDE (Xamora's wings): hold JUMP while FALLING → suppressed gravity + capped fall + a little drift.
+        this.gliding = !!this.char.glide && this.pad.held.jump && this.vy > 0.5 && this.state === 'air';
+        if (this.gliding) {
+          this.vy += this.stats.gravity * CFG.GLIDE_GRAV_MULT;
+          if (this.vy > CFG.GLIDE_MAX_VY) this.vy = CFG.GLIDE_MAX_VY;
+          if (this.pad.held.right) this.vx += CFG.GLIDE_DRIFT; else if (this.pad.held.left) this.vx -= CFG.GLIDE_DRIFT;
+        } else this.vy += this.stats.gravity;
+      }
       this.x += this.vx;
       this.y += this.vy;
       if (this.y >= CFG.FLOOR_Y && this.vy >= 0) {

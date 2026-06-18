@@ -83,6 +83,12 @@ const CFG = {
   // ── Vesper SUPERS ──
   CLIMAX_FRAMES: 44,            // Bullet Climax: how long the barrage fires
   CLIMAX_INTERVAL: 3,          // frames between volleys
+  // WRATH OF GOD (Xamora's super): she raises the staff and the sky FALLS — meteors rain across the arena.
+  WRATH_FRAMES: 66,            // how long the meteor storm rains
+  WRATH_INTERVAL: 6,           // frames between meteor volleys
+  WRATH_DMG: 20,               // per-meteor damage (many connect over the window → big total, combo-scaled)
+  WRATH_SPEED: 6,              // meteor initial fall speed
+  WRATH_GRAV: 0.7,             // meteor downward acceleration
   TANGO_HITS: 7,               // Killer Tango: teleport slashes before the finisher
   TANGO_DELAY: 6, TANGO_INTERVAL: 6, TANGO_RADIUS: 120,
   WITCH_DODGE_FRAMES: 22,      // Witch Time: the dodge window (invuln) that can trigger the slow
@@ -205,6 +211,14 @@ const CFG = {
   LIVERSHOT_CRUMPLE_FRAMES: 46, // liver shot's longer body-shot freeze (via move.crumpleFrames)
   LIVERSHOT_DRAIN: 30,          // stamina ripped by the liver shot
 
+  // SUPER-ARMOR (Xamora the heavy only — gated by char id). She EATS a hit through a
+  // flagged commital windup (move.armor:N = hits absorbed) or while walking the foe down
+  // (stamina-priced), takes reduced damage, and keeps coming. Counterplay is built in:
+  // THROWS bypass it (a grab on frame 5 overwrites her 'attack' state), MULTI-HIT breaks
+  // it (the N cap), and an `armorBreak:true` move blows straight through.
+  ARMOR_CHIP: 0.7,              // fraction of damage she still takes through armor (a trade, never free)
+  ARMOR_WALK_STAMINA: 34,       // stamina drained per hit eaten while walking → self-limits to ~2 advancing hits
+
   // THE FLATLINER — just-frame overhand off the machine-gun's FINAL hit → one-punch KO.
   // A clean primed overhand diverts into the shared cine harness (kind:'flatliner') instead
   // of the blast: small impact hitstop, white flash, freeze, body crumples, round ends.
@@ -271,6 +285,64 @@ const CFG = {
   SUPLEX_ARC_H: 150,           // peak height of the over-the-head bridge (vs throw's 120)
   SUPLEX_BACK_DIST: 95,        // px the victim lands BEHIND the thrower (over the head, far side)
   SUPLEX_TECH_WINDOW: 6,       // mash P+K within this to break the bridge (reuses thrown-tech feel)
+
+  // Vesper cinematic finishers (scissor takedown / 3-shot execution / skeet / auto-kick followups)
+  CMDGRAB_RANGE: 200,          // reach for the chain command grabs (EXECUTION / SKEET) at the gun fire-frame
+  SCISSOR_FRAMES: 18,          // scissor windup before the throw-down
+  SCISSOR_HANG: 16,            // beat Vesper holds FROZEN airborne while the victim drops
+  SCISSOR_AIR_H: 168,          // how high she freezes during the takedown
+  SCISSOR_DMG: 130,            // the slam
+  SCISSOR_SPIKE_VY: 23,        // victim DOWN-spike velocity (positive = into the floor → bounce)
+
+  // TALON SNATCH — Xamora's winged command grab (P+K): hoist the foe overhead on the staff, then SLAM.
+  TALON_FRAMES: 18,            // the lift (foe hauled up off the floor)
+  TALON_HANG: 10,             // beat she holds them at the apex before the slam
+  TALON_LIFT_H: 150,          // how high the victim is hoisted
+  TALON_DMG: 140,             // the slam payoff (her heaviest grab — the catch-and-kill identity)
+  TALON_SPIKE_VY: 20,         // down-spike velocity into the floor (untechable)
+
+  // SKY TALON — the AIR command grab (air ↑K): she snatches a jumping foe and HURLS them into the ground.
+  SKYTALON_AIR_H: 196,        // how high she hovers (winged) holding them
+  SKYTALON_GRIP_H: 150,       // height the victim is gripped at before the hurl-down
+  SKYTALON_FRAMES: 13,        // the grip beat
+  SKYTALON_HANG: 13,          // the hurl-down arc duration
+  SKYTALON_DMG: 120,          // the air-slam payoff
+  EXEC3_STEPBACK: 130,         // px Vesper backs off to execute
+  EXEC3_DELAY: 16,             // frames before the first shot
+  EXEC3_INTERVAL: 15,          // frames between the 3 shots
+  EXEC3_DMG: 42,               // damage per execution shot
+  EXEC3_TUMBLE_VX: 13,         // the last shot sends him tumbling away
+  EXEC3_TUMBLE_VY: -9,
+  SKEET_KICK_FRAME: 8,         // frame the launching kick lands
+  SKEET_RISE: 4,               // px/frame the 'clay pigeon' climbs after the kick
+  SKEET_AIR_H0: 70,            // starting height of the kicked-up victim
+  SKEET_BLAST_FRAME: 30,       // frame the shotgun fires
+  SKEET_KICK_DMG: 26,
+  SKEET_BLAST_DMG: 95,
+  SKEET_BLAST_VX: 10,
+  SKEET_BLAST_VY: -7,
+  KICKFOLLOW_WINDUP: 7,        // frames before the auto-followup (heel-spike / side-kick) 2nd hit lands
+  KEBAB_CARRY_FRAMES: 14,      // SHISH KEBAB: frames spent dragging the impaled victim to the wall
+  KEBAB_REACH: 96,             // how far behind the victim Vesper stays (blade-length) during the carry
+  KEBAB_DMG: 120,              // the stab-through-and-pin damage
+
+  // Xamora (char #3) — winged bo-staff heavy zoner
+  GLIDE_GRAV_MULT: 0.30,       // wings: gravity while gliding (hold JUMP falling) — a slow, drifting descent
+  GLIDE_MAX_VY: 3.2,           // terminal fall speed while gliding (she hangs)
+  GLIDE_DRIFT: 0.35,           // horizontal nudge per frame while gliding + holding a direction
+  WISP_DMG: 26, WISP_SPEED: 9, // drifting magic orb (her main ranged poke)
+  TREMOR_DMG: 54, TREMOR_SPEED: 11,  // traveling ground shockwave that DETONATES — tons of damage
+  VACUUM_DMG: 8, VACUUM_SPEED: 7,    // the GAP-CLOSER orb: low damage, its job is the PULL not the hit
+  VACUUM_PULL: 16,             // how hard the vacuum orb yanks the victim toward her (the "get over here")
+  LANTERN_DMG: 30,             // the placed-trap orb: detonates on contact, pops them up (juggle/grab follow)
+  LANTERN_LIFE: 170,           // frames the lantern hangs in space before it fizzles (~2.8s of zoning)
+  LANTERN_ARM: 8,              // arming delay — it can't detonate the instant it's cast (it's a TRAP, not a melee)
+  TIPPED_STAMINA_LOCK: 120,    // Extend Thrust SWEET SPOT: frames the victim is held at ZERO stamina (winded) — gassed on wakeup
+  CRESCENT_BONUS: 95,          // CRESCENT SLAM: huge bonus on a DIRECT hit (on top of base×dmgMult) → THE most damaging non-special
+  CRESCENT_FREEZE: 36,         // the WORLD STOPS — a long hitstop the instant it connects (cinematic impact)
+  CRESCENT_BOUNCE_VY: -25,     // they're slammed to the floor then BOUNCE very high into the air
+  CRESCENT_AOE_RANGE: 175,     // a WHIFFED slam erupts the ground: foes within this range get knocked back
+  CRESCENT_AOE_DMG: 24,        // ...for chip damage (the explosion, not the direct slam)
 
   // Clinch — neutral P+K locks the bodies together: dirty boxing, body knees,
   // a judo throw off BACK, and a mash-escape for the victim. Auto-releases.

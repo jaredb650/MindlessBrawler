@@ -576,10 +576,18 @@ function runTangoCine(game, ex) {
 // Generic VESPER slash-flurry cinematic — used by the dive-grab (3 slashes), slide tackle (2,
 // launches high), tele-slash (2), and the slash→thrust→rising aerial rave (3). opts =
 // { hits, launchVy, aerial, label }. She blinks around the locked victim slashing, last hit LAUNCHES.
+// per-combo visual identity so each auto-combo reads as a DISTINCT move (slash-line colour + signature burst).
+const SLASH_STYLES = {
+  rave:    { slash: 'rgba(150,230,255,0.95)', spark: 'parry', extra: 'electric' },   // AERIAL RAVE — icy cyan + blue crackle
+  skyhook: { slash: 'rgba(255,196,110,0.95)', spark: 'hit',   extra: 'blast' },      // SKYHOOK — orange fireball
+  triple:  { slash: 'rgba(206,160,255,0.95)', spark: 'parry', extra: 'electric' },   // TRIPLE SLASH — violet
+  iaido:   { slash: 'rgba(255,244,196,0.95)', spark: 'parry', extra: 'gold' },       // IAIDO — gold katana flash
+  rising:  { slash: 'rgba(255,150,170,0.95)', spark: 'hit',   extra: 'blast' },      // RISING SLASH — hot pink
+};
 function startSlashCombo(att, vic, game, opts) {
   att.facing = Math.sign(vic.x - att.x) || att.facing;
   const vicX = Math.max(CFG.WALL_L + 70, Math.min(CFG.WALL_R - 70, vic.x));
-  startCine('slashcombo', att, vic, game, { vicX, hits: 0, total: opts.hits || 3, launchVy: opts.launchVy || -13, aerial: !!opts.aerial, nextHit: 4, interval: 5, poseF0: 0 });
+  startCine('slashcombo', att, vic, game, { vicX, hits: 0, total: opts.hits || 3, launchVy: opts.launchVy || -13, aerial: !!opts.aerial, overhead: !!opts.overhead, style: opts.style || 'rave', nextHit: 4, interval: 5, poseF0: 0 });
   att.setState('magiccombo'); att.comboStrike = 'punch';
   vic.setState('executed');
   vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
@@ -601,31 +609,320 @@ function runSlashComboCine(game, ex) {
     att.y = data.aerial ? vy0 : CFG.FLOOR_Y;
     att.facing = Math.sign(vic.x - att.x) || att.facing;
     data.poseF0 = ex.f;
-    vic.hp = Math.max(1, vic.hp - 30);   // rushdown buff: the auto-combo cuts hit harder too
+    vic.hp = Math.max(1, vic.hp - 40);   // rushdown buff: the auto-combo cuts hit harder too
     const cy = vy0 - 80;
-    spawnSpark(vic.x, cy, 'parry'); spawnBlood(vic.x, cy, att.facing, last ? 28 : 12);
-    // dramatic slash crescents — an alternating diagonal each hit, a crossing flurry on the finisher
+    const st = SLASH_STYLES[data.style] || SLASH_STYLES.rave;
+    spawnSpark(vic.x, cy, st.spark); spawnBlood(vic.x, cy, att.facing, last ? 28 : 12);
+    // ONE slash crescent PER HIT (sequenced by the per-hit interval), in this combo's signature colour;
+    // the finisher's is bigger. Alternating diagonal so a multi-hit string reads as separate strokes.
     const sa = (data.hits % 2 === 0) ? 0.7 : -0.7;
-    spawnSlashFx(vic.x, cy, sa, 150);
-    if (last) { spawnSlashFx(vic.x, cy, -sa, 165); spawnSlashFx(vic.x, cy, Math.PI / 2, 150); }
-    spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 4); spawnDust(att.x, CFG.FLOOR_Y, 3);
+    spawnSlashFx(vic.x, cy, sa, last ? 184 : 150, st.slash);
+    if (st.extra === 'electric') spawnElectric(vic.x, cy, 5);
+    else if (st.extra === 'blast') spawnBlast(vic.x, cy);
+    else spawnSpark(vic.x, cy, 'parry', 2);   // gold flash (iaido)
+    spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 3); spawnDust(att.x, CFG.FLOOR_Y, 3);
     game.shake = Math.max(game.shake, 4 + data.hits);
     game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : 3);
     playSfx('slash_combo_' + (1 + (data.hits - 1) % 3));   // cycle the 3 sword-combo swings across the flurry
     if (last) playSfx('stab_heavy');                        // the launching cut rips deep
     data.nextHit = ex.f + data.interval;
     if (last) {
-      // FINISHER: launch them up for the juggle, hand control back.
-      att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * 64));
-      att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
-      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
-      vic.setLaunched(att.facing * 3, data.launchVy, true);
+      if (data.overhead) {
+        // SKYHOOK: drag them DIRECTLY ABOVE her and pop straight up so the ↑K up-uzi catches them.
+        att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x));
+        att.y = CFG.FLOOR_Y;
+        vic.x = att.x;
+        att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+        vic.setLaunched(0, data.launchVy, true);   // straight up, directly overhead
+      } else {
+        // FINISHER: launch them up for the juggle, hand control back.
+        att.x = Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, vic.x - att.facing * 64));
+        att.y = CFG.FLOOR_Y; att.facing = Math.sign(vic.x - att.x) || att.facing;
+        att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+        vic.setLaunched(att.facing * 3, data.launchVy, true);
+      }
       game.cine = null;
     }
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine, slashcombo: runSlashComboCine };
+// clamp an x into the playable arena (body-center bounds)
+function cineClampX(x) { return Math.max(CFG.WALL_L + CFG.BODY_W / 2, Math.min(CFG.WALL_R - CFG.BODY_W / 2, x)); }
+
+// ── #2 SCISSOR TAKEDOWN (air ↑K command grab): Vesper stays FROZEN AIRBORNE while the victim is
+// thrown straight DOWN into a hard ground spike, then she drops.
+function startScissorTake(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 70, Math.min(CFG.WALL_R - 70, vic.x));
+  startCine('scissortake', att, vic, game, { vicX });
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 120, 'parry', 1); playSfx('throw_grab');
+  pushFeed('SCISSOR TAKEDOWN!!', att.color);
+}
+function runScissorTakeCine(game, ex) {
+  const { att, vic, data } = ex;
+  // Vesper is held FROZEN airborne the entire takedown (she only drops once the victim is slammed).
+  att.x = cineClampX(data.vicX - att.facing * 30); att.y = CFG.FLOOR_Y - CFG.SCISSOR_AIR_H; att.vx = 0; att.vy = 0;
+  if (ex.f < CFG.SCISSOR_FRAMES) {
+    vic.x = data.vicX; vic.y = CFG.FLOOR_Y - 132; vic.vx = 0; vic.vy = 0;   // gripped UP in the scissor
+    if (ex.f === 2) playSfx('whoosh_heavy');
+  } else if (ex.f < CFG.SCISSOR_FRAMES + CFG.SCISSOR_HANG) {
+    const t = (ex.f - CFG.SCISSOR_FRAMES) / CFG.SCISSOR_HANG;   // 0..1 — he FLIES into the ground while she hangs
+    vic.x = data.vicX; vic.y = (CFG.FLOOR_Y - 132) + 132 * (t * t); vic.vx = 0; vic.vy = 0;
+    if (ex.f === CFG.SCISSOR_FRAMES) spawnSlashFx(vic.x, CFG.FLOOR_Y - 132, Math.PI / 2, 150);
+  } else {
+    vic.hp = Math.max(0, vic.hp - CFG.SCISSOR_DMG);
+    vic.y = CFG.FLOOR_Y;
+    const away = Math.sign(vic.x - att.x) || att.facing;
+    vic.setState('fallheavy'); vic.noTech = true;   // hard untechable slam (matches the suplex spike)
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5); game.hitstop = Math.max(game.hitstop, 12);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 20, 'hit', 2); spawnDust(vic.x, CFG.FLOOR_Y, 16); spawnBlood(vic.x, CFG.FLOOR_Y - 30, away, 18);
+    playSfx('body_slam'); playSfx('throw_slam');
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');   // she drops now (the floor-snap lands her next frame)
+    game.cine = null;
+  }
+}
+
+// ── TALON SNATCH — Xamora's winged command grab (P+K): she hoists the foe overhead on the staff,
+// holds them at the apex, then SLAMS them straight down into an untechable ground spike. The unblockable
+// that cracks a turtle. Mirrors the scissor takedown harness; reuses receiveSpike for the slam.
+function startTalonSnatch(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 70, Math.min(CFG.WALL_R - 70, vic.x));
+  startCine('talonsnatch', att, vic, game, { vicX });
+  att.setState('idle');         // frozen grab pose (placeholder — a winged-hoist pose can be authored later)
+  vic.setState('executed');     // gripped/locked
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 130, 'parry', 1); playSfx('throw_grab');
+  pushFeed('TALON SNATCH!!', att.color);
+}
+function runTalonSnatchCine(game, ex) {
+  const { att, vic, data } = ex;
+  // she stays planted a staff-length back, holding them up; pinned each frame (physics is gated off)
+  att.x = cineClampX(data.vicX - att.facing * 56); att.y = CFG.FLOOR_Y; att.vx = 0; att.vy = 0;
+  const PEAK = CFG.TALON_LIFT_H;
+  if (ex.f < CFG.TALON_FRAMES) {
+    // LIFT: haul the victim up off the floor toward the apex (ease-out)
+    const t = ex.f / CFG.TALON_FRAMES;
+    vic.x = data.vicX; vic.y = CFG.FLOOR_Y - PEAK * (1 - (1 - t) * (1 - t)); vic.vx = 0; vic.vy = 0;
+    if (ex.f === 2) playSfx('whoosh_heavy');
+  } else if (ex.f < CFG.TALON_FRAMES + CFG.TALON_HANG) {
+    // HANG: gripped at the apex, just before the slam
+    vic.x = data.vicX; vic.y = CFG.FLOOR_Y - PEAK; vic.vx = 0; vic.vy = 0;
+    if (ex.f === CFG.TALON_FRAMES) spawnSlashFx(vic.x, CFG.FLOOR_Y - PEAK, Math.PI / 2, 150);
+  } else {
+    // SLAM: untechable ground spike. receiveSpike drives vy DOWN + sets noTech + bounce + FX (calls setLaunched).
+    vic.hp = Math.max(0, vic.hp - CFG.TALON_DMG);
+    const away = Math.sign(vic.x - att.x) || att.facing;
+    vic.receiveSpike(CFG.TALON_SPIKE_VY, away, game);
+    vic.noTech = true;   // re-assert (receiveSpike already set it; explicit, matches the KO/scissor path)
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5); game.hitstop = Math.max(game.hitstop, 12);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 20, 'hit', 2); spawnDust(vic.x, CFG.FLOOR_Y, 16); spawnBlood(vic.x, CFG.FLOOR_Y - 30, away, 18);
+    playSfx('body_slam'); playSfx('throw_slam');
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');   // she regains control
+    game.cine = null;                                     // RELEASE the gate (required, or soft-lock)
+    pushFeed('SLAMMED!!', vic.color);
+  }
+}
+
+// ── SKY TALON — Xamora's AIR command grab (air ↑K): she snatches a jumping foe at her talons, hangs a beat
+// (winged), then HURLS them straight into the ground (untechable). Mirrors the scissor-takedown harness.
+function startSkyTalon(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 70, Math.min(CFG.WALL_R - 70, vic.x));
+  startCine('skytalon', att, vic, game, { vicX });
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  spawnSpark(vic.x, CFG.FLOOR_Y - CFG.SKYTALON_GRIP_H, 'parry', 1); playSfx('throw_grab');
+  pushFeed('SKY TALON!!', att.color);
+}
+function runSkyTalonCine(game, ex) {
+  const { att, vic, data } = ex;
+  // she hovers (winged) the whole grab, holding the foe up at her talons — frozen airborne, zeroed velocity.
+  att.x = cineClampX(data.vicX - att.facing * 36); att.y = CFG.FLOOR_Y - CFG.SKYTALON_AIR_H; att.vx = 0; att.vy = 0;
+  if (ex.f < CFG.SKYTALON_FRAMES) {
+    vic.x = data.vicX; vic.y = CFG.FLOOR_Y - CFG.SKYTALON_GRIP_H; vic.vx = 0; vic.vy = 0;   // gripped up at her talons
+    if (ex.f === 2) playSfx('whoosh_heavy');
+  } else if (ex.f < CFG.SKYTALON_FRAMES + CFG.SKYTALON_HANG) {
+    const t = (ex.f - CFG.SKYTALON_FRAMES) / CFG.SKYTALON_HANG;   // 0..1 — HURLED into the ground while she hangs
+    vic.x = data.vicX; vic.y = (CFG.FLOOR_Y - CFG.SKYTALON_GRIP_H) + CFG.SKYTALON_GRIP_H * (t * t); vic.vx = 0; vic.vy = 0;
+    if (ex.f === CFG.SKYTALON_FRAMES) spawnSlashFx(vic.x, CFG.FLOOR_Y - CFG.SKYTALON_GRIP_H, Math.PI / 2, 150);
+  } else {
+    vic.hp = Math.max(0, vic.hp - CFG.SKYTALON_DMG);
+    vic.y = CFG.FLOOR_Y;
+    const away = Math.sign(vic.x - att.x) || att.facing;
+    vic.setState('fallheavy'); vic.noTech = true;   // hard untechable slam (matches the scissor takedown)
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 5); game.hitstop = Math.max(game.hitstop, 12);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 20, 'hit', 2); spawnDust(vic.x, CFG.FLOOR_Y, 16); spawnBlood(vic.x, CFG.FLOOR_Y - 30, away, 18);
+    playSfx('body_slam'); playSfx('throw_slam');
+    att.y = CFG.FLOOR_Y; att.vx = 0; att.vy = 0;
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');   // she drops to the floor + regains control
+    game.cine = null;
+    pushFeed('SLAMMED!!', vic.color);
+  }
+}
+
+// ── #7 EXECUTION (thrust→hamstring→pistol): Vesper steps back and fires 3 shots into the LOCKED
+// kneeling victim; the last shot tumbles him.
+function startExecution3(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 90, Math.min(CFG.WALL_R - 90, vic.x));
+  startCine('exec3', att, vic, game, { vicX, shots: 0, nextShot: CFG.EXEC3_DELAY });
+  att.x = cineClampX(vicX - att.facing * CFG.EXEC3_STEPBACK); att.y = CFG.FLOOR_Y;
+  att.setState('execpistol');   // stepped-back, pistol leveled
+  vic.setState('execkneel');    // locked kneeling
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  pushFeed('EXECUTION...', att.color);
+}
+function runExecution3Cine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y; vic.vx = 0; vic.vy = 0;   // pinned kneeling
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  if (ex.f >= data.nextShot && data.shots < 3) {
+    data.shots++;
+    const last = data.shots >= 3;
+    const mx = att.x + att.facing * 42, my = CFG.FLOOR_Y - 118;
+    spawnSpark(mx, my, 'hit', 1);
+    spawnBlood(vic.x, CFG.FLOOR_Y - 92, att.facing, last ? 22 : 9);
+    game.shake = Math.max(game.shake, last ? CFG.SHAKE_HEAVY + 2 : CFG.SHAKE_MED);
+    game.hitstop = Math.max(game.hitstop, last ? CFG.HITSTOP_ENDER : CFG.HITSTOP_MED);
+    playSfx('pistol_shot');
+    if (!last) { vic.hp = Math.max(1, vic.hp - CFG.EXEC3_DMG); data.nextShot = ex.f + CFG.EXEC3_INTERVAL; }
+    else {
+      vic.hp = Math.max(1, vic.hp - CFG.EXEC3_DMG);   // floor at 1 — the WALL SPIKE impact is the kill, not the shot
+      vic.receiveSideSpike(att.facing, game);          // the last shot BLASTS him flat into the wall (wall-spike)
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      game.cine = null;
+      pushFeed('EXECUTED.', att.color);
+    }
+  }
+}
+
+// ── #8 SKEET (thrust→hamstring→back-K): kick the victim UP into the air, then blast the 'clay' with the shotgun.
+function startSkeet(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 80, Math.min(CFG.WALL_R - 80, vic.x));
+  startCine('skeet', att, vic, game, { vicX });
+  att.x = cineClampX(vicX - att.facing * 80); att.y = CFG.FLOOR_Y;
+  att.setState('skeetkick');
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  pushFeed('SKEET!!', att.color);
+}
+function runSkeetCine(game, ex) {
+  const { att, vic, data } = ex;
+  att.x = cineClampX(data.vicX - att.facing * 80); att.y = CFG.FLOOR_Y;
+  const h = ex.f < CFG.SKEET_KICK_FRAME ? 0 : CFG.SKEET_AIR_H0 + (ex.f - CFG.SKEET_KICK_FRAME) * CFG.SKEET_RISE;
+  vic.x = data.vicX; vic.y = CFG.FLOOR_Y - h; vic.vx = 0; vic.vy = 0;
+  if (ex.f === CFG.SKEET_KICK_FRAME) {
+    vic.hp = Math.max(1, vic.hp - CFG.SKEET_KICK_DMG);
+    spawnSpark(vic.x, CFG.FLOOR_Y - 70, 'hit', 1); game.shake = Math.max(game.shake, CFG.SHAKE_MED); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_MED);
+    playSfx('hit_heavy'); att.setState('shotgun');   // pull the shotgun, aim up at the clay
+  }
+  if (ex.f >= CFG.SKEET_BLAST_FRAME) {
+    vic.hp = Math.max(0, vic.hp - CFG.SKEET_BLAST_DMG);
+    vic.gibArmed = 90;   // a lethal shotgun blast GIBS (the shared KO block decapitates)
+    vic.setLaunched(att.facing * CFG.SKEET_BLAST_VX, CFG.SKEET_BLAST_VY, true); vic.noTech = true;
+    spawnBlast(vic.x, vic.y - CFG.BODY_H * 0.4); spawnSpark(vic.x, vic.y - 40, 'hit', 2); spawnBlood(vic.x, vic.y - 40, att.facing, 22);
+    spawnShell(att.x - att.facing * 4, CFG.FLOOR_Y - CFG.BODY_H * 0.62, -att.facing * 2.4, -6);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+    playSfx('shotgun_blast');
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    game.cine = null;
+    pushFeed('SKEET SHOOT!!', att.color);
+  }
+}
+
+// ── #5/#6 AUTO 2-HIT KICKS: gunkick → front-flip HEEL SPIKE (down); heelshot → SIDE KICK (shove back).
+function startKickCombo(att, vic, game, opts) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const vicX = Math.max(CFG.WALL_L + 60, Math.min(CFG.WALL_R - 60, vic.x));
+  startCine('kickcombo', att, vic, game, { vicX, kind: opts.kind, dmg: opts.dmg, pushVx: opts.pushVx });
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  if (opts.kind === 'heelspike') { att.setState('flipheel'); att.x = cineClampX(vicX - att.facing * 16); }
+  else { att.setState('sidekick'); att.x = cineClampX(vicX - att.facing * 60); }
+  att.y = CFG.FLOOR_Y;
+  if (opts.label) pushFeed(opts.label + '!', att.color);
+}
+function runKickComboCine(game, ex) {
+  const { att, vic, data } = ex;
+  vic.x = data.vicX; vic.vx = 0; vic.vy = 0;
+  if (data.kind === 'heelspike') {
+    const t = Math.min(1, ex.f / CFG.KICKFOLLOW_WINDUP);
+    att.x = cineClampX(data.vicX - att.facing * 10); att.y = CFG.FLOOR_Y - 130 * Math.sin(t * Math.PI);   // flip arc up→down
+    if (ex.f < CFG.KICKFOLLOW_WINDUP) { vic.y = CFG.FLOOR_Y; }
+    else {
+      vic.hp = Math.max(0, vic.hp - data.dmg);
+      const away = att.facing;
+      vic.receiveSpike(CFG.AXEKICK_SPIKE_VY, away, game);
+      spawnSpike(vic.x, away); spawnSpark(vic.x, CFG.FLOOR_Y - 30, 'hit', 2); spawnDust(vic.x, CFG.FLOOR_Y, 12);
+      game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 2); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+      playSfx('spike');
+      att.x = cineClampX(vic.x - att.facing * 54); att.y = CFG.FLOOR_Y;
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      game.cine = null;
+    }
+  } else {
+    att.x = cineClampX(data.vicX - att.facing * 56); att.y = CFG.FLOOR_Y; vic.y = CFG.FLOOR_Y;
+    if (ex.f >= CFG.KICKFOLLOW_WINDUP) {
+      vic.hp = Math.max(0, vic.hp - data.dmg);
+      const away = att.facing;
+      spawnSpark(vic.x, CFG.FLOOR_Y - 92, 'hit', 1); game.shake = Math.max(game.shake, CFG.SHAKE_MED); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_MED);
+      playSfx('hit_heavy2');
+      vic.setLaunched(away * (data.pushVx || 14), -3, true);   // a flat shove back
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      game.cine = null;
+    }
+  }
+}
+
+// ── SHISH KEBAB (slash→slash→thrust): the thrust impales the victim and CARRIES them into the wall, pinning them.
+function startKebab(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  const wallX = att.facing === 1 ? CFG.WALL_R - CFG.BODY_W / 2 : CFG.WALL_L + CFG.BODY_W / 2;
+  startCine('kebab', att, vic, game, { wallX, vicX0: vic.x, into: -att.facing });   // into = direction the pinned body faces (into the stage)
+  vic.setState('executed');
+  vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
+  game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+  spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'hit', 1); playSfx('stab_light');
+  pushFeed('SHISH KEBAB!!', att.color);
+}
+function runKebabCine(game, ex) {
+  const { att, vic, data } = ex;
+  if (ex.f < CFG.KEBAB_CARRY_FRAMES) {
+    // CARRY: drag the impaled victim toward the wall; Vesper stays a blade-length behind, thrust held.
+    const t = ex.f / CFG.KEBAB_CARRY_FRAMES;
+    vic.x = data.vicX0 + (data.wallX - data.vicX0) * t; vic.y = CFG.FLOOR_Y - 36; vic.vx = 0; vic.vy = 0;
+    att.x = cineClampX(vic.x - att.facing * CFG.KEBAB_REACH); att.y = CFG.FLOOR_Y;
+    if (ex.f % 3 === 0) spawnBlood(vic.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, att.facing, 4);
+  } else {
+    // PIN: slam them into the wall — a manual WALL SPIKE (the cine owns the bodies, so set it directly).
+    vic.x = data.wallX; vic.facing = data.into; vic.vx = 0; vic.vy = 0;
+    vic.y = CFG.FLOOR_Y - CFG.SIDESPIKE_LIFT;
+    vic.hp = Math.max(0, vic.hp - CFG.KEBAB_DMG);
+    vic.setState('wallsplat'); vic.f = 0; vic.wallSpiked = true;   // → the slow blood-slide down the wall
+    game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    game.flash = Math.max(game.flash, 8); game.flashMax = Math.max(game.flashMax, 8);
+    spawnRumble(data.wallX + data.into * 12, vic.y - CFG.BODY_H * 0.3, data.into);
+    spawnBlood(data.wallX + data.into * 14, vic.y - CFG.BODY_H * 0.2, data.into, 38);
+    for (let i = 0; i < 5; i++) spawnStain(data.wallX + data.into * 6, CFG.FLOOR_Y - CFG.BODY_H * (0.25 + i * 0.12), true);
+    playSfx('wall_spike'); playSfx('stab_heavy');
+    att.x = cineClampX(data.wallX - att.facing * CFG.KEBAB_REACH); att.y = CFG.FLOOR_Y;
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    game.cine = null;
+    pushFeed('PINNED!!', vic.color);
+  }
+}
+
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine, slashcombo: runSlashComboCine, scissortake: runScissorTakeCine, exec3: runExecution3Cine, skeet: runSkeetCine, kickcombo: runKickComboCine, kebab: runKebabCine, talonsnatch: runTalonSnatchCine, skytalon: runSkyTalonCine };
 
 function runCine(game) {
   const ex = game.cine;

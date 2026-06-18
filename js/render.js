@@ -114,8 +114,8 @@ function spawnBlast(x, y) {
 
 // A standalone SLASH CRESCENT — a bright streak thrown for drama (knife auto-combo).
 // Lives a few frames, growing + fading; angle in radians, len = full length in px.
-function spawnSlashFx(x, y, ang, len) {
-  Slashes.push({ x, y, ang, len: len || 120, life: 9, maxLife: 9 });
+function spawnSlashFx(x, y, ang, len, color) {
+  Slashes.push({ x, y, ang, len: len || 120, life: 9, maxLife: 9, color: color || 'rgba(200,242,255,0.9)' });
   if (Slashes.length > 28) Slashes.shift();
 }
 function drawSlashes(ctx) {
@@ -124,8 +124,8 @@ function drawSlashes(ctx) {
     const t = s.life / s.maxLife;                  // 1 → 0
     const half = s.len * 0.5 * (1.2 - t * 0.2);    // the streak grows slightly as it fades out
     const dx = Math.cos(s.ang) * half, dy = Math.sin(s.ang) * half;
-    ctx.globalAlpha = t * 0.55;                     // outer glow
-    ctx.strokeStyle = 'rgba(200,242,255,0.9)'; ctx.lineWidth = 10;
+    ctx.globalAlpha = t * 0.55;                     // outer glow (per-combo colour)
+    ctx.strokeStyle = s.color || 'rgba(200,242,255,0.9)'; ctx.lineWidth = 10;
     ctx.beginPath(); ctx.moveTo(s.x - dx, s.y - dy); ctx.lineTo(s.x + dx, s.y + dy); ctx.stroke();
     ctx.globalAlpha = t;                            // bright white core
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
@@ -448,14 +448,23 @@ const VESPER_LOOK = {
   torsoW: 25, headR: 13.5, armW: 9, legW: 11, armWR: 8, legWR: 10,
   female: true, hair: '#15121b', longHair: true, shades: true, dualWield: true,
 };
+// Xamora: a taller, broader WINGED frame — heavyset, angel wings, carries a bo staff. v1 reskins the brawler body.
+const XAMORA_LOOK = {
+  glove: '#caa64a', skin: '#e6c6a4', bootShade: 0.40,
+  torsoW: 36, headR: 15.5, armW: 13, legW: 15, armWR: 12, legWR: 14,
+  female: true, hair: '#2a2030', longHair: true,
+  scale: 1.12, wings: true, staffWeapon: true,
+};
 
 // Per-character body dispatch: each character draws its own silhouette + pose set. Both run the
 // same pose engine (drawFighterBrawler) but with a different LOOK; routed here by charType.
 function drawFighter(ctx, f, game) {
   if (f.charType === 'vesper' && typeof drawFighterVesper === 'function') return drawFighterVesper(ctx, f, game);
+  if (f.charType === 'xamora' && typeof drawFighterXamora === 'function') return drawFighterXamora(ctx, f, game);
   return drawFighterBrawler(ctx, f, game);
 }
 function drawFighterVesper(ctx, f, game) { return drawFighterBrawler(ctx, f, game, VESPER_LOOK); }
+function drawFighterXamora(ctx, f, game) { return drawFighterBrawler(ctx, f, game, XAMORA_LOOK); }
 
 // Skeleton in local space: feet at y=0, +x = forward.
 function drawFighterBrawler(ctx, f, game, look) {
@@ -493,6 +502,7 @@ function drawFighterBrawler(ctx, f, game, look) {
   const vib = (game.hitstop > 0 && f.hitFlash > 0) ? (Math.random() - 0.5) * CFG.HIT_VIB : 0;
   ctx.translate(rx + vib, ry);
   if (f.facing === -1) ctx.scale(-1, 1);
+  if (look.scale) ctx.scale(look.scale, look.scale);   // bigger silhouette (Xamora — taller/heavier), scaled around the feet
   // Spinning moves (back kick / backfist): a VISUAL 360 — flip away during the
   // wind-up, whip back around as the strike extends. Gameplay facing is untouched.
   if ((key === 'backkick' || key === 'backfist' || key === 'spinelbow' || key === 'tornado') && f.move) {
@@ -501,6 +511,9 @@ function drawFighterBrawler(ctx, f, game, look) {
     sx = sx >= 0 ? Math.max(0.12, sx) : Math.min(-0.12, sx);
     ctx.scale(sx, 1);
   }
+  // Vesper aerials/cines that FLIP the body — rotate inside the save/scale scope.
+  if (key === 'scissorkick') { ctx.translate(0, -88); ctx.rotate(Math.PI); }                     // held UPSIDE-DOWN (the scissor invert)
+  if (key === 'flipheel') { const fa = Math.min(1, f.f / 12); ctx.translate(0, -70); ctx.rotate(-fa * Math.PI * 2); ctx.translate(0, 70); }      // a full front-flip into the heel
   // HARD RULE: unhittable ⇔ flashing transparent. Solid body = fair game.
   if ((f.invuln > 0 || f.state === 'fallheavy') && game.koFreeze <= 0) ctx.globalAlpha = game.frame % 6 < 3 ? 0.25 : 0.6;
 
@@ -741,6 +754,12 @@ function drawFighterBrawler(ctx, f, game, look) {
         P.armBendR = 1;
         P.footF.x = 32; P.footR.x = -28;
         P.faceMood = 1;
+      } else if (f.superKind === 'wrath') {
+        // WRATH OF GOD: staff thrust to the heavens, summoning the storm
+        lean(P, -0.12);
+        P.handF = { x: 12, y: -214 }; P.handR = { x: -6, y: -190 };
+        P.armBendF = -1; P.armBendR = -1;
+        P.faceMood = 1;
       } else {
         lean(P, 0.12); guardUp(P); P.faceMood = 1;
       }
@@ -842,6 +861,149 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.handF = { x: 70, y: -148 };   // lead hand on the fore-end (forward)
       P.handR = { x: 34, y: -140 };   // rear hand on the stock/trigger
       P.faceMood = 1;
+      break;
+    }
+    // UP-UZI (Vesper ↑K): bends BACKWARD, both uzis raised to the SKY firing straight up (NOT a kick).
+    case 'upuzi': {
+      lean(P, -0.32);                                  // arch backward
+      P.head.y += 6; P.head.x -= 6; P.sho.x -= 4;
+      P.footF.x = 24; P.footR.x = -22;                 // planted wide
+      P.handF = { x: 24, y: -212 }; P.handR = { x: 4, y: -206 };   // both hands punched UP at the sky
+      P.armBendF = 1; P.armBendR = 1; P.faceMood = 1;
+      break;
+    }
+    // AERIAL UPSLASH (air ↑P): the knife hand rides a SEMICIRCLE over her head (the crescent follows it).
+    case 'aerupslash': {
+      lean(P, 0.06);
+      P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 }; P.legBendF = -1; P.legBendR = -1;   // legs tucked
+      const c2 = f.move ? Math.min(1, Math.max(0, (f.f - 3) / 16)) : 1;   // 0..1 across the sweep
+      const ang = Math.PI * (1.15 - 1.15 * c2);          // back-low → straight up → front-low
+      P.handF = { x: Math.cos(ang) * 60, y: -156 - Math.sin(ang) * 64 };
+      P.armBendF = 1; P.handR = { x: 8, y: -120 };
+      P.trail = { to: P.handF, isLeg: false }; P.faceMood = 1;
+      break;
+    }
+    // SLASH REKKA link 2 (neutral-P): a forward SEMICIRCLE ARC — the knife hand sweeps high-back → over → forward.
+    case 'slasharc': {
+      lean(P, 0.12);
+      const ca = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 0.5;
+      const ang = (1 - ca) * Math.PI * 0.92;               // 0.92π (up-back) → 0 (forward)
+      P.handF = { x: 24 + Math.cos(ang) * 54, y: -150 - Math.sin(ang) * 54 };   // rides the front arc
+      P.armBendF = 1; P.handR = { x: 10, y: -120 };
+      P.trail = { to: P.handF, isLeg: false }; P.faceMood = 1;
+      break;
+    }
+    // SLASH REKKA link 3 (neutral-P): an UPWARD back-hand cut — low-front up to high-back (opposite diagonal).
+    case 'slashup': {
+      lean(P, -0.05);
+      const cu = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 0.5;
+      P.handF = { x: 56 - 78 * cu, y: -120 - 84 * cu };     // low-front (56,-120) → high-back (-22,-204)
+      P.armBendF = 1; P.handR = { x: 14, y: -110 };
+      P.sho.x -= 5 * cu; P.head.x -= 4 * cu;                // lean back into the rising cut
+      P.trail = { to: P.handF, isLeg: false }; P.faceMood = 1;
+      break;
+    }
+    // ── XAMORA STAFF poses (the staff is drawn through handF→handR; these aim it) ──
+    case 'staffswing': {   // Staff Swat: a BIG horizontal SWING (high-back → forward-low) that swats them back
+      lean(P, 0.16);
+      const cw = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 0.5;
+      P.handR = { x: 4 - cw * 12, y: -120 };
+      P.handF = { x: -10 + cw * 84, y: -162 + cw * 54 };    // sweeps a wide arc from up-back to forward-down
+      P.armBendF = 1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: false };
+      break;
+    }
+    case 'staffthrust': {  // Extend Thrust / Spear Flurry: a straight two-handed THRUST forward at CHEST level
+      lean(P, 0.22);
+      const ct = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 1;
+      P.handR = { x: 10, y: -116 };
+      P.handF = { x: 30 + ct * 30, y: -114 };               // front grip drives forward at chest / just-below-chest height
+      P.armBendF = -1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: false };
+      break;
+    }
+    case 'staffslam': {    // Crescent Slam: CHARGE the staff high overhead (rear way back), then SLAM it to the floor
+      const su = f.move ? f.move.startup : 20, ac = f.move ? f.move.active : 6;
+      if (f.move && f.f <= su) { const u = f.f / su; lean(P, -0.24 * u); P.head.x -= 5 * u; P.sho.x -= 7 * u; P.handR = { x: -8, y: -156 - u * 42 }; P.handF = { x: 0, y: -212 - u * 58 }; }   // gathering power, tip climbs high
+      else { const cc = f.move ? Math.min(1, (f.f - su) / ac) : 1; lean(P, 0.30 + 0.22 * cc); P.handR = { x: 18, y: -150 + cc * 36 }; P.handF = { x: 44 + cc * 36, y: -118 + cc * 112 }; }   // smashes to the floor with authority
+      P.armBendF = 1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: false };
+      break;
+    }
+    case 'staffsweeplow': {  // Staff Sweep: crouch and sweep the staff LOW along the ground
+      crouchPose(P); lean(P, 0.1);
+      const cs = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 0.5;
+      P.handR = { x: -6, y: -70 };
+      P.handF = { x: 30 + cs * 64, y: -18 };               // front grip sweeps low at ankle height
+      P.armBendF = 1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: true };
+      break;
+    }
+    case 'staffvert': {    // Sky Pillar: staff held VERTICAL, extends straight up (anti-air)
+      P.handR = { x: 8, y: -120 };
+      P.handF = { x: 8, y: -178 };                          // directly above the rear grip → staff vertical
+      P.armBendF = 1; P.armBendR = 1; P.faceMood = 1;
+      break;
+    }
+    case 'staffrise': {    // Rising Pole: a low→high upward SWEEP that knocks them airborne
+      lean(P, 0.05);
+      const cr = f.move ? Math.min(1, Math.max(0, (f.f - f.move.startup) / Math.max(1, f.move.active))) : 0.6;
+      P.handR = { x: 6, y: -110 };
+      P.handF = { x: 40 - cr * 8, y: -60 - cr * 142 };      // sweeps from low-front up to overhead
+      P.armBendF = 1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: false };
+      break;
+    }
+    case 'staffspin': {    // Ring Smash: a big telegraphed WHIRL (interruptible load) then a wide forward smash (side-spike)
+      const su = f.move ? f.move.startup : 22, ac = f.move ? f.move.active : 6;
+      P.handR = { x: 2, y: -120 };
+      if (f.move && f.f <= su) { const a = (f.f / su) * Math.PI * 5; lean(P, 0.04); P.handF = { x: Math.cos(a) * 54, y: -130 + Math.sin(a) * 54 }; }   // the staff whirls overhead
+      else { const cc = f.move ? Math.min(1, (f.f - su) / ac) : 1; lean(P, 0.3); P.handF = { x: 30 + cc * 62, y: -150 + cc * 22 }; }   // a wide forward smash
+      P.armBendF = 1; P.faceMood = 1; P.trail = { to: P.handF, isLeg: false };
+      break;
+    }
+    // SCISSOR KICK (air ↑K): held UPSIDE-DOWN (rotated 180° above), so local +y renders UP. Legs are
+    // authored DOWN (positive y) so the flip kicks them toward the SKY; the scissor alternates them.
+    case 'scissorkick': {
+      const s = Math.sin(f.f * 0.55) * 28;
+      P.footF = { x: 14, y: 46 + s }; P.footR = { x: -14, y: 46 - s };   // → flip → legs kick UP, scissoring
+      P.legBendF = 1; P.legBendR = 1;
+      P.handF = { x: 24, y: -116 }; P.handR = { x: 10, y: -108 };
+      P.faceMood = 1;
+      break;
+    }
+    // FRONT-FLIP HEEL (kickcombo): body flipped (rotated above); heel whips straight DOWN.
+    case 'flipheel': {
+      P.footF = { x: 30, y: -150 }; P.legBendF = -1;
+      P.footR = { x: -16, y: -36 }; P.legBendR = -1;
+      P.handF = { x: 10, y: -118 }; P.handR = { x: -6, y: -110 };
+      P.faceMood = 1; P.trail = { to: { x: 30, y: -150 }, isLeg: true };
+      break;
+    }
+    // SIDE KICK (kickcombo): a straight thrusting side kick that shoves them back.
+    case 'sidekick': {
+      lean(P, 0.08); P.sho.x -= 6; P.head.x -= 4;        // torso chambers side-on
+      P.footF = { x: 84, y: -76 }; P.legBendF = -1;      // leg thrusts straight out at hip height
+      P.handF = { x: -10, y: -120 }; P.handR = { x: 8, y: -108 };
+      P.faceMood = 1; P.trail = { to: { x: 84, y: -76 }, isLeg: true };
+      break;
+    }
+    // EXECUTION: Vesper stepped back, the off-hand SIDEARM leveled at the kneeling victim.
+    case 'execpistol': {
+      lean(P, -0.04); P.footR.x = -30; P.footF.x = 18;   // weight back
+      P.handR = { x: 84, y: -148 }; P.handF = { x: 10, y: -132 };   // handR = off-hand sidearm (drawn by dualWield), extended
+      P.faceMood = 1;
+      break;
+    }
+    // EXECUTION victim: locked on one knee, arms hanging.
+    case 'execkneel': {
+      crouchPose(P); P.hip.y = -36; P.footR = { x: -16, y: 0 }; P.legBendR = -1; P.footF = { x: 16, y: 0 }; P.legBendF = -1;
+      P.sho.x -= 4; P.head.x -= 4; P.head.y += 6;
+      P.handF = { x: -4, y: -56 }; P.handR = { x: 6, y: -64 };
+      P.faceMood = -1;
+      break;
+    }
+    // SKEET launching kick: a rising scoop kick that pops the 'clay pigeon' up.
+    case 'skeetkick': {
+      crouchPose(P);
+      P.footF = { x: 40, y: -120 }; P.legBendF = 1;      // lead foot scoops UP-forward
+      P.handF = { x: 10, y: -118 }; P.handR = { x: -8, y: -110 };
+      P.faceMood = 1; P.trail = { to: { x: 40, y: -120 }, isLeg: true };
       break;
     }
     case 'supercombo':
@@ -1215,6 +1377,16 @@ function drawFace(ctx, hx, hy, mood, dead, flash) {
   ctx.stroke();
 }
 
+// Xamora's angel wings — two layered feather-fans sweeping up-and-back behind the body (side view).
+function drawWings(ctx, P, c) {
+  const bx = P.sho.x - 8, by = P.sho.y + 6;
+  for (const layer of [{ o: 7, col: 'rgba(206,210,228,0.85)' }, { o: 0, col: 'rgba(246,248,253,0.95)' }]) {
+    for (let k = 0; k < 4; k++) {
+      const ex = bx - 16 - k * 16, ey = by - 34 + k * 20;
+      capsule(ctx, bx + layer.o, by, ex + layer.o, ey, 9 - k * 1.5, c.flash ? '#ffffff' : layer.col);
+    }
+  }
+}
 function drawSkeleton(ctx, P, c) {
   const ARM = 36, LEG = 44;
   const L = c.look || BRAWLER_LOOK;
@@ -1233,6 +1405,9 @@ function drawSkeleton(ctx, P, c) {
     }
     ctx.restore();
   }
+
+  // angel WINGS (Xamora) — drawn first, behind the whole body.
+  if (L.wings) drawWings(ctx, P, c);
 
   // hair behind the head (drawn first so the head overlaps its root). longHair = a flowing
   // ponytail that trails well down the back in two tapering segments.
@@ -1301,10 +1476,41 @@ function drawSkeleton(ctx, P, c) {
   // WEAPONS (Vesper dual-wields): the active weapon in the lead hand (+ slash line / muzzle flash
   // on its active frames), and a sidearm resting in the off hand. dualWield → the lead hand is
   // never empty (knife by default). Brawler: no weapon, no dualWield → nothing draws.
-  const activeW = c.weapon || (L.dualWield ? 'knife' : null);
+  const activeW = c.weapon || (L.dualWield ? 'knife' : (L.staffWeapon ? 'staff' : null));
   const aHand = c.strikeRear ? P.handR : P.handF;   // the STRIKING hand — weapon + slash line + muzzle
   const oHand = c.strikeRear ? P.handF : P.handR;   // the OFF hand — the resting sidearm
-  if (activeW === 'knife') {
+  if (activeW === 'staff') {
+    // a long BO STAFF gripped in BOTH hands (grip→tip direction = handF − handR), extending past the front grip.
+    const fx = P.handF.x, fy = P.handF.y, rx = P.handR.x, ry = P.handR.y;
+    let ux = fx - rx, uy = fy - ry; const dd = Math.hypot(ux, uy) || 1; ux /= dd; uy /= dd;
+    const longStaff = c.key === 'staffthrust' || c.key === 'staffvert';   // the EXTEND moves reach far
+    const reach = c.mvActive ? (longStaff ? 262 : 152) : 92;
+    const tx = fx + ux * reach, ty = fy + uy * reach, bx = rx - ux * 46, by = ry - uy * 46;
+    capsule(ctx, bx, by, tx, ty, 5, c.flash ? '#ffffff' : '#7a5a36');                         // shaft through both grips
+    capsule(ctx, tx - ux * 12, ty - uy * 12, tx, ty, 6.5, c.flash ? '#ffffff' : '#caa64a');    // gold tip cap
+    capsule(ctx, bx, by, bx + ux * 10, by + uy * 10, 6.5, c.flash ? '#ffffff' : '#caa64a');    // gold butt cap
+    if (c.key === 'staffrise') {   // RISING POLE — the staff tip is ABLAZE (flames lick up off the tip)
+      for (let k = 0; k < 6; k++) {
+        const fxk = tx + (Math.random() - 0.5) * 7, fyk = ty - k * 6 - Math.random() * 5;     // fire rises off the tip
+        ctx.fillStyle = k < 2 ? 'rgba(255,236,150,0.92)' : k < 4 ? 'rgba(255,150,40,0.85)' : 'rgba(220,70,25,0.7)';
+        ctx.beginPath(); ctx.arc(fxk, fyk, Math.max(1.5, (7 - k) * (0.7 + Math.random() * 0.5)), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  } else if (c.key === 'upuzi') {
+    // DUAL UZIS raised to the SKY, firing straight up (replaces the default knife + forward muzzle).
+    for (const h of [P.handF, P.handR]) {
+      capsule(ctx, h.x, h.y, h.x, h.y - 20, 5, c.flash ? '#ffffff' : '#24242c');             // uzi body, pointing up
+      capsule(ctx, h.x, h.y + 2, h.x + 3, h.y + 12, 3.5, c.flash ? '#ffffff' : '#1a1a20');   // stubby magazine
+      if (c.mvActive) {
+        ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(h.x, h.y - 22, 5.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,233,150,0.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        for (const a of [-0.5, -0.15, 0.15, 0.5]) { ctx.beginPath(); ctx.moveTo(h.x, h.y - 22); ctx.lineTo(h.x + Math.sin(a) * 12, h.y - 22 - Math.cos(a) * 12); ctx.stroke(); }
+        ctx.strokeStyle = 'rgba(255,240,180,0.5)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y - 22); ctx.lineTo(h.x, h.y - 90); ctx.stroke();   // tracer straight UP
+      }
+    }
+  } else if (activeW === 'knife') {
     const hx = aHand.x, hy = aHand.y;
     let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;   // blade-pointing dir
     const ang = Math.atan2(uy, ux);
@@ -1350,14 +1556,14 @@ function drawSkeleton(ctx, P, c) {
     }
   }
   // off-hand sidearm: a small pistol resting in the OFF hand (always, so she reads as armed)
-  if (L.dualWield) {
+  if (L.dualWield && c.key !== 'upuzi') {
     const hx = oHand.x, hy = oHand.y; let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
     capsule(ctx, hx, hy, hx + ux * 11, hy + uy * 11, 4.5, c.flash ? '#ffffff' : shade('#24242c', 0.8));
   }
   // MUZZLE FLASH (gun moves) — ALWAYS fires FORWARD (+x = toward the enemy in local space, since the
   // body is drawn facing +x). Fired from the gun hand: the LEAD hand on the point-blank shot
   // (weapon:'pistol'), the OFF-hand sidearm during gun-kata kicks. Fixes the old "shoots backward".
-  if (c.mvActive && c.gun) {
+  if (c.mvActive && c.gun && c.key !== 'upuzi') {
     const gh = c.weapon ? aHand : oHand;   // hand-shot fires from the strike hand; kicks from the off-hand sidearm
     const mx = gh.x + 18, my = gh.y;
     ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(mx, my, 6.5, 0, Math.PI * 2); ctx.fill();
@@ -1398,6 +1604,29 @@ function drawMech(ctx, f, alpha) {
 
 function drawProjectile(ctx, p) {
   const d = Math.sign(p.vx);
+  if (p.kind === 'magic' && p.hue === 'shockwave') {   // Rising Pole's SHOCK FRONT — energy arcs rolling forward off the ground
+    const d2 = d || 1, cx = p.x, cy = p.y + p.h * 0.55, ca = d2 === 1 ? 0 : Math.PI;
+    ctx.save(); ctx.lineCap = 'round';
+    for (let k = 0; k < 3; k++) {   // a hot leading edge with orange ripples trailing the front
+      ctx.globalAlpha = 0.9 - k * 0.26;
+      ctx.strokeStyle = k === 0 ? '#fff3c8' : '#ff9a36';
+      ctx.lineWidth = 7 - k * 1.6;
+      ctx.beginPath(); ctx.arc(cx - d2 * k * 16, cy, p.h * (0.78 - k * 0.16), ca - Math.PI * 0.6, ca + Math.PI * 0.6); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.85; ctx.fillStyle = '#ffce78';   // scorched ground at the base
+    ctx.beginPath(); ctx.ellipse(cx, p.y + p.h, p.w * 0.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.restore();
+    return;
+  }
+  if (p.kind === 'magic') {   // a glowing magic orb (Xamora's wisp / tremor)
+    const cx = p.x, cy = p.y + p.h / 2, r = Math.max(8, p.w * 0.5);
+    const wisp = p.hue !== 'tremor';
+    const core = wisp ? '#e2e8ff' : '#ffe2a6', glow = wisp ? 'rgba(150,170,255,1)' : 'rgba(255,150,70,1)';
+    ctx.fillStyle = glow;
+    for (let k = 3; k >= 1; k--) { ctx.globalAlpha = 0.22 * (4 - k); ctx.beginPath(); ctx.arc(cx, cy, r * (0.6 + k * 0.42), 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
   if (p.kind === 'bullet') {   // a bright round + a streak trailing it (size scales with the round)
     const r = Math.max(3.5, p.h * 0.5), tlen = Math.max(24, p.w * 1.5);
     const cy = p.y + p.h / 2, ang = Math.atan2(p.vy || 0, p.vx || (d || 1));
