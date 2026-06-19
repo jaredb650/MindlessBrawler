@@ -1,0 +1,518 @@
+{
+  "version": 1,
+  "_note": "Sprite config edited by tools/sprite-tool.html. Per character: `global` defaults + `sheets` keyed by STATE name (idle/walk/run/prejump/air/land/...) or a move's animKey (jab/cross/pistolaim/...). Per-sheet keys: src, cols, rows, cw, ch, start, frames, fps, mode, scale, offX, offY, tint. mode = loop | once | syncMove | jumpStart | jumpAir | jumpLand.",
+  "characters": {
+    "vesper": {
+      "global": {
+        "scale": 1.045,
+        "offX": 0,
+        "offY": 55,
+        "artFacesLeft": false,
+        "tint": null,
+        "bright": 1,
+        "cellW": 161,
+        "cellH": 240
+      },
+      "sheets": {
+        "idle": {
+          "src": "assets/sprites/vesper/andromedaIdle.png",
+          "cols": 4,
+          "rows": 3,
+          "start": 0,
+          "frames": 12,
+          "fps": 12,
+          "mode": "loop"
+        },
+        "walk": {
+          "src": "assets/sprites/vesper/andromedaWalk.png",
+          "cols": 3,
+          "rows": 3,
+          "start": 0,
+          "frames": 8,
+          "fps": 17,
+          "mode": "loop"
+        },
+        "run": {
+          "src": "assets/sprites/vesper/andromedaRun.png",
+          "cols": 25,
+          "rows": 1,
+          "start": 12,
+          "frames": 9,
+          "fps": 15,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.98,
+          "offY": 39,
+          "offX": -11
+        },
+        "prejump": {
+          "src": "assets/sprites/vesper/andromedaJumpStart.png",
+          "cols": 4,
+          "rows": 4,
+          "start": 0,
+          "frames": 13,
+          "fps": 45,
+          "mode": "jumpStart",
+          "offX": -4
+        },
+        "air": {
+          "src": "assets/sprites/vesper/andromedaJumpAir.png",
+          "cols": 2,
+          "rows": 2,
+          "start": 0,
+          "frames": 4,
+          "fps": 9,
+          "mode": "jumpAir",
+          "offX": -10,
+          "offY": 46
+        },
+        "land": {
+          "src": "assets/sprites/vesper/andromedaJumpLand.png",
+          "cols": 13,
+          "rows": 1,
+          "start": 0,
+          "frames": 13,
+          "fps": 38,
+          "mode": "jumpLand",
+          "offX": 0
+        },
+        "jab": {
+          "src": "assets/sprites/vesper/andromedaStab.png",
+          "cols": 4,
+          "rows": 4,
+          "start": 0,
+          "frames": 14,
+          "fps": 20,
+          "mode": "syncMove",
+          "cw": 240,
+          "ch": 240,
+          "scale": 1.15,
+          "offY": 60,
+          "offX": 13
+        },
+        "cross": {
+          "src": "assets/sprites/vesper/andromedaThrust.png",
+          "cols": 6,
+          "rows": 5,
+          "start": 0,
+          "frames": 28,
+          "fps": 43,
+          "mode": "syncMove",
+          "cw": 240,
+          "ch": 240,
+          "scale": 1.1,
+          "offY": 52,
+          "offX": -10,
+          "tint": [
+            0.76,
+            1,
+            1
+          ],
+          "bright": 1.08
+        },
+        "pistolaim": {
+          "src": "assets/sprites/vesper/andromedaPistol.png",
+          "cols": 19,
+          "rows": 1,
+          "start": 0,
+          "frames": 19,
+          "fps": 38,
+          "mode": "syncMove",
+          "cw": 240,
+          "ch": 240,
+          "scale": 1.17,
+          "offY": 65,
+          "offX": 1,
+          "tint": [
+            0.9,
+            1.09,
+            1
+          ]
+        },
+        "crouch": {
+          "src": "assets/sprites/vesper/spritesheet-table-161-240__1_.png",
+          "cols": 33,
+          "rows": 1,
+          "start": 9,
+          "frames": 24,
+          "fps": 60,
+          "mode": "once",
+          "cw": 161,
+          "ch": 240
+        },
+        "slashup": {
+          "src": "assets/sprites/vesper/andromedaRisingSlash.png",
+          "cols": 4,
+          "rows": 1,
+          "start": 0,
+          "frames": 4,
+          "fps": 12,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.965,
+          "offX": 4,
+          "offY": 32,
+          "cells": {
+            "1": {
+              "ds": -0.035
+            },
+            "2": {
+              "dy": -5,
+              "dx": 0
+            }
+          }
+        },
+        "uppercut": {
+          "src": "assets/sprites/vesper/andromedaUppercut.png",
+          "cols": 5,
+          "rows": 1,
+          "start": 0,
+          "frames": 5,
+          "fps": 15,
+          "mode": "once",
+          "cw": 240,
+          "ch": 240,
+          "scale": 1.115,
+          "bright": 1.16,
+          "tint": [
+            0.88,
+            1,
+            1
+          ]
+        },
+        "backdash": {
+          "src": "assets/sprites/vesper/andromedaDodge.png",
+          "cols": 6,
+          "rows": 1,
+          "start": 0,
+          "frames": 4,
+          "fps": 16,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "cells": {
+            "0": {
+              "ds": 0.155,
+              "dy": 10
+            },
+            "1": {
+              "ds": 0.15,
+              "dy": 12,
+              "dx": -16
+            },
+            "2": {
+              "ds": 0.02,
+              "dx": -24,
+              "dy": 0
+            },
+            "3": {
+              "ds": 0.19,
+              "dy": 12,
+              "dx": -7
+            },
+            "4": {
+              "ds": 0.08
+            },
+            "5": {
+              "ds": 0.075
+            }
+          },
+          "tint": [
+            0.76,
+            1,
+            1
+          ],
+          "bright": 1.42
+        },
+        "slasharc": {
+          "src": "assets/sprites/vesper/spritesheet-table-240-240__5_.png",
+          "cols": 4,
+          "rows": 3,
+          "start": 0,
+          "frames": 10,
+          "fps": 19,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "tint": [
+            0.88,
+            1,
+            1
+          ],
+          "bright": 1.33
+        },
+        "blockstun": {
+          "src": "assets/sprites/vesper/spritesheet-table-240-240__6_.png",
+          "cols": 15,
+          "rows": 1,
+          "start": 0,
+          "frames": 15,
+          "fps": 19,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 1.115,
+          "offY": 60,
+          "bright": 1.29,
+          "tint": [
+            0.78,
+            1,
+            1
+          ]
+        },
+        "hitstun": {
+          "src": "assets/sprites/vesper/andromedaSheet_clean.png",
+          "cols": 5,
+          "rows": 1,
+          "start": 1,
+          "frames": 4,
+          "fps": 10,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "bright": 1.28,
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "scale": 0.925,
+          "offY": 28,
+          "cells": {
+            "2": {
+              "dx": -2
+            },
+            "3": {
+              "dx": 5
+            }
+          }
+        },
+        "shotgun": {
+          "src": "assets/sprites/vesper/andromedaShotgun.png",
+          "cols": 8,
+          "rows": 1,
+          "start": 0,
+          "frames": 8,
+          "fps": 16,
+          "mode": "once",
+          "cw": 240,
+          "ch": 240,
+          "bright": 1.19,
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "cells": {
+            "2": {
+              "ds": 0.04
+            },
+            "3": {
+              "ds": 0.045
+            },
+            "4": {
+              "ds": -0.03
+            },
+            "5": {
+              "dx": -7
+            },
+            "6": {
+              "dx": -6
+            },
+            "7": {
+              "dx": -6
+            }
+          },
+          "scale": 0.905,
+          "offX": 1,
+          "offY": 28
+        },
+        "crumple": {
+          "src": "assets/sprites/vesper/andromedaPoses_sheet.png",
+          "cols": 8,
+          "rows": 1,
+          "start": 2,
+          "frames": 6,
+          "fps": 8,
+          "mode": "boomerang",
+          "cw": 240,
+          "ch": 240,
+          "offY": 25,
+          "offX": 3,
+          "scale": 0.965,
+          "cells": {
+            "5": {
+              "ds": 0.04
+            }
+          },
+          "tint": [
+            0.7,
+            1,
+            1
+          ],
+          "bright": 1.33
+        },
+        "launched": {
+          "src": "assets/sprites/vesper/andromedaTumble2.png",
+          "cols": 12,
+          "rows": 1,
+          "start": 0,
+          "frames": 12,
+          "fps": 18,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.84,
+          "offY": -4,
+          "bright": 1.08,
+          "tint": [
+            0.88,
+            1,
+            1
+          ]
+        },
+        "fallheavy": {
+          "src": "assets/sprites/vesper/vesper_knockdown_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 7,
+          "fps": 10,
+          "mode": "once",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.89,
+          "offY": 30,
+          "cells": {
+            "1": {
+              "dx": 15
+            },
+            "2": {
+              "dx": 16
+            },
+            "3": {
+              "dx": 17
+            },
+            "4": {
+              "dy": 26
+            },
+            "5": {
+              "dy": 34,
+              "dx": 11
+            },
+            "6": {
+              "dx": 19,
+              "dy": 38
+            },
+            "7": {
+              "dx": 22,
+              "dy": 11
+            }
+          },
+          "offX": -9
+        },
+        "rifleaim": {
+          "src": "assets/sprites/vesper/andromedaRifleKneel.png",
+          "cols": 8,
+          "rows": 1,
+          "start": 3,
+          "frames": 5,
+          "fps": 9,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.92,
+          "offX": 42,
+          "offY": 25,
+          "cells": {
+            "2": {
+              "dx": -30
+            },
+            "4": {
+              "dx": 7
+            }
+          }
+        },
+        "kipup": {
+          "src": "assets/sprites/vesper/vesper_getup_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 11,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "cells": {
+            "1": {
+              "dx": -37
+            },
+            "5": {
+              "dx": -3
+            },
+            "7": {
+              "dx": 6
+            }
+          },
+          "scale": 0.925
+        },
+        "downed": {
+          "src": "assets/sprites/vesper/vesper_knockdown_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 7,
+          "frames": 1,
+          "fps": 30,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.97,
+          "offX": 28,
+          "offY": 69
+        },
+        "thrown": {
+          "src": "assets/sprites/vesper/andromedaTumble.png",
+          "cols": 8,
+          "rows": 1,
+          "start": 0,
+          "frames": 6,
+          "fps": 14,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.565,
+          "offX": 8,
+          "offY": -11
+        }
+      }
+    },
+    "brawler": {
+      "global": {
+        "scale": 1,
+        "offX": 0,
+        "offY": 0,
+        "artFacesLeft": false,
+        "tint": null,
+        "bright": 1,
+        "cellW": 240,
+        "cellH": 240
+      },
+      "sheets": {}
+    },
+    "xamora": {
+      "global": {
+        "scale": 1,
+        "offX": 0,
+        "offY": 0,
+        "artFacesLeft": false,
+        "tint": null,
+        "bright": 1,
+        "cellW": 240,
+        "cellH": 240
+      },
+      "sheets": {}
+    }
+  }
+}

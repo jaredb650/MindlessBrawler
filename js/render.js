@@ -458,12 +458,153 @@ const XAMORA_LOOK = {
 
 // Per-character body dispatch: each character draws its own silhouette + pose set. Both run the
 // same pose engine (drawFighterBrawler) but with a different LOOK; routed here by charType.
+// ── VESPER SPRITE SHEETS (chroma-keyed green → transparent at load; sliced 161×240 per cell) ──
+// Each sheet is read left→right, top→bottom. `frames` caps real cells (some sheets pad with blanks).
+const SPR_CELL_W = 161, SPR_CELL_H = 240;   // default cell size; a sheet can override with cw/ch
+// A sheet may also override scale/offX/offY (e.g. a different cell size needs its own alignment).
+// ALL sprite config lives in assets/sprites/sprites.json (edited by tools/sprite-tool.html) and is loaded here.
+const SPRITES = { ready: false, chars: {} };   // chars[id] = { global, sheets:{ key:{…cfg…, canvas, ready} } }
+
+function _spriteKey(img, tint, bright) {   // green → transparent + despill + [r,g,b] tint × brightness; returns a canvas (raw img if tainted)
+  try {
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0);
+    const id = cx.getImageData(0, 0, cv.width, cv.height), d = id.data;
+    const br = bright || 1, adj = tint || br !== 1, tr = tint ? tint[0] : 1, tg = tint ? tint[1] : 1, tb = tint ? tint[2] : 1;
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i], g = d[i + 1], b = d[i + 2];
+      if (g > 80 && g > r * 1.2 && g > b * 1.2) { d[i + 3] = 0; continue; }   // green background → cut it out
+      const mx = r > b ? r : b;
+      if (g > mx) { g = mx; d[i + 1] = g; }                                    // DESPILL the green rim off the subject
+      if (adj) { d[i] = Math.min(255, r * tr * br); d[i + 1] = Math.min(255, g * tg * br); d[i + 2] = Math.min(255, b * tb * br); }
+    }
+    cx.putImageData(id, 0, 0); return cv;
+  } catch (e) { return img; }   // tainted canvas (file://) → raw image (green shows; use a local server)
+}
+function loadSprites() {
+  fetch('assets/sprites/sprites.json').then(r => r.json()).then(data => {
+    SPRITES.chars = {};
+    for (const cid in (data.characters || {})) {
+      const c = data.characters[cid], entry = { global: c.global || {}, sheets: {} };
+      for (const k in (c.sheets || {})) {
+        const sh = Object.assign({}, c.sheets[k]); entry.sheets[k] = sh;
+        const img = new Image();
+        img.onload = (G => () => { sh.canvas = _spriteKey(img, sh.tint || G.tint, sh.bright != null ? sh.bright : G.bright); sh.ready = true; })(entry.global);
+        img.onerror = () => { sh.ready = false; };
+        img.src = sh.src;
+      }
+      SPRITES.chars[cid] = entry;
+    }
+    SPRITES.ready = true;
+  }).catch(() => {});
+}
+if (typeof Image !== 'undefined' && typeof fetch !== 'undefined' && typeof document !== 'undefined') loadSprites();
+
+function spriteIncluded(sh, nf) {   // frame indices the animation actually plays; null = all (fast path) when nothing excluded
+  if (!sh.exclude || !sh.exclude.length) return null;
+  const out = [];
+  for (let i = 0; i < nf; i++) if (sh.exclude.indexOf(i) < 0) out.push(i);
+  return out;
+}
+function spriteAnimKey(entry, f) {
+  // The JUMP phases are handled separately (spriteJump, on their own clock). Everything else keys off
+  // animKey() — which is the move's anim during attacks, else the state name (idle/walk/run/crouch/backdash/
+  // blockstun/hitstun/…). Any sheet whose key matches is used; falls back to the raw state key.
+  const k = f.animKey ? f.animKey() : f.state;
+  if (k && entry.sheets[k]) return k;
+  if (f.state && entry.sheets[f.state]) return f.state;
+  return null;
+}
+// JUMP state-machine: full JumpStart on takeoff + full JumpLand on touchdown, each on its OWN clock (game.frame),
+// JumpAir looped between, double-jump replays the launch frames. ANY other state cancels. Returns {key, frame} | null.
+function spriteJump(entry, f, game) {
+  const st = entry.sheets.prejump, a = entry.sheets.air, lnd = entry.sheets.land, gf = game.frame | 0;
+  if (f.state === 'prejump' && st) {
+    f._jumpF0 = gf - f.f;
+    return { key: 'prejump', frame: Math.min(st.frames - 1, ((gf - f._jumpF0) * (st.fps || 30) / 60) | 0) };
+  }
+  if (f.state === 'air' && (st || a)) {
+    if (st) {
+      if (!f.usedDoubleJump) { f._djF0 = null; f._djDone = false; }   // fresh airtime — no double-jump yet
+      else if (!f._djDone) {
+        if (f._djF0 == null) f._djF0 = gf;
+        const DJN = 5, dfr = ((gf - f._djF0) * (st.fps || 30) / 60) | 0;
+        if (dfr < DJN) return { key: 'prejump', frame: (st.frames - DJN) + dfr };   // replay the launch frames
+        f._djDone = true;
+      }
+      if (f._jumpF0 != null) { const fr = ((gf - f._jumpF0) * (st.fps || 30) / 60) | 0; if (fr < st.frames) return { key: 'prejump', frame: fr }; }
+    }
+    if (a) return { key: 'air', frame: ((f.f * (a.fps || 9) / 60) | 0) % a.frames };
+    return null;
+  }
+  f._jumpF0 = null;
+  if (f.state === 'land' && lnd) { f._landF0 = gf - f.f; return { key: 'land', frame: Math.min(lnd.frames - 1, ((gf - f._landF0) * (lnd.fps || 30) / 60) | 0) }; }
+  if (f.state === 'idle' && lnd && f._landF0 != null) { const fr = ((gf - f._landF0) * (lnd.fps || 30) / 60) | 0; if (fr < lnd.frames) return { key: 'land', frame: fr }; }
+  f._landF0 = null;
+  return null;
+}
+function drawSpritePose(ctx, f, game) {
+  const entry = SPRITES.chars[f.charType];
+  if (!entry) return false;   // no sprite config for this character → vector
+  let key, frame = null;
+  const js = spriteJump(entry, f, game);   // jump phases drive themselves; cancelled by any non-jump state
+  if (js) { key = js.key; frame = js.frame; }
+  else { key = spriteAnimKey(entry, f); if (!key) return false; }
+  const sh = entry.sheets[key];
+  if (!sh || !sh.ready || !sh.canvas) return false;   // not loaded yet → vector fallback
+  const g = entry.global, nf = sh.frames || 1;
+  const cw = sh.cw || g.cellW || SPR_CELL_W, ch = sh.ch || g.cellH || SPR_CELL_H;
+  if (frame == null) {
+    const inc = spriteIncluded(sh, nf);                 // excluded frames are skipped from the cycle
+    const nfe = inc ? (inc.length || 1) : nf;
+    let idx;
+    if (sh.mode === 'syncMove' && f.move) {   // attack sheets: scale the cycle to the move's total length
+      const dur = (f.move.startup || 0) + (f.move.active || 0) + (f.move.recovery || 0);
+      idx = dur > 0 ? Math.min(nfe - 1, (f.f / dur * nfe) | 0) : 0;
+    } else {
+      const ft = Math.floor(f.f * (sh.fps || 30) / 60);
+      if (sh.mode === 'once') idx = Math.min(ft, nfe - 1);
+      else if (sh.mode === 'boomerang' && nfe > 1) { const per = 2 * (nfe - 1), p = ((ft % per) + per) % per; idx = p < nfe ? p : per - p; }   // ping-pong: 0→n-1→0…
+      else idx = ((ft % nfe) + nfe) % nfe;   // default = loop
+    }
+    frame = inc ? (inc.length ? inc[idx] : 0) : idx;
+  }
+  const cell = (sh.start || 0) + frame, cols = sh.cols || 1;
+  const sx = (cell % cols) * cw, sy = ((cell / cols) | 0) * ch;
+
+  let rx = f.x, ry = f.y;   // mirror the vector path's render interp
+  const ra = game.renderAlpha;
+  if (ra != null && ra < 1 && f.prevX != null) {
+    const dx = f.x - f.prevX, dy = f.y - f.prevY;
+    if (Math.abs(dx) <= CFG.INTERP_SNAP && Math.abs(dy) <= CFG.INTERP_SNAP) { rx = f.prevX + dx * ra; ry = f.prevY + dy * ra; }
+  }
+  const airH = Math.max(0, CFG.FLOOR_Y - ry);   // ground shadow (same as the vector body)
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - airH * 0.08), 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.translate(rx, ry);
+  const flip = g.artFacesLeft ? f.facing === 1 : f.facing === -1;
+  if (flip) ctx.scale(-1, 1);
+  let scale = sh.scale != null ? sh.scale : (g.scale != null ? g.scale : 1);
+  let offX = sh.offX != null ? sh.offX : (g.offX || 0);
+  let offY = sh.offY != null ? sh.offY : (g.offY || 0);
+  const cadj = sh.cells && sh.cells[frame];   // per-frame nudge: deltas on top of the sheet alignment (fixes drift in independently-genned frames)
+  if (cadj) { offX += cadj.dx || 0; offY += cadj.dy || 0; scale += cadj.ds || 0; }
+  const dw = cw * scale, dh = ch * scale;
+  ctx.imageSmoothingEnabled = false;   // sprites are pre-rendered → draw with HARD pixels (no bilinear blur). Restored by ctx.restore() below.
+  ctx.drawImage(sh.canvas, sx, sy, cw, ch, -dw / 2 + offX, -dh + offY, dw, dh);   // feet at y=0
+  ctx.restore();
+  return true;
+}
+
 function drawFighter(ctx, f, game) {
-  if (f.charType === 'vesper' && typeof drawFighterVesper === 'function') return drawFighterVesper(ctx, f, game);
-  if (f.charType === 'xamora' && typeof drawFighterXamora === 'function') return drawFighterXamora(ctx, f, game);
+  if (drawSpritePose(ctx, f, game)) return;   // ANY character with sprite config + a matching sheet → sprite; else vector
+  if (f.charType === 'vesper') return drawFighterBrawler(ctx, f, game, VESPER_LOOK);
+  if (f.charType === 'xamora') return drawFighterBrawler(ctx, f, game, XAMORA_LOOK);
   return drawFighterBrawler(ctx, f, game);
 }
-function drawFighterVesper(ctx, f, game) { return drawFighterBrawler(ctx, f, game, VESPER_LOOK); }
+function drawFighterVesper(ctx, f, game) { return drawFighterBrawler(ctx, f, game, VESPER_LOOK); }   // legacy refs
 function drawFighterXamora(ctx, f, game) { return drawFighterBrawler(ctx, f, game, XAMORA_LOOK); }
 
 // Skeleton in local space: feet at y=0, +x = forward.
@@ -1715,7 +1856,35 @@ function drawBeam(ctx, f, ff) {
   ctx.restore();
 }
 
+// ── STAGE BACKGROUND (photo) — "cover"-scaled so it fills the stage with no empty space; its floor line is pinned to FLOOR_Y ──
+const STAGE_BG = { ready: false, img: null };
+const BG_FLOOR_FRAC = 0.85;    // image fraction pinned to FLOOR_Y. Platform front edge is ~0.897, so <0.897 seats the feet ON TOP of the platform with floor visible below (LOWER FRAC = lower stage). Gap-free range at zoom 1.0 is ~0.67–0.917.
+const BG_ZOOM = 1.0;           // extra scale over "cover" (>1 crops sides/top; only needed to push the floor ABOVE 0.917 gap-free)
+function loadStageBg() {
+  const img = new Image();
+  img.onload = () => { STAGE_BG.img = img; STAGE_BG.ready = true; };
+  img.onerror = () => { STAGE_BG.ready = false; };
+  img.src = 'assets/stages/foundry.png';
+}
+if (typeof Image !== 'undefined') loadStageBg();
+
+function drawStageBg(ctx) {
+  const img = STAGE_BG.img, iw = img.width, ih = img.height;
+  const scale = Math.max(CFG.STAGE_W / iw, CFG.STAGE_H / ih) * BG_ZOOM;   // cover (×zoom): always fills, overflow cropped
+  const dw = iw * scale, dh = ih * scale;
+  const dx = (CFG.STAGE_W - dw) / 2;                            // center horizontally
+  const dy = CFG.FLOOR_Y - BG_FLOOR_FRAC * ih * scale;          // pin the image's floor seam to the gameplay floor
+  ctx.drawImage(img, dx, dy, dw, dh);
+  // vignette to frame the action + match the old mood
+  const v = ctx.createRadialGradient(CFG.STAGE_W / 2, CFG.STAGE_H / 2, 380, CFG.STAGE_W / 2, CFG.STAGE_H / 2, 860);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+}
+
 function drawStage(ctx) {
+  if (STAGE_BG.ready && STAGE_BG.img) return drawStageBg(ctx);   // photo stage; falls through to the vector stage until it loads
   const g = ctx.createLinearGradient(0, 0, 0, CFG.STAGE_H);
   g.addColorStop(0, '#1b1b26');
   g.addColorStop(0.8, '#13131b');

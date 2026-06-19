@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mindless Brawler — Sprite Tool</title>
+<style>
+  :root { --bg:#15161c; --panel:#1d1f28; --panel2:#262936; --line:#333747; --txt:#d7dbe6; --dim:#8990a3; --acc:#5cc8ff; --good:#5bd98a; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:14px; margin:0; font-weight:600; letter-spacing:.3px; }
+  header .tabs { display:flex; gap:6px; }
+  header .tabs button { background:var(--panel2); color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:5px 12px; cursor:pointer; font-weight:600; text-transform:capitalize; }
+  header .tabs button.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
+  header .grow { flex:1; }
+  header #status { color:var(--dim); font-size:12px; min-width:120px; text-align:right; }
+  header #save { background:var(--good); color:#06210f; border:none; border-radius:6px; padding:7px 16px; font-weight:700; cursor:pointer; }
+  main { flex:1; display:flex; min-height:0; }
+  #list { width:260px; border-right:1px solid var(--line); overflow-y:auto; background:var(--panel); padding:8px; }
+  #list .grp { color:var(--dim); text-transform:uppercase; font-size:10px; letter-spacing:.8px; margin:12px 6px 4px; }
+  .slot { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; }
+  .slot:hover { background:var(--panel2); }
+  .slot.on { background:var(--acc); color:#06131c; }
+  .slot .dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .slot .dot.has { background:var(--good); } .slot .dot.miss { background:#4a4f60; }
+  .slot .nm { flex:1; font-weight:600; }
+  .slot .sub { color:var(--dim); font-size:11px; } .slot.on .sub { color:#0a2535; }
+  #editor { flex:1; display:flex; min-width:0; }
+  #stage { flex:1; display:flex; flex-direction:column; align-items:center; padding:14px; gap:8px; background:#101117; min-width:0; overflow:auto; }
+  #pv { background:#0b0c11; border:1px solid var(--line); border-radius:8px; }
+  #pvbar { display:flex; align-items:center; gap:10px; }
+  #pvbar button, #ctrls button.mini { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:4px 10px; cursor:pointer; }
+  #strip { display:flex; flex-wrap:wrap; gap:3px; max-width:640px; justify-content:center; }
+  #strip canvas { border:1px solid #2a2d3a; border-radius:3px; cursor:pointer; background:#0b0c11; }
+  #strip canvas.in { border-color:var(--acc); } #strip canvas.edge { box-shadow:0 0 0 2px var(--good) inset; }
+  #strip canvas.adj { outline:2px solid #e0a23a; outline-offset:-2px; }
+  #strip canvas.excl { opacity:0.3; filter:grayscale(1); box-shadow:0 0 0 2px var(--bad) inset; }
+  #ctrls { width:300px; border-left:1px solid var(--line); background:var(--panel); padding:12px; overflow-y:auto; }
+  #ctrls h3 { margin:0 0 4px; font-size:12px; color:var(--acc); }
+  .row { display:flex; align-items:center; gap:8px; margin:7px 0; }
+  .row label { width:64px; color:var(--dim); flex:0 0 auto; }
+  .row input[type=range] { flex:1; }
+  .row input[type=number], .row select, .row input[type=text] { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:4px 6px; width:62px; }
+  .row .val { width:48px; text-align:right; color:var(--acc); font-variant-numeric:tabular-nums; }
+  .row.wide select, .row.wide input { flex:1; width:auto; }
+  hr { border:none; border-top:1px solid var(--line); margin:12px 0; }
+  .drop { border:2px dashed var(--line); border-radius:8px; padding:14px; text-align:center; color:var(--dim); cursor:pointer; }
+  .drop.hot { border-color:var(--acc); color:var(--acc); }
+  button.full { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:6px; padding:8px; cursor:pointer; margin-top:6px; font-weight:600; }
+  button.full:hover { border-color:var(--acc); }
+  .hint { color:var(--dim); font-size:11px; margin:4px 0; }
+  .empty { color:var(--dim); text-align:center; margin-top:40px; }
+  #miss { color:var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎞️ Sprite Tool</h1>
+  <div class="tabs" id="chartabs"></div>
+  <span id="srv" title="checking server…" style="font-size:16px;color:#8990a3">●</span>
+  <div class="grow"></div>
+  <span id="status"></span>
+  <button id="dl" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer">Download</button>
+  <button id="save">Save</button>
+</header>
+<main>
+  <div id="list"></div>
+  <div id="editor">
+    <div id="stage">
+      <canvas id="pv" width="360" height="420"></canvas>
+      <div id="pvbar">
+        <button id="play">⏸ Pause</button>
+        <input type="range" id="scrub" min="0" max="0" value="0" style="width:200px">
+        <span id="frlbl" class="val">0</span>
+        <button id="facebtn">⇄ Facing</button>
+        <button id="refbtn">Ref: on</button>
+      </div>
+      <div id="strip"></div>
+    </div>
+    <div id="ctrls"><div class="empty">Pick an animation on the left.</div></div>
+  </div>
+</main>
+
+<script src="../js/config.js"></script>
+<script src="../js/moves.js"></script>
+<script src="../js/characters.js"></script>
+<script src="../js/render.js"></script>   <!-- reused for the procedural placeholder ref (drawFighterBrawler + LOOKs) -->
+<script>
+// ───────────────────────── data / spec ─────────────────────────
+const STATE_SLOTS = [  // [key, label] — universal engine states a sprite would cover
+  ['idle','Idle'],['walk','Walk'],['run','Run'],['crouch','Crouch'],
+  ['prejump','Jump · Start'],['air','Jump · Air (loop)'],['land','Jump · Land'],
+  ['backdash','Backdash'],['blockstun','Block'],['hitstun','Hitstun'],['crumple','Crumple'],
+  ['launched','Launched'],['fallheavy','Hard knockdown'],['wallsplat','Wall splat'],
+  ['gassed','Gassed'],['electrified','Electrified'],['downed','Downed'],['getup','Get up'],
+  ['backroll','Back roll'],['kipup','Kip up'],['clinch','Clinch'],['thrown','Thrown'],['superstart','Super'],
+];
+const DEFAULT_GLOBAL = { scale:1, offX:0, offY:0, artFacesLeft:false, tint:null, bright:1, cellW:240, cellH:240 };
+let refKey = '';   // a sheet to colour-compare against (opt-in via the dropdown); empty = show the PROCEDURAL placeholder instead
+const JUMP_MODE = { prejump:'jumpStart', air:'jumpAir', land:'jumpLand' };
+
+let DATA = null, charId = null, slotKey = null, playing = true, facing = 1, showRef = true, editFrame = 0;
+const keyed = {}, dims = {};   // src → keyed canvas / {w,h}
+const ROSTER = (typeof CHAR_ROSTER !== 'undefined' && CHAR_ROSTER) || Object.keys(CHARACTERS || {});
+
+function charDef(id){ return (typeof CHARACTERS!=='undefined') && CHARACTERS[id]; }
+
+// reachable moves for a character (so we list only animations it can actually do) → {anim:[moveNames]}
+function moveAnims(id){
+  const c = charDef(id); if(!c) return {};
+  const set = new Set(), add = m => { if(m && c.moves[m]) set.add(m); };
+  for(const map of [c.neutralMap, c.airMap]) for(const b in (map||{})) for(const d in map[b]) add(map[b][d]);
+  for(const b in (c.dashMap||{})) add(c.dashMap[b]);
+  (c.rekka&&c.rekka.steps||[]).forEach(add);
+  (c.comboChains||[]).forEach(ch => (ch.sequence||[]).forEach(add));
+  add(c.otgKickForward);
+  for(let i=0;i<3;i++) for(const k of [...set]) ((c.moves[k]||{}).cancels||[]).forEach(add);
+  const out = {};
+  for(const m of set){ const a = c.moves[m].anim || m; (out[a]=out[a]||[]).push(c.moves[m].label || m); }
+  return out;
+}
+function moveDuration(id, animKey){
+  const c = charDef(id); if(!c) return 0;
+  for(const m in c.moves){ const mv=c.moves[m]; if((mv.anim||m)===animKey){ return (mv.startup||0)+(mv.active||0)+(mv.recovery||0); } }
+  return 0;
+}
+
+// ───────────────────────── chroma key (same as the game) ─────────────────────────
+function keySheet(img, tint, bright){
+  const cv=document.createElement('canvas'); cv.width=img.width; cv.height=img.height;
+  const cx=cv.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0);
+  const id=cx.getImageData(0,0,cv.width,cv.height), d=id.data;
+  const br=bright||1, adj=tint||br!==1, tr=tint?tint[0]:1, tg=tint?tint[1]:1, tb=tint?tint[2]:1;
+  for(let i=0;i<d.length;i+=4){ let r=d[i],g=d[i+1],b=d[i+2];
+    if(g>80&&g>r*1.2&&g>b*1.2){ d[i+3]=0; continue; }
+    const mx=r>b?r:b; if(g>mx){ g=mx; d[i+1]=g; }
+    if(adj){ d[i]=Math.min(255,r*tr*br); d[i+1]=Math.min(255,g*tg*br); d[i+2]=Math.min(255,b*tb*br); }
+  }
+  cx.putImageData(id,0,0); return cv;
+}
+function loadSheet(src, tint, bright, cb){
+  if(keyed[src]) return cb(keyed[src]);
+  const img=new Image();
+  img.onload=()=>{ dims[src]={w:img.width,h:img.height}; keyed[src]=keySheet(img,tint||null,bright); cb(keyed[src]); };
+  img.onerror=()=>cb(null);
+  img.src = '../'+src;   // tool lives in /tools/, art paths are repo-root-relative
+}
+function colorTint(sh){ return sh.tint || gl().tint; }
+function colorBright(sh){ return sh.bright!=null ? sh.bright : (gl().bright!=null?gl().bright:1); }
+
+// ───────────────────────── config helpers ─────────────────────────
+function gl(){ return DATA.characters[charId].global; }
+function sheets(){ return DATA.characters[charId].sheets; }
+function sheet(){ return sheets()[slotKey]; }
+function val(k){ const s=sheet(); if(s&&s[k]!=null) return s[k]; const g=gl(); return g[k]!=null?g[k]:DEFAULT_GLOBAL[k]; }
+function cellW(){ const s=sheet(); return (s&&s.cw)||gl().cellW||240; }
+function cellH(){ const s=sheet(); return (s&&s.ch)||gl().cellH||240; }
+
+// ───────────────────────── UI: char tabs + slot list ─────────────────────────
+function buildTabs(){
+  const t=document.getElementById('chartabs'); t.innerHTML='';
+  ROSTER.forEach(id=>{ const b=document.createElement('button'); b.textContent=id; b.className=id===charId?'on':''; b.onclick=()=>selectChar(id); t.appendChild(b); });
+}
+function slotList(){
+  const have = sheets(), art = k => !!(have[k] && have[k].src), out = [];
+  out.push({grp:'States'});
+  STATE_SLOTS.forEach(([k,l])=> out.push({key:k,label:l,has:art(k)}));
+  out.push({grp:'Attacks / moves'});
+  const ma = moveAnims(charId);
+  Object.keys(ma).sort().forEach(a=> out.push({key:a,label:ma[a].join(', '),has:art(a)}));
+  // any saved sheet not covered above
+  const known=new Set([...STATE_SLOTS.map(s=>s[0]),...Object.keys(ma)]);
+  const extra=Object.keys(have).filter(k=>!known.has(k) && art(k));
+  if(extra.length){ out.push({grp:'Other'}); extra.forEach(k=>out.push({key:k,label:'(custom)',has:true})); }
+  return out;
+}
+function renderList(){
+  for(const k in sheets()){ if(!sheets()[k].src && k!==slotKey) delete sheets()[k]; }   // drop empty draft slots (viewed but never given art)
+  const el=document.getElementById('list'); el.innerHTML='';
+  let miss=0;
+  slotList().forEach(it=>{
+    if(it.grp){ const g=document.createElement('div'); g.className='grp'; g.textContent=it.grp; el.appendChild(g); return; }
+    if(!it.has) miss++;
+    const d=document.createElement('div'); d.className='slot'+(it.key===slotKey?' on':'');
+    d.innerHTML=`<span class="dot ${it.has?'has':'miss'}"></span><span class="nm">${it.key}</span><span class="sub">${it.has?'':'needs art'}</span>`;
+    d.title=it.label; d.onclick=()=>selectSlot(it.key); el.appendChild(d);
+  });
+  // custom-key adder
+  const add=document.createElement('div'); add.className='grp'; add.style.cursor='pointer'; add.textContent='+ add custom key';
+  add.onclick=()=>{ const k=prompt('Animation key (a state name or a move animKey):'); if(k){ selectSlot(k.trim()); } };
+  el.appendChild(add);
+  document.getElementById('status').innerHTML = miss? `<span id="miss">${miss} missing</span> · ${charId}` : `all set · ${charId}`;
+}
+
+// ───────────────────────── editor ─────────────────────────
+function ensureSheet(){
+  const sh=sheets();
+  if(!sh[slotKey]){ const def={ src:'', cols:1, rows:1, start:0, frames:1, fps:30, mode: JUMP_MODE[slotKey]||'loop' };
+    sh[slotKey]=def; }
+  return sh[slotKey];
+}
+function selectChar(id){ charId=id; slotKey=null; buildTabs(); renderList(); renderEditor(); }
+function selectSlot(k){ slotKey=k; editFrame=0; renderList(); renderEditor(); }
+
+function ctrlRange(label,key,min,max,step,fmt){
+  const cur=val(key);
+  return `<div class="row"><label>${label}</label><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${cur}"><span class="val" id="v_${key}">${fmt?fmt(cur):cur}</span></div>`;
+}
+function renderEditor(){
+  const c=document.getElementById('ctrls');
+  if(!slotKey){ c.innerHTML='<div class="empty">Pick an animation.</div>'; return; }
+  const sh=ensureSheet();
+  const isJump = !!JUMP_MODE[slotKey];
+  c.innerHTML = `
+    <h3>${slotKey}</h3>
+    <div class="hint">${isJump?'Jump phase — auto-driven clock (start→air→land).':'mode controls playback'}</div>
+    <div class="drop" id="drop">${sh.src?('🖼 '+sh.src.split('/').pop()):'drop a PNG here / click to choose'}<br><span class="hint">(saved to assets/sprites/${charId}/)</span></div>
+    <hr>
+    <h3>Cell grid</h3>
+    <div class="row"><label>cell W</label><input type="number" data-k="cw" value="${sh.cw||gl().cellW||240}"><label>cell H</label><input type="number" data-k="ch" value="${sh.ch||gl().cellH||240}"></div>
+    <div class="row"><label>cols</label><input type="number" data-k="cols" value="${sh.cols||1}"><label>start</label><input type="number" data-k="start" value="${sh.start||0}"></div>
+    <div class="row"><label>frames</label><input type="number" data-k="frames" value="${sh.frames||1}"></div>
+    <button class="full" id="reslice">⊞ auto-slice (grid + skip empty cells)</button>
+    <div class="hint">click a cell below = start · shift-click = end · <b>alt-click = exclude</b> (red = skipped in playback)</div>
+    <hr>
+    <h3>Alignment</h3>
+    ${ctrlRange('scale','scale',0.3,2.5,0.005,v=>(+v).toFixed(3))}
+    ${ctrlRange('offX','offX',-180,180,1)}
+    ${ctrlRange('offY','offY',-120,200,1)}
+    <button class="full" id="autobtn">⊿ Auto-align (feet to floor + center)</button>
+    <hr>
+    <h3>Per-frame nudge <span class="hint" style="text-transform:none;font-weight:400">· drift fix</span></h3>
+    <div id="cellbox"></div>
+    <hr>
+    <h3>Playback</h3>
+    <div class="row wide"><label>mode</label><select data-k="mode" ${isJump?'disabled':''}>
+      ${['loop','boomerang','once','syncMove','jumpStart','jumpAir','jumpLand'].map(m=>`<option ${sh.mode===m?'selected':''}>${m}</option>`).join('')}
+    </select></div>
+    ${ctrlRange('speed','fps',1,60,1,v=>v+' fps')}
+    <div class="hint">${sh.mode==='syncMove'?"in-game this locks to the move's frame length; the slider sets PREVIEW speed":'frames per second (controls in-game + preview speed)'}</div>
+    <hr>
+    <h3>Colour match</h3>
+    ${ctrlRange('brightness','bright',0.4,1.8,0.01,v=>(+v).toFixed(2))}
+    <div class="row"><label>tint R/G/B</label>
+      <input type="number" step="0.02" id="tr" value="${(val('tint')||[1,1,1])[0]}">
+      <input type="number" step="0.02" id="tg" value="${(val('tint')||[1,1,1])[1]}">
+      <input type="number" step="0.02" id="tb" value="${(val('tint')||[1,1,1])[2]}"></div>
+    <div class="hint">tint multiplies channels (1/1/1 = off). Tinting darkens it → raise <b>brightness</b> to match the others.</div>
+    <div class="row wide"><label>compare to</label><select id="refsel">
+      <option value="">— no reference —</option>
+      ${Object.keys(sheets()).filter(k=>sheets()[k].src && k!==slotKey).map(k=>`<option value="${k}" ${refKey===k?'selected':''}>${k}</option>`).join('')}
+    </select></div>
+    <div class="hint">shows that sheet beside this one in the preview as a colour reference.</div>
+    <button class="full" id="delcolor">reset colour (tint + brightness)</button>
+    <hr>
+    <div class="row"><label>faces left</label><input type="checkbox" data-k="artFacesLeft" ${gl().artFacesLeft?'checked':''}> <span class="hint">(global)</span></div>
+    <hr>
+    <button class="full" id="delsheet" style="color:var(--bad)">✕ remove this animation</button>
+  `;
+  bindControls();
+  loadAndRefresh();
+  renderCellCtrls();
+}
+
+function bindControls(){
+  const c=document.getElementById('ctrls'), sh=sheet();
+  c.querySelectorAll('input[type=range]').forEach(inp=> inp.oninput=()=>{ const k=inp.dataset.k, v=parseFloat(inp.value); setKey(k,v);
+    const lbl=document.getElementById('v_'+k); if(lbl) lbl.textContent = k==='scale'?v.toFixed(3):(k==='bright'?v.toFixed(2):v);
+    if(k==='bright') rekeySoon(); });
+  c.querySelectorAll('input[type=number][data-k]').forEach(inp=> inp.onchange=()=>{
+    setKey(inp.dataset.k, parseFloat(inp.value));
+    if(['cw','ch'].includes(inp.dataset.k)){ const s=sheet(), d=dims[s.src]; if(d){ s.cols=Math.max(1,Math.floor(d.w/cellW())); s.rows=Math.max(1,Math.floor(d.h/cellH())); } renderEditor(); }
+    else refreshAfterGrid();
+  });
+  c.querySelectorAll('select[data-k]').forEach(s=> s.onchange=()=> setKey(s.dataset.k, s.value));
+  const fl=c.querySelector('[data-k=artFacesLeft]'); if(fl) fl.onchange=()=>{ gl().artFacesLeft=fl.checked; };
+  ['tr','tg','tb'].forEach(id=>{ const e=document.getElementById(id); if(e) e.onchange=setTint; });
+  const dc=document.getElementById('delcolor'); if(dc) dc.onclick=()=>{ delete sh.tint; delete sh.bright; rekey(); renderEditor(); };
+  const rsel=document.getElementById('refsel'); if(rsel) rsel.onchange=()=>{ refKey=rsel.value; loadAndRefresh(); };
+  document.getElementById('autobtn').onclick=autoAlign;
+  const rs=document.getElementById('reslice'); if(rs) rs.onclick=()=>{ const s=sheet(); if(s.src&&keyed[s.src]){ autoSliceSheet(s,s.src); renderEditor(); } else status('load a sheet first'); };
+  document.getElementById('delsheet').onclick=()=>{ if(confirm('Remove '+slotKey+'?')){ delete sheets()[slotKey]; slotKey=null; renderList(); renderEditor(); } };
+  setupDrop();
+}
+function setKey(k,v){ const sh=sheet(); if(['cw','ch'].includes(k) && v===(gl().cellW||240)){} sh[k]=v; }
+function setTint(){ const t=[parseFloat(document.getElementById('tr').value),parseFloat(document.getElementById('tg').value),parseFloat(document.getElementById('tb').value)]; const sh=sheet(); if(t[0]===1&&t[1]===1&&t[2]===1) delete sh.tint; else sh.tint=t; keyed[sh.src]=null; loadAndRefresh(); }
+function refreshAfterGrid(){ buildStrip(); updateScrub(); }
+
+// ───────────────────────── sheet load + filmstrip + preview ─────────────────────────
+function loadAndRefresh(){
+  const sh=sheet(); if(!sh||!sh.src){ buildStrip(); return; }
+  loadSheet(sh.src, colorTint(sh), colorBright(sh), ()=>{ buildStrip(); updateScrub(); });
+  const rs = refKey && sheets()[refKey]; if(rs && rs.src && rs!==sh) loadSheet(rs.src, colorTint(rs), colorBright(rs), ()=>{});   // preload the colour reference
+}
+let _rkT; function rekey(){ const sh=sheet(); if(sh&&sh.src){ keyed[sh.src]=null; loadAndRefresh(); } }
+function rekeySoon(){ clearTimeout(_rkT); _rkT=setTimeout(rekey, 60); }   // debounce re-keying a big sheet while dragging
+function totalCells(){ const d=dims[sheet().src]; const cw=cellW(),ch=cellH(),cols=sheet().cols||1; if(!d) return (sheet().frames||1); return Math.max(1, Math.floor(d.w/cw)*Math.floor(d.h/ch)); }
+function buildStrip(){
+  const strip=document.getElementById('strip'); strip.innerHTML=''; const sh=sheet(); if(!sh||!sh.src||!keyed[sh.src]) return;
+  const cw=cellW(),ch=cellH(),cols=sh.cols||1, n=totalCells(), start=sh.start||0, end=start+(sh.frames||1)-1;
+  const tw=64, th=Math.round(64*ch/cw);
+  for(let i=0;i<n;i++){
+    const cv=document.createElement('canvas'); cv.width=tw; cv.height=th;
+    const g=cv.getContext('2d'); const sx=(i%cols)*cw, sy=((i/cols)|0)*ch;
+    g.drawImage(keyed[sh.src], sx,sy,cw,ch, 0,0,tw,th);
+    const inRange=i>=start&&i<=end, fi=i-start, excluded=inRange && sh.exclude && sh.exclude.indexOf(fi)>=0;
+    if(inRange) cv.className='in'; if(i===start||i===end) cv.className+=' edge';
+    if(inRange && sh.cells && sh.cells[fi]) cv.className+=' adj';   // tagged with a per-frame nudge
+    if(excluded) cv.className+=' excl';                             // skipped from playback
+    cv.title='cell '+i+(inRange?'  ·  frame '+fi+(excluded?' (excluded)':'')+'  ·  alt-click = exclude':'');
+    cv.onclick=(e)=>{
+      if(e.altKey){ if(inRange) toggleExclude(fi); return; }       // alt-click = toggle exclude (dial out a bad frame)
+      if(e.shiftKey){ const s=sh.start||0; sh.frames=Math.max(1, i-s+1); } else { sh.start=i; sh.frames=Math.max(1, end-i+1>0?(end-i+1):1); }
+      renderEditor();
+    };
+    strip.appendChild(cv);
+  }
+}
+function updateScrub(){ const sh=sheet(); const sc=document.getElementById('scrub'); sc.max=Math.max(0,(sh.frames||1)-1); }
+
+// preview animation
+let t0=performance.now(), curFrame=0;
+function effFps(){ return (sheet().fps)||30; }   // preview speed = the fps slider, for every mode
+function paintSprite(g, key, cx, fy, frame){   // draw one sheet's frame with the GAME's exact math (feet at fy)
+  const sh=sheets()[key]; if(!sh||!sh.src||!keyed[sh.src]) return false;
+  const cw=(sh.cw||gl().cellW||240), ch=(sh.ch||gl().cellH||240), cols=sh.cols||1, cell=(sh.start||0)+frame;
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  let scale=sh.scale!=null?sh.scale:(gl().scale!=null?gl().scale:1), offX=sh.offX!=null?sh.offX:(gl().offX||0), offY=sh.offY!=null?sh.offY:(gl().offY||0);
+  const cadj=sh.cells&&sh.cells[frame]; if(cadj){ offX+=cadj.dx||0; offY+=cadj.dy||0; scale+=cadj.ds||0; }   // per-frame nudge (matches game render)
+  g.save(); g.translate(cx,fy);
+  const flip=gl().artFacesLeft?facing===1:facing===-1; if(flip) g.scale(-1,1);
+  const dw=cw*scale, dh=ch*scale;
+  g.imageSmoothingEnabled=false;   // match the game: hard pixels, no bilinear blur
+  g.drawImage(keyed[sh.src], sx,sy,cw,ch, -dw/2+offX, -dh+offY, dw,dh); g.restore(); return true;
+}
+function includedFrames(sh){   // frame indices that actually play (exclusions skipped); never empty
+  const nf=Math.max(1,sh.frames||1), ex=sh.exclude||[], out=[];
+  for(let i=0;i<nf;i++) if(ex.indexOf(i)<0) out.push(i);
+  return out.length?out:[0];
+}
+function toggleExclude(fi){   // fi = frame index within the animation (0..frames-1)
+  const sh=sheet(), ex=sh.exclude||(sh.exclude=[]), k=ex.indexOf(fi);
+  if(k<0) ex.push(fi); else ex.splice(k,1);
+  ex.sort((a,b)=>a-b); if(!ex.length) delete sh.exclude;
+  buildStrip(); renderCellCtrls();
+}
+function drawVectorBox(g, cx, fy){   // crude fallback if render.js isn't available
+  if(typeof CFG==='undefined') return; const H=CFG.BODY_H||170, W=CFG.BODY_W||60;
+  g.save(); g.globalAlpha=0.4; g.strokeStyle='#5cc8ff'; g.fillStyle='rgba(92,200,255,0.08)'; g.lineWidth=1.5;
+  g.fillRect(cx-W/2, fy-H, W, H); g.strokeRect(cx-W/2, fy-H, W, H);
+  g.beginPath(); g.arc(cx, fy-H+15, 13, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(cx, fy-H+28); g.lineTo(cx, fy-H*0.45); g.stroke(); g.restore();
+}
+// ── procedural PLACEHOLDER: drive the GAME's own vector pose engine (drawFighterBrawler) for the
+//    current slot so you can see what the move/state actually is, regardless of whether art exists yet.
+let procClock = 0;   // advances while playing → idle bob / walk cycle / move loop animate
+function moveObjFor(animKey){   // the move whose anim == this slot (so attacks pose correctly), or null for plain states
+  const c=charDef(charId); if(!c) return null;
+  for(const m in (c.moves||{})){ const mv=c.moves[m]; if((mv.anim||m)===animKey) return mv; }
+  return null;
+}
+function drawProcRef(g, cx, fy){
+  if(typeof drawFighterBrawler!=='function'){ drawVectorBox(g,cx,fy); return; }
+  const mv0=moveObjFor(slotKey);
+  // ensure numeric timing so attackExt() can't NaN on a move that omits a phase
+  const mv = mv0 ? Object.assign({}, mv0, { startup:mv0.startup||6, active:mv0.active||3, recovery:mv0.recovery||12 }) : null;
+  const dur = mv ? (mv.startup+mv.active+mv.recovery) : 0;
+  const f = {
+    charType:charId, color:'#7f8794',
+    x:cx, y:fy, prevX:cx, prevY:fy, facing:facing,
+    state: mv?'attack':slotKey,
+    f: mv ? (procClock % dur) : (procClock % 96),
+    animClock: procClock, move: mv,
+    hp:100, invuln:0, hitFlash:0, decapitated:false, pendingElectric:0,
+    comboStrike:0, superKind:null, swordWind:0, stunFrames:0, crumpleKind:null, counterKind:null, backHeldFrames:0,
+    animKey:function(){ return slotKey; },
+  };
+  const game={ renderAlpha:null, koFreeze:0, frame:procClock|0, hitstop:0 };
+  const look = charId==='vesper'?VESPER_LOOK : charId==='xamora'?XAMORA_LOOK : BRAWLER_LOOK;
+  g.save(); g.globalAlpha=0.85;
+  try{ drawFighterBrawler(g, f, game, look); }catch(e){ g.restore(); drawVectorBox(g,cx,fy); return; }
+  g.restore();
+}
+function refLabel(g, txt, x, fy){ g.fillStyle='#8990a3'; g.font='10px sans-serif'; g.textAlign='center'; g.fillText(txt, x, fy+15); g.textAlign='left'; }
+function loop(){
+  requestAnimationFrame(loop);
+  const pv=document.getElementById('pv'), g=pv.getContext('2d'); g.clearRect(0,0,pv.width,pv.height); g.imageSmoothingEnabled=true;
+  const fy=pv.height-70;
+  g.strokeStyle='#3a3f50'; g.lineWidth=2; g.beginPath(); g.moveTo(0,fy); g.lineTo(pv.width,fy); g.stroke();
+  g.fillStyle='#1a1c24'; g.fillRect(0,fy,pv.width,pv.height-fy);
+  const sh=slotKey&&sheet();
+  const nf=Math.max(1,(sh&&sh.frames)||1);
+  if(sh){
+    if(playing){ const inc=includedFrames(sh), m=inc.length, ft=Math.floor((performance.now()-t0)/1000*effFps());
+      let idx; if(sh.mode==='boomerang'&&m>1){ const per=2*(m-1), p=((ft%per)+per)%per; idx=p<m?p:per-p; } else idx=ft%m;   // ping-pong else loop
+      curFrame=inc[idx]; document.getElementById('scrub').value=curFrame; procClock++; }
+    const exN=(sh.exclude||[]).length;
+    document.getElementById('frlbl').textContent=curFrame+' / '+(nf-1)+(exN?(' ('+exN+' excl)'):'');
+  }
+  if(!slotKey) return;
+  const hasArt = sh && sh.src && keyed[sh.src];
+  const cmp = sh && refKey && sheets()[refKey] && sheets()[refKey].src && refKey!==slotKey ? refKey : null;  // a SHEET to colour-compare against
+  const showProc = showRef && !cmp;                              // procedural placeholder takes the reference slot unless you've picked a sheet to compare
+  const split = hasArt && (cmp || showProc);                     // two figures side by side
+  const mainX = split ? pv.width*0.64 : pv.width*0.5;
+  const refX  = hasArt ? pv.width*0.30 : pv.width*0.5;           // centre the reference when this slot has no art of its own
+
+  // reference figure (left, or centre when empty): a colour-compare sheet, else the procedural placeholder
+  if(cmp){
+    const rsh=sheets()[cmp], rfr=((Math.max(1,rsh.frames||1))/2)|0;
+    if(!keyed[rsh.src]) loadSheet(rsh.src, colorTint(rsh), colorBright(rsh), ()=>{});
+    paintSprite(g, cmp, refX, fy, rfr); refLabel(g,'ref · '+cmp, refX, fy);
+  } else if(showProc){
+    drawProcRef(g, refX, fy); refLabel(g,'procedural · '+slotKey, refX, fy);
+  }
+
+  // the actual sprite (right, or centre)
+  if(hasArt){ paintSprite(g, slotKey, mainX, fy, curFrame); }
+  else if(sh && sh.src){ g.fillStyle='#8990a3'; g.textAlign='center'; g.fillText('loading…', pv.width*0.5, fy-120); g.textAlign='left'; }
+  else if(!showProc){ g.fillStyle='#8990a3'; g.textAlign='center'; g.fillText('no art — drop a PNG (or turn Ref on for the procedural placeholder)', pv.width*0.5, fy-150); g.textAlign='left'; }
+}
+
+// ───────────────────────── auto-align (measure feet/center) ─────────────────────────
+function measureFrame(canvas, cw, ch, cell, cols){
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  const tmp=document.createElement('canvas'); tmp.width=cw; tmp.height=ch;
+  const g=tmp.getContext('2d',{willReadFrequently:true}); g.drawImage(canvas, sx,sy,cw,ch, 0,0,cw,ch);
+  const d=g.getImageData(0,0,cw,ch).data; let mnx=cw,mxx=-1,mny=ch,mxy=-1;
+  for(let y=0;y<ch;y++) for(let x=0;x<cw;x++){ const a=d[(y*cw+x)*4+3]; if(a<128) continue; if(x<mnx)mnx=x; if(x>mxx)mxx=x; if(y<mny)mny=y; if(y>mxy)mxy=y; }
+  return mxy<0?null:{minx:mnx,maxx:mxx,miny:mny,maxy:mxy};
+}
+function autoAlign(){
+  const sh=sheet(); if(!sh.src||!keyed[sh.src]) return alert('Load a sheet first.');
+  const cw=cellW(),ch=cellH(),cols=sh.cols||1, start=sh.start||0, n=sh.frames||1;
+  let foot=-1, c0=null;
+  for(let i=0;i<n;i++){ const m=measureFrame(keyed[sh.src],cw,ch,start+i,cols); if(!m)continue; foot=Math.max(foot,m.maxy); if(c0==null) c0=(m.minx+m.maxx)/2; }
+  if(foot<0) return alert('No opaque pixels found.');
+  const scale=val('scale');
+  sh.offY = Math.round((ch-foot)*scale);            // feet exactly on the floor line (y=0)
+  sh.offX = Math.round(-((c0||cw/2)-cw/2)*scale);   // first frame centered on the fighter's x
+  renderEditor();
+}
+
+// ───────────────────────── per-frame nudge (deltas on top of sheet alignment) ─────────────────────────
+function cellAdj(i){ const c=sheet().cells; return (c&&c[i])||{}; }
+function setCell(i,k,v){
+  const sh=sheet(), cells=sh.cells||(sh.cells={});
+  const o=cells[i]||(cells[i]={}); o[k]=v;
+  if(!o.dx&&!o.dy&&!o.ds) delete cells[i];                 // all-zero → inherit the sheet (keeps json tidy)
+  if(!Object.keys(cells).length) delete sh.cells;
+  buildStrip();
+}
+function renderCellCtrls(){
+  const box=document.getElementById('cellbox'); if(!box||!slotKey) return;
+  const sh=sheet(), nf=Math.max(1,sh.frames||1);
+  editFrame=Math.max(0,Math.min(nf-1,editFrame|0));
+  const a=cellAdj(editFrame), tagged=Object.keys(sh.cells||{}).length;
+  box.innerHTML=`
+    <div class="row"><button class="mini" id="cf_prev">◀</button>
+      <span class="val" style="width:auto;flex:1;text-align:center;color:var(--txt)">frame ${editFrame} / ${nf-1}</span>
+      <button class="mini" id="cf_next">▶</button></div>
+    <div class="row"><label>Δx</label><input type="range" id="cf_dx" min="-160" max="160" step="1" value="${a.dx||0}"><span class="val" id="cf_dxv">${a.dx||0}</span></div>
+    <div class="row"><label>Δy</label><input type="range" id="cf_dy" min="-160" max="160" step="1" value="${a.dy||0}"><span class="val" id="cf_dyv">${a.dy||0}</span></div>
+    <div class="row"><label>Δscale</label><input type="range" id="cf_ds" min="-0.6" max="0.6" step="0.005" value="${a.ds||0}"><span class="val" id="cf_dsv">${(a.ds||0).toFixed(3)}</span></div>
+    <div class="row"><button class="mini" id="cf_clr">clear frame</button><button class="mini" id="cf_clrall">clear all${tagged?' ('+tagged+')':''}</button></div>
+    <div class="hint">scrub or ◀ ▶ to a frame, then nudge it. Deltas stack on the alignment above; gold-outlined cells below are tagged.</div>`;
+  const pause=()=>{ playing=false; document.getElementById('play').textContent='▶ Play'; };
+  const sync=()=>{ curFrame=editFrame; document.getElementById('scrub').value=editFrame; };
+  box.querySelector('#cf_prev').onclick=()=>{ pause(); editFrame--; sync(); renderCellCtrls(); };
+  box.querySelector('#cf_next').onclick=()=>{ pause(); editFrame++; sync(); renderCellCtrls(); };
+  const bind=(id,k,fmt)=>{ const el=box.querySelector('#'+id); el.oninput=()=>{ pause(); sync(); const v=parseFloat(el.value)||0; setCell(editFrame,k,v); const l=document.getElementById(id+'v'); if(l) l.textContent=fmt?fmt(v):v; }; };
+  bind('cf_dx','dx'); bind('cf_dy','dy'); bind('cf_ds','ds',v=>v.toFixed(3));
+  box.querySelector('#cf_clr').onclick=()=>{ const c=sheet().cells; if(c){ delete c[editFrame]; if(!Object.keys(c).length) delete sheet().cells; } buildStrip(); renderCellCtrls(); };
+  box.querySelector('#cf_clrall').onclick=()=>{ delete sheet().cells; buildStrip(); renderCellCtrls(); };
+}
+
+// ───────────────────────── drop / upload ─────────────────────────
+function setupDrop(){
+  const dz=document.getElementById('drop'); if(!dz) return;
+  dz.onclick=()=>{ const i=document.createElement('input'); i.type='file'; i.accept='image/png'; i.onchange=()=>i.files[0]&&upload(i.files[0]); i.click(); };
+  dz.ondragover=e=>{e.preventDefault(); dz.classList.add('hot');}; dz.ondragleave=()=>dz.classList.remove('hot');
+  dz.ondrop=e=>{ e.preventDefault(); dz.classList.remove('hot'); const f=e.dataTransfer.files[0]; if(f) upload(f); };
+}
+function upload(file){
+  const tChar=charId, tSlot=slotKey;   // capture targets — uploads are async; a later click must not misattribute the art
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const dataUrl=fr.result, img=new Image();
+    img.onload=()=>{
+      const G=DATA.characters[tChar].global, shs=DATA.characters[tChar].sheets;
+      const sh=shs[tSlot]||(shs[tSlot]={src:'',start:0,frames:1,fps:30,mode:JUMP_MODE[tSlot]||'loop'});
+      const name=(file.name||'sheet.png').replace(/[^a-zA-Z0-9_.-]/g,'_');
+      const src='assets/sprites/'+tChar+'/'+name; sh.src=src;
+      dims[src]={w:img.width,h:img.height};
+      keyed[src]=keySheet(img, sh.tint||G.tint, sh.bright!=null?sh.bright:G.bright);   // key NOW → previews instantly, no server needed
+      // SQUARE-CELL STRIP auto-detect: a wide strip whose width is a multiple of its height (the
+      // normalizer's output) → square cells of size = height. Beats the per-char global cellW (e.g.
+      // Vesper's 161) which would mis-slice a 240-cell sheet. Falls back to the global otherwise.
+      if(!sh.cw||!sh.ch){
+        if(img.width>img.height && img.width%img.height===0){ sh.cw=sh.ch=img.height; }
+        else { sh.cw=G.cellW||240; sh.ch=G.cellH||240; }
+      }
+      autoSliceSheet(sh, src);                                   // detect grid + auto-trim empty cells
+      if(tChar===charId && tSlot===slotKey){ renderList(); renderEditor(); } else renderList();
+      status('keyed + sliced ✓ · saving…');
+      fetch('/api/upload',{method:'POST',body:JSON.stringify({char:tChar,name:file.name,dataUrl})})
+        .then(r=>r.json()).then(j=>status(j&&j.ok?'saved to disk ✓':'persist error'))
+        .catch(()=>status('⚠ preview only — run `node server.js` (then Save) to persist'));
+    };
+    img.onerror=()=>status('not a valid image');
+    img.src=dataUrl;
+  };
+  fr.readAsDataURL(file);
+}
+function cellHasContent(key, cw, ch, cols, cell){   // does this cell have real content (opaque pixels, post chroma-key)?
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  const t=document.createElement('canvas'); t.width=cw; t.height=ch;
+  const g=t.getContext('2d',{willReadFrequently:true}); g.drawImage(keyed[key], sx,sy,cw,ch, 0,0,cw,ch);
+  const d=g.getImageData(0,0,cw,ch).data;
+  let cnt=0; for(let i=3;i<d.length;i+=4){ if(d[i]>40 && ++cnt>20) return true; }   // >20 opaque px = a real frame
+  return false;
+}
+function autoSliceSheet(sh, src){   // grid from cell size + trim leading/trailing EMPTY cells
+  const d=dims[src]; if(!d||!keyed[src]) return;
+  const cw=sh.cw||240, ch=sh.ch||240;
+  sh.cols=Math.max(1,Math.floor(d.w/cw)); sh.rows=Math.max(1,Math.floor(d.h/ch));
+  const n=sh.cols*sh.rows; let first=-1,last=-1;
+  for(let i=0;i<n;i++){ if(cellHasContent(src,cw,ch,sh.cols,i)){ if(first<0)first=i; last=i; } }
+  sh.start = first<0?0:first; sh.frames = first<0?n:(last-first+1);
+}
+
+// ───────────────────────── save ─────────────────────────
+function status(s){ document.getElementById('status').textContent=s; }
+function clean(){ // strip runtime-only keys before save
+  const out=JSON.parse(JSON.stringify(DATA));
+  for(const cid in out.characters) for(const k in out.characters[cid].sheets){ const s=out.characters[cid].sheets[k];
+    delete s.canvas; delete s.ready; delete s._blob;
+    if(!s.src) delete out.characters[cid].sheets[k];   // drop empty (no-art) slots
+  }
+  return JSON.stringify(out,null,2);
+}
+let hasServer=false;
+function downloadJSON(){ const b=new Blob([clean()],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='sprites.json'; a.click(); status('⬇ downloaded — drop it into assets/sprites/ (or run node server.js to Save directly)'); }
+function doSave(){
+  if(!hasServer) return downloadJSON();
+  status('saving…');
+  fetch('/api/sprites',{method:'POST',body:clean()}).then(r=>r.json())
+    .then(j=>status(j&&j.ok?'saved ✓ — hard-reload the game':'save error: '+(j&&j.error||'?')))
+    .catch(()=>{ hasServer=false; markServer(); downloadJSON(); });
+}
+function markServer(){ const s=document.getElementById('srv'); s.style.color=hasServer?'var(--good)':'var(--bad)'; s.title=hasServer?'node server.js running — Save/upload work':'no server — run `node server.js` to Save/upload to disk (Download still works)'; }
+document.getElementById('save').onclick=doSave;
+document.getElementById('dl').onclick=downloadJSON;
+fetch('/api/ping').then(r=>r.ok&&r.json()).then(j=>{ hasServer=!!(j&&j.ok); markServer(); if(!hasServer) status('⚠ run `node server.js` to add art + Save to disk'); }).catch(()=>{ hasServer=false; markServer(); status('⚠ run `node server.js` to add art + Save to disk'); });
+document.getElementById('play').onclick=function(){ playing=!playing; this.textContent=playing?'⏸ Pause':'▶ Play'; if(playing) t0=performance.now(); };
+document.getElementById('scrub').oninput=function(){ playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=parseInt(this.value)||0; editFrame=curFrame; renderCellCtrls(); };
+document.getElementById('facebtn').onclick=()=>facing=-facing;
+document.getElementById('refbtn').onclick=function(){ showRef=!showRef; this.textContent='Ref: '+(showRef?'on':'off'); };
+
+// ───────────────────────── boot ─────────────────────────
+fetch('../assets/sprites/sprites.json').then(r=>r.json()).then(d=>{
+  DATA=d; DATA.characters=DATA.characters||{};
+  ROSTER.forEach(id=>{ if(!DATA.characters[id]) DATA.characters[id]={global:Object.assign({},DEFAULT_GLOBAL),sheets:{}};
+    DATA.characters[id].global=Object.assign({},DEFAULT_GLOBAL,DATA.characters[id].global); DATA.characters[id].sheets=DATA.characters[id].sheets||{}; });
+  charId=ROSTER[0]; buildTabs(); renderList(); renderEditor(); requestAnimationFrame(loop);
+}).catch(e=>{ document.body.innerHTML='<p style="padding:40px;color:#ff6b6b">Could not load sprites.json — run <code>node server.js</code> and open this via http://localhost:8000/tools/sprite-tool.html</p>'; });
+</script>
+</body>
+</html>
