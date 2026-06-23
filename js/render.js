@@ -10,6 +10,22 @@ const FloatTexts = [];
 const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
 const Heads = [];        // severed heads — physics objects that fly, bounce, roll (decapitation KO)
 
+// ── PIXEL-ART FX: chunky, grid-snapped blocks (Mortal Kombat / Metal Slug / Blasphemous look) ──
+// Every particle / stain draws as a hard-edged square snapped to FX_PX, with stepped (not smooth)
+// alpha — so blood + impacts read as deliberate pixel art, and stay consistent when the retro
+// filter (js/retro.js) is on. FX_PX matches RETRO.scale so a chunk = 1 retro-pixel under the filter.
+const FX_PX = 3;   // FX pixel size (smaller = finer chunks). Tune to taste.
+function fxStepA(t) { return t > 0.66 ? 1 : t > 0.33 ? 0.7 : 0.4; }   // quantized fade
+function fxBlock(ctx, x, y, size, color, alpha, outline) {
+  const s = Math.max(FX_PX, Math.round(size / FX_PX) * FX_PX);
+  const px = Math.round(x / FX_PX) * FX_PX - (s >> 1);
+  const py = Math.round(y / FX_PX) * FX_PX - (s >> 1);
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  if (outline) { ctx.fillStyle = outline; ctx.fillRect(px - FX_PX, py - FX_PX, s + FX_PX * 2, s + FX_PX * 2); }
+  ctx.fillStyle = color;
+  ctx.fillRect(px, py, s, s);
+}
+
 // A severed head launched off the body — bounces, rolls, bleeds, settles on the floor.
 function spawnHead(x, y, vx, vy, skin, color) {
   Heads.push({ x, y, vx, vy, rot: (Math.random() - 0.5) * 0.6, vrot: (Math.random() - 0.5) * 0.5, skin, color, rest: false });
@@ -136,24 +152,47 @@ function drawSlashes(ctx) {
 
 // Blood gout — a directional spray (mostly along `dir`) that arcs and falls fast.
 // The Flatliner's money shot; also a light spurt on the connecting blow.
-function spawnBlood(x, y, dir, n) {
-  const reds = ['#c0392b', '#e74c3c', '#a93226', '#922b21', '#7b241c'];
+// `power` (0 light · 1 med · 2 heavy) scales the CHUNK size: heavy = big chunky globs, light = fine spray.
+function spawnBlood(x, y, dir, n, power) {
+  const reds = ['#c0392b', '#a93226', '#922b21', '#7b241c', '#5e1a13'];   // tight crimson ramp (no bright AA red)
+  const p = power == null ? 1 : power;
   for (let i = 0; i < n; i++) {
     const sp = 3 + Math.random() * 10;
     Particles.push({
       x, y: y + (Math.random() - 0.5) * 36,
       vx: dir * sp * (0.5 + Math.random()) + (Math.random() - 0.5) * 4,
-      vy: -Math.random() * 8 - 1,                      // sprays up, then gravity drags it down
-      life: 22 + Math.random() * 20, maxLife: 42,
+      vy: -Math.random() * 7 - 0.5,                    // sprays up/out, then falls
+      life: 40 + Math.random() * 34, maxLife: 74,      // lives long enough to REACH the floor → stains the ground
       color: reds[(Math.random() * reds.length) | 0],
-      size: 2 + Math.random() * 4.5, grav: 0.34,       // heavier than sparks — blood drops
+      size: (1.5 + Math.random() * 2) + p * 1.8,       // smaller chunks; still scales with hit power
+      grav: 0.42,                                      // falls fast → lands + pools
       blood: true,                                     // stains the floor/wall where it lands
+    });
+  }
+  // a portion flung DOWNWARD so the floor right under the hit catches blood (environmental gore)
+  for (let i = 0, dn = Math.max(2, n >> 1); i < dn; i++) {
+    Particles.push({
+      x: x + (Math.random() - 0.5) * 26, y: y + Math.random() * 22,
+      vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 5,
+      life: 50 + Math.random() * 34, maxLife: 84,
+      color: reds[(Math.random() * reds.length) | 0],
+      size: (1.5 + Math.random() * 2) + p * 1.4, grav: 0.5, blood: true,
+    });
+  }
+  if (p >= 2) for (let i = 0; i < 4; i++) {            // heavy hits throw a few chunky globs (now a bit smaller)
+    const sp = 2 + Math.random() * 6;
+    Particles.push({
+      x, y: y + (Math.random() - 0.5) * 24,
+      vx: dir * sp + (Math.random() - 0.5) * 3, vy: -Math.random() * 6 - 1,
+      life: 44 + Math.random() * 24, maxLife: 70,
+      color: reds[3 + ((Math.random() * 2) | 0)],
+      size: 6 + Math.random() * 4, grav: 0.5, blood: true,
     });
   }
 }
 
 // A persistent blood decal where a drop hit the floor (pool) or a wall (drip).
-const STAIN_CAP = 240;   // the arena can only hold so much
+const STAIN_CAP = 600;   // persistent gore — the arena soaks in blood over the round (ring-buffer recycles oldest)
 let stainWrite = 0;      // ring-buffer cursor — overwrite oldest in O(1) (was Array.shift, O(n) per drop)
 function spawnStain(x, y, vertical) {
   const s = {
@@ -173,10 +212,15 @@ function drawStains(ctx) {
   for (const s of Stains) {
     ctx.globalAlpha = s.a;
     ctx.fillStyle = s.color;
-    ctx.beginPath();
-    if (s.vertical) ctx.ellipse(s.x, s.y, s.r * 0.6, s.r * 1.4, 0, 0, Math.PI * 2);   // wall drip
-    else ctx.ellipse(s.x, s.y, s.r * 1.5, s.r * 0.45, 0, 0, Math.PI * 2);             // floor pool
-    ctx.fill();
+    const sx = Math.round(s.x / FX_PX) * FX_PX, sy = Math.round(s.y / FX_PX) * FX_PX;
+    if (s.vertical) {                                  // wall drip — narrow vertical chunky streak
+      const w = Math.max(FX_PX, Math.round(s.r * 0.7 / FX_PX) * FX_PX), h = Math.max(FX_PX, Math.round(s.r * 1.6 / FX_PX) * FX_PX);
+      ctx.fillRect(sx - (w >> 1), sy, w, h);
+    } else {                                           // floor pool — wide flat chunky splat (many overlap into an organic pool)
+      const w = Math.max(FX_PX, Math.round(s.r * 1.8 / FX_PX) * FX_PX), h = Math.max(FX_PX, Math.round(s.r * 0.7 / FX_PX) * FX_PX);
+      ctx.fillRect(sx - (w >> 1), sy - (h >> 1), w, h);
+      if (s.r > 5) ctx.fillRect(sx - (w >> 2), sy - (h >> 1) - FX_PX, (w >> 1), FX_PX);   // a small raised lump → irregular pixel edge
+    }
   }
   ctx.globalAlpha = 1;
 }
@@ -359,6 +403,7 @@ function updateFx() {
     }
     if (p.life <= 0) Particles.splice(i, 1);
   }
+  if (Particles.length > 1400) Particles.splice(0, Particles.length - 1400);   // safety cap (bloodier hits → more particles); drop oldest
   for (let i = Slashes.length - 1; i >= 0; i--) { if (--Slashes[i].life <= 0) Slashes.splice(i, 1); }
   for (let i = FloatTexts.length - 1; i >= 0; i--) {
     const t = FloatTexts[i];
@@ -554,6 +599,15 @@ function drawSpritePose(ctx, f, game) {
   if (!sh || !sh.ready || !sh.canvas) return false;   // not loaded yet → vector fallback
   const g = entry.global, nf = sh.frames || 1;
   const cw = sh.cw || g.cellW || SPR_CELL_W, ch = sh.ch || g.cellH || SPR_CELL_H;
+  // Cinematic states (heel drop / side kick / …) clear the move and run a short sequencer, so the normal
+  // fps clock barely advances. If this fighter is the one a cine is driving and the cine knows its length,
+  // scale the WHOLE sheet across the cine so the sprite plays start→finish instead of holding one frame.
+  if (frame == null && game.cine && (game.cine.att === f || game.cine.vic === f) && game.cine.data && game.cine.data.total) {
+    const inc = spriteIncluded(sh, nf);                 // honour excluded frames in cines too (skip the dialed-out cells)
+    const nfe = inc ? (inc.length || 1) : nf;
+    const idx = Math.min(nfe - 1, Math.max(0, (game.cine.f / game.cine.data.total * nfe) | 0));
+    frame = inc ? (inc.length ? inc[idx] : 0) : idx;
+  }
   if (frame == null) {
     const inc = spriteIncluded(sh, nf);                 // excluded frames are skipped from the cycle
     const nfe = inc ? (inc.length || 1) : nf;
@@ -584,16 +638,20 @@ function drawSpritePose(ctx, f, game) {
 
   ctx.save();
   ctx.translate(rx, ry);
-  const flip = g.artFacesLeft ? f.facing === 1 : f.facing === -1;
+  const facesLeft = sh.faceLeft != null ? sh.faceLeft : g.artFacesLeft;   // per-sheet override, else character global
+  const flip = facesLeft ? f.facing === 1 : f.facing === -1;
   if (flip) ctx.scale(-1, 1);
   let scale = sh.scale != null ? sh.scale : (g.scale != null ? g.scale : 1);
   let offX = sh.offX != null ? sh.offX : (g.offX || 0);
   let offY = sh.offY != null ? sh.offY : (g.offY || 0);
   const cadj = sh.cells && sh.cells[frame];   // per-frame nudge: deltas on top of the sheet alignment (fixes drift in independently-genned frames)
   if (cadj) { offX += cadj.dx || 0; offY += cadj.dy || 0; scale += cadj.ds || 0; }
-  const dw = cw * scale, dh = ch * scale;
+  let dw = cw * scale, dh = ch * scale;
   ctx.imageSmoothingEnabled = false;   // sprites are pre-rendered → draw with HARD pixels (no bilinear blur). Restored by ctx.restore() below.
-  ctx.drawImage(sh.canvas, sx, sy, cw, ch, -dw / 2 + offX, -dh + offY, dw, dh);   // feet at y=0
+  let dx0 = -dw / 2 + offX, dy0 = sh.flipY ? -offY : (-dh + offY);   // feet at y=0 (flipY = vertical mirror)
+  if (sh.flipY) ctx.scale(1, -1);
+  if (sh.snap) { dx0 = Math.round(dx0); dy0 = Math.round(dy0); dw = Math.round(dw); dh = Math.round(dh); }   // optional per-sheet pixel-snap (default off → identical render)
+  ctx.drawImage(sh.canvas, sx, sy, cw, ch, dx0, dy0, dw, dh);
   ctx.restore();
   return true;
 }
@@ -1116,12 +1174,18 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1; P.trail = { to: { x: 30, y: -150 }, isLeg: true };
       break;
     }
-    // SIDE KICK (kickcombo): a straight thrusting side kick that shoves them back.
+    // SIDE KICK: chamber → straight thrusting side kick that shoves them back.
+    // Normalizes over the real move's frames (front-kick combo ender); falls back to the old
+    // cine windup if it's ever driven without a move.
     case 'sidekick': {
-      lean(P, 0.08); P.sho.x -= 6; P.head.x -= 4;        // torso chambers side-on
-      P.footF = { x: 84, y: -76 }; P.legBendF = -1;      // leg thrusts straight out at hip height
-      P.handF = { x: -10, y: -120 }; P.handR = { x: 8, y: -108 };
-      P.faceMood = 1; P.trail = { to: { x: 84, y: -76 }, isLeg: true };
+      const skDur = f.move ? (f.move.startup + f.move.active + f.move.recovery) : (CFG.KICKFOLLOW_WINDUP || 7);
+      const t = Math.min(1, f.f / skDur);
+      const e = t * t * (3 - 2 * t);                     // smoothstep chamber→extend
+      lean(P, 0.05 + 0.05 * e); P.sho.x -= 6 * e; P.head.x -= 4 * e;   // torso chambers side-on, then drives in
+      const fx = 26 + (84 - 26) * e;                     // knee tucked → leg snapped straight out at hip height
+      P.footF = { x: fx, y: -76 }; P.legBendF = e > 0.4 ? -1 : 1;
+      P.handF = { x: -10, y: -120 }; P.handR = { x: 8 - 6 * e, y: -108 };
+      P.faceMood = 1; if (e > 0.5) P.trail = { to: { x: fx, y: -76 }, isLeg: true };
       break;
     }
     // EXECUTION: Vesper stepped back, the off-hand SIDEARM leveled at the kneeling victim.
@@ -1267,7 +1331,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'jumpkick': case 'flyknee': {
+    case 'jumpkick': case 'flyknee': case 'airuzi': {   // airuzi reuses the jump-kick vector pose as a placeholder until its sprite is assigned
       lean(P, key === 'flyknee' ? 0.35 : 0.2);
       P.footR = { x: -8, y: -36 }; P.legBendR = -1;         // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');
@@ -1985,11 +2049,9 @@ function render(ctx, game, alpha) {
   for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
 
   for (const p of Particles) {
-    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
+    const t = Math.max(0, p.life / p.maxLife);
+    if (p.blood) fxBlock(ctx, p.x, p.y, p.size, p.color, t > 0.22 ? 1 : 0.7, p.size >= 6 ? '#2e0a08' : null);  // crisp crimson chunk; dark outline on globs (gore stays opaque, no soft fade)
+    else fxBlock(ctx, p.x, p.y, p.size, p.color, fxStepA(t));   // sparks / dust / energy → stepped fade
   }
   ctx.globalAlpha = 1;
   drawSlashes(ctx);   // slash crescents ride on top of the sparks/blood

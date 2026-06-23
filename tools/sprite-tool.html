@@ -30,6 +30,11 @@
   #pv { background:#0b0c11; border:1px solid var(--line); border-radius:8px; }
   #pvbar { display:flex; align-items:center; gap:10px; }
   #pvbar button, #ctrls button.mini { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:4px 10px; cursor:pointer; }
+  #pvbar #hitbtn.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
+  #pvbar #headbtn.on { background:var(--bad); color:#2a0808; border-color:var(--bad); }
+  #pvbar #onionbtn.on, #pvbar #flipbtn.on, #pvbar #diffbtn.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
+  #pvbar input.cnt { width:34px; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:3px 4px; }
+  #strip canvas.reff { box-shadow:0 0 0 2px #c08bff inset; }
   #strip { display:flex; flex-wrap:wrap; gap:3px; max-width:640px; justify-content:center; }
   #strip canvas { border:1px solid #2a2d3a; border-radius:3px; cursor:pointer; background:#0b0c11; }
   #strip canvas.in { border-color:var(--acc); } #strip canvas.edge { box-shadow:0 0 0 2px var(--good) inset; }
@@ -51,6 +56,17 @@
   .hint { color:var(--dim); font-size:11px; margin:4px 0; }
   .empty { color:var(--dim); text-align:center; margin-top:40px; }
   #miss { color:var(--bad); }
+  /* ── touch-up (erase) modal ── */
+  #tu { position:fixed; inset:0; background:rgba(0,0,0,0.68); display:none; align-items:center; justify-content:center; z-index:50; }
+  #tubox { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; max-width:94vw; max-height:94vh; }
+  #tuhdr { display:flex; align-items:center; gap:10px; font-size:13px; }
+  #tuhdr #tulbl { color:var(--dim); font-size:12px; }
+  #tuhdr .grow { flex:1; }
+  #tucv { background:#0b0c11; border:1px solid var(--line); border-radius:6px; cursor:crosshair; image-rendering:pixelated; touch-action:none; align-self:center; }
+  #tubar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  #tubar label { color:var(--dim); }
+  #tubar button, #tuhdr button { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:5px 12px; cursor:pointer; font-weight:600; }
+  #tubar button:hover { border-color:var(--acc); }
 </style>
 </head>
 <body>
@@ -74,6 +90,12 @@
         <span id="frlbl" class="val">0</span>
         <button id="facebtn">⇄ Facing</button>
         <button id="refbtn">Ref: on</button>
+        <button id="hitbtn" title="engine hurtbox (BODY_W × BODY_H, crouch/downed aware)">Hitbox: off</button>
+        <button id="headbtn" title="engine head marker — top of the hurtbox + headR">Head: off</button>
+        <button id="onionbtn" title="onion skin: prev (red) + next (blue) frames under this one · hotkey O">Onion: off</button>
+        <input type="number" class="cnt" id="onionN" min="1" max="4" value="1" title="onion neighbour count">
+        <button id="flipbtn" title="flip test: rapidly alternate reference frame ↔ current frame · hotkey T">FlipTest: off</button>
+        <button id="diffbtn" title="difference vs reference frame · hotkey D">Diff: off</button>
       </div>
       <div id="strip"></div>
     </div>
@@ -81,42 +103,85 @@
   </div>
 </main>
 
+<!-- ── touch-up (erase) modal ── -->
+<div id="tu">
+  <div id="tubox">
+    <div id="tuhdr"><b>✎ Touch-up — erase</b><span id="tulbl"></span><div class="grow"></div><button id="tuclose">✕</button></div>
+    <canvas id="tucv" width="480" height="480"></canvas>
+    <div id="tubar">
+      <label>brush</label><input type="range" id="tubrush" min="1" max="60" value="10" style="width:140px"><span id="tubrushv" class="val">10</span>
+      <button id="tuundo">↶ undo</button>
+      <button id="tucancel">cancel</button>
+      <button id="tudone">done</button>
+      <button id="tusave" style="background:var(--good);color:#06210f;border-color:var(--good)">save to disk</button>
+    </div>
+    <div class="hint">drag on the frame to erase pixels (they become transparent). <b>done</b> keeps edits in memory for this session · <b>save to disk</b> writes the PNG. <b>cancel</b> reverts this frame.</div>
+  </div>
+</div>
+
 <script src="../js/config.js"></script>
 <script src="../js/moves.js"></script>
 <script src="../js/characters.js"></script>
 <script src="../js/render.js"></script>   <!-- reused for the procedural placeholder ref (drawFighterBrawler + LOOKs) -->
 <script>
 // ───────────────────────── data / spec ─────────────────────────
-const STATE_SLOTS = [  // [key, label] — universal engine states a sprite would cover
-  ['idle','Idle'],['walk','Walk'],['run','Run'],['crouch','Crouch'],
-  ['prejump','Jump · Start'],['air','Jump · Air (loop)'],['land','Jump · Land'],
-  ['backdash','Backdash'],['blockstun','Block'],['hitstun','Hitstun'],['crumple','Crumple'],
-  ['launched','Launched'],['fallheavy','Hard knockdown'],['wallsplat','Wall splat'],
-  ['gassed','Gassed'],['electrified','Electrified'],['downed','Downed'],['getup','Get up'],
-  ['backroll','Back roll'],['kipup','Kip up'],['clinch','Clinch'],['thrown','Thrown'],['superstart','Super'],
+// Universal engine states a sprite can key to (animKey() returns the STATE when no move is active).
+// Scanned from every setState()/state=== in js/* — anything the engine can put a fighter in.
+// {grp} entries are section headers. Move-driven states (attack/airattack/flyattack) are omitted —
+// those resolve to the move's anim, listed under Attacks/moves instead.
+const STATE_SLOTS = [
+  {grp:'States · neutral & locomotion'},
+  ['idle','Idle'],['walk','Walk'],['run','Run'],['crouch','Crouch'],['backdash','Backdash'],
+  ['prejump','Jump · start'],['air','Jump · air (loop)'],['land','Jump · land'],
+  {grp:'States · hit reactions'},
+  ['blockstun','Block'],['hitstun','Hitstun'],['crumple','Crumple'],['launched','Launched'],
+  ['fallheavy','Hard knockdown'],['wallsplat','Wall splat'],['gassed','Gassed'],['electrified','Electrified'],
+  ['parried','Parried'],['countered','Countered'],['slipcounter','Slip counter'],
+  {grp:'States · knockdown & wake-up'},
+  ['downed','Downed (on ground)'],['getup','Get up (neutral)'],['backroll','Back roll (tech)'],
+  ['wakeuproll','Wake-up roll (non-tech)'],['kipup','Kip up'],
+  {grp:'States · throws & grapple'},
+  ['throwgrab','Throw · grab'],['throwanim','Throw · execute'],['thrown','Thrown (victim)'],
+  ['clinch','Clinch'],['clinchgrab','Clinch · grab'],['clinched','Clinched (victim)'],
+  ['suplexthrow','Suplex · throw'],['suplexed','Suplexed (victim)'],
+  ['gpmount','Ground&pound · mount'],['gpmounted','Ground&pound (victim)'],
+  {grp:'States · execution & super'},
+  ['superstart','Super · start'],['supercombo','Super · combo'],['swordfinish','Sword finish'],
+  ['execute','Execute'],['executed','Executed (victim)'],['execkneel','Execution · kneel (victim)'],
+  ['sidekick','Side kick'],['flipheel','Flip heel'],
 ];
 const DEFAULT_GLOBAL = { scale:1, offX:0, offY:0, artFacesLeft:false, tint:null, bright:1, cellW:240, cellH:240 };
 let refKey = '';   // a sheet to colour-compare against (opt-in via the dropdown); empty = show the PROCEDURAL placeholder instead
 const JUMP_MODE = { prejump:'jumpStart', air:'jumpAir', land:'jumpLand' };
 
 let DATA = null, charId = null, slotKey = null, playing = true, facing = 1, showRef = true, editFrame = 0;
-const keyed = {}, dims = {};   // src → keyed canvas / {w,h}
+let showHit = false, showHead = false;   // engine hurtbox / head-position overlays (for aligning art to the game's boxes)
+let onion = false, onionN = 1, flipTest = false, diffMode = false;   // alignment aids (preview-only, no save-format change)
+let refFrame = 0, flipA = 0, flipB = 1, _flipT = 0;                  // reference frame (session-only) for flip-test + diff
+const keyed = {}, dims = {}, orig = {};   // src → keyed canvas / {w,h} / raw (green-screen) canvas, kept so erases survive re-keying
+let TU = null;                 // active touch-up session
 const ROSTER = (typeof CHAR_ROSTER !== 'undefined' && CHAR_ROSTER) || Object.keys(CHARACTERS || {});
 
 function charDef(id){ return (typeof CHARACTERS!=='undefined') && CHARACTERS[id]; }
 
-// reachable moves for a character (so we list only animations it can actually do) → {anim:[moveNames]}
+// EVERY move the character defines → {anim:[labels]}. We list them all (not just ones reachable
+// through the input maps) so specials reached by bespoke inputs — run+↓ slide tackle, low sweep, etc. —
+// are assignable too. The sprite key is the move's `anim` (falls back to the move name).
 function moveAnims(id){
-  const c = charDef(id); if(!c) return {};
-  const set = new Set(), add = m => { if(m && c.moves[m]) set.add(m); };
-  for(const map of [c.neutralMap, c.airMap]) for(const b in (map||{})) for(const d in map[b]) add(map[b][d]);
-  for(const b in (c.dashMap||{})) add(c.dashMap[b]);
-  (c.rekka&&c.rekka.steps||[]).forEach(add);
-  (c.comboChains||[]).forEach(ch => (ch.sequence||[]).forEach(add));
-  add(c.otgKickForward);
-  for(let i=0;i<3;i++) for(const k of [...set]) ((c.moves[k]||{}).cancels||[]).forEach(add);
+  const c = charDef(id); if(!c || !c.moves) return {};
   const out = {};
-  for(const m of set){ const a = c.moves[m].anim || m; (out[a]=out[a]||[]).push(c.moves[m].label || m); }
+  for(const m in c.moves){ const mv = c.moves[m] || {}; const a = mv.anim || m; (out[a]=out[a]||[]).push(mv.label || m); }
+  return out;
+}
+// Combo-FINISHER cinematics aren't entries in c.moves — they're engine states the attacker enters
+// (setState clears move, so spriteAnimKey resolves to the STATE name). Map each finish.kind → that state.
+const COMBO_KIND_STATE = { slashcombo:'magiccombo', magiccombo:'magiccombo', execution:'execpistol', skeet:'skeetkick' };
+// (kebab reuses the 'thrust' carry pose, already listed as a move → no separate slot)
+function comboAnims(id){
+  const c = charDef(id); if(!c || !c.comboChains) return {};
+  const out = {};
+  c.comboChains.forEach(ch=>{ const f=ch.finish; if(!f) return; const key=COMBO_KIND_STATE[f.kind]; if(!key) return;
+    const lab=(f.opts&&f.opts.label)||f.kind; if(!(out[key]||[]).includes(lab)) (out[key]=out[key]||[]).push(lab); });
   return out;
 }
 function moveDuration(id, animKey){
@@ -141,9 +206,13 @@ function keySheet(img, tint, bright){
 function loadSheet(src, tint, bright, cb){
   if(keyed[src]) return cb(keyed[src]);
   const img=new Image();
-  img.onload=()=>{ dims[src]={w:img.width,h:img.height}; keyed[src]=keySheet(img,tint||null,bright); cb(keyed[src]); };
+  img.onload=()=>{ dims[src]={w:img.width,h:img.height}; orig[src]=rawCanvas(img); keyed[src]=keySheet(img,tint||null,bright); cb(keyed[src]); };
   img.onerror=()=>cb(null);
   img.src = '../'+src;   // tool lives in /tools/, art paths are repo-root-relative
+}
+function rawCanvas(img){   // a writable copy of the source image, kept so touch-up erases persist across re-keying
+  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+  c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0); return c;
 }
 function colorTint(sh){ return sh.tint || gl().tint; }
 function colorBright(sh){ return sh.bright!=null ? sh.bright : (gl().bright!=null?gl().bright:1); }
@@ -162,16 +231,17 @@ function buildTabs(){
   ROSTER.forEach(id=>{ const b=document.createElement('button'); b.textContent=id; b.className=id===charId?'on':''; b.onclick=()=>selectChar(id); t.appendChild(b); });
 }
 function slotList(){
-  const have = sheets(), art = k => !!(have[k] && have[k].src), out = [];
-  out.push({grp:'States'});
-  STATE_SLOTS.forEach(([k,l])=> out.push({key:k,label:l,has:art(k)}));
+  const have = sheets(), art = k => !!(have[k] && have[k].src), out = [], seen = new Set();
+  const emit = (k,l)=>{ if(seen.has(k)) return; seen.add(k); out.push({key:k,label:l,has:art(k)}); };   // dedupe across groups
+  STATE_SLOTS.forEach(s=> s.grp ? out.push(s) : emit(s[0], s[1]));
   out.push({grp:'Attacks / moves'});
   const ma = moveAnims(charId);
-  Object.keys(ma).sort().forEach(a=> out.push({key:a,label:ma[a].join(', '),has:art(a)}));
-  // any saved sheet not covered above
-  const known=new Set([...STATE_SLOTS.map(s=>s[0]),...Object.keys(ma)]);
-  const extra=Object.keys(have).filter(k=>!known.has(k) && art(k));
-  if(extra.length){ out.push({grp:'Other'}); extra.forEach(k=>out.push({key:k,label:'(custom)',has:true})); }
+  Object.keys(ma).sort().forEach(a=> emit(a, ma[a].join(', ')));
+  const ca = comboAnims(charId);                                  // combo-finisher cinematics (AERIAL RAVE / EXECUTION / SKEET …)
+  if(Object.keys(ca).length){ out.push({grp:'Combo finishers'}); Object.keys(ca).forEach(k=> emit(k, ca[k].join(' / '))); }
+  // any saved sheet not covered by the scans above (hand-added custom keys)
+  const extra = Object.keys(have).filter(k=> !seen.has(k) && art(k));
+  if(extra.length){ out.push({grp:'Other'}); extra.forEach(k=> emit(k, '(custom)')); }
   return out;
 }
 function renderList(){
@@ -200,7 +270,7 @@ function ensureSheet(){
   return sh[slotKey];
 }
 function selectChar(id){ charId=id; slotKey=null; buildTabs(); renderList(); renderEditor(); }
-function selectSlot(k){ slotKey=k; editFrame=0; renderList(); renderEditor(); }
+function selectSlot(k){ slotKey=k; editFrame=0; refFrame=0; renderList(); renderEditor(); }
 
 function ctrlRange(label,key,min,max,step,fmt){
   const cur=val(key);
@@ -228,6 +298,7 @@ function renderEditor(){
     ${ctrlRange('offX','offX',-180,180,1)}
     ${ctrlRange('offY','offY',-120,200,1)}
     <button class="full" id="autobtn">⊿ Auto-align (feet to floor + center)</button>
+    <div class="row"><label>pixel-snap</label><input type="checkbox" data-k2="snap" ${sh.snap?'checked':''}> <span class="hint">round x/y/size → kills shimmer (in-game too)</span></div>
     <hr>
     <h3>Per-frame nudge <span class="hint" style="text-transform:none;font-weight:400">· drift fix</span></h3>
     <div id="cellbox"></div>
@@ -253,7 +324,16 @@ function renderEditor(){
     <div class="hint">shows that sheet beside this one in the preview as a colour reference.</div>
     <button class="full" id="delcolor">reset colour (tint + brightness)</button>
     <hr>
-    <div class="row"><label>faces left</label><input type="checkbox" data-k="artFacesLeft" ${gl().artFacesLeft?'checked':''}> <span class="hint">(global)</span></div>
+    <h3>Orientation <span class="hint" style="text-transform:none;font-weight:400">· this animation</span></h3>
+    <div class="row wide"><label>facing</label><select id="faceLeft">
+      <option value="" ${sh.faceLeft==null?'selected':''}>inherit global (${gl().artFacesLeft?'faces left':'faces right'})</option>
+      <option value="1" ${sh.faceLeft===true?'selected':''}>force faces left</option>
+      <option value="0" ${sh.faceLeft===false?'selected':''}>force faces right</option>
+    </select></div>
+    <div class="row"><label>flip vertical</label><input type="checkbox" id="flipY" ${sh.flipY?'checked':''}> <span class="hint">(mirror upside-down)</span></div>
+    <div class="hint">overrides facing for THIS sheet only (e.g. one anim drawn the wrong way).</div>
+    <hr>
+    <div class="row"><label>faces left</label><input type="checkbox" data-k="artFacesLeft" ${gl().artFacesLeft?'checked':''}> <span class="hint">(global default)</span></div>
     <hr>
     <button class="full" id="delsheet" style="color:var(--bad)">✕ remove this animation</button>
   `;
@@ -273,17 +353,20 @@ function bindControls(){
     else refreshAfterGrid();
   });
   c.querySelectorAll('select[data-k]').forEach(s=> s.onchange=()=> setKey(s.dataset.k, s.value));
-  const fl=c.querySelector('[data-k=artFacesLeft]'); if(fl) fl.onchange=()=>{ gl().artFacesLeft=fl.checked; };
+  const fl=c.querySelector('[data-k=artFacesLeft]'); if(fl) fl.onchange=()=>{ gl().artFacesLeft=fl.checked; renderEditor(); };
+  const fsel=document.getElementById('faceLeft'); if(fsel) fsel.onchange=()=>{ const v=fsel.value, s=sheet(); if(v==='') delete s.faceLeft; else s.faceLeft=(v==='1'); };
+  const fyc=document.getElementById('flipY'); if(fyc) fyc.onchange=()=>{ const s=sheet(); if(fyc.checked) s.flipY=true; else delete s.flipY; };
   ['tr','tg','tb'].forEach(id=>{ const e=document.getElementById(id); if(e) e.onchange=setTint; });
   const dc=document.getElementById('delcolor'); if(dc) dc.onclick=()=>{ delete sh.tint; delete sh.bright; rekey(); renderEditor(); };
   const rsel=document.getElementById('refsel'); if(rsel) rsel.onchange=()=>{ refKey=rsel.value; loadAndRefresh(); };
   document.getElementById('autobtn').onclick=autoAlign;
+  const sn=c.querySelector('[data-k2=snap]'); if(sn) sn.onchange=()=>{ const s=sheet(); if(sn.checked) s.snap=true; else delete s.snap; };
   const rs=document.getElementById('reslice'); if(rs) rs.onclick=()=>{ const s=sheet(); if(s.src&&keyed[s.src]){ autoSliceSheet(s,s.src); renderEditor(); } else status('load a sheet first'); };
   document.getElementById('delsheet').onclick=()=>{ if(confirm('Remove '+slotKey+'?')){ delete sheets()[slotKey]; slotKey=null; renderList(); renderEditor(); } };
   setupDrop();
 }
 function setKey(k,v){ const sh=sheet(); if(['cw','ch'].includes(k) && v===(gl().cellW||240)){} sh[k]=v; }
-function setTint(){ const t=[parseFloat(document.getElementById('tr').value),parseFloat(document.getElementById('tg').value),parseFloat(document.getElementById('tb').value)]; const sh=sheet(); if(t[0]===1&&t[1]===1&&t[2]===1) delete sh.tint; else sh.tint=t; keyed[sh.src]=null; loadAndRefresh(); }
+function setTint(){ const t=[parseFloat(document.getElementById('tr').value),parseFloat(document.getElementById('tg').value),parseFloat(document.getElementById('tb').value)]; const sh=sheet(); if(t[0]===1&&t[1]===1&&t[2]===1) delete sh.tint; else sh.tint=t; rekey(); }
 function refreshAfterGrid(){ buildStrip(); updateScrub(); }
 
 // ───────────────────────── sheet load + filmstrip + preview ─────────────────────────
@@ -292,7 +375,10 @@ function loadAndRefresh(){
   loadSheet(sh.src, colorTint(sh), colorBright(sh), ()=>{ buildStrip(); updateScrub(); });
   const rs = refKey && sheets()[refKey]; if(rs && rs.src && rs!==sh) loadSheet(rs.src, colorTint(rs), colorBright(rs), ()=>{});   // preload the colour reference
 }
-let _rkT; function rekey(){ const sh=sheet(); if(sh&&sh.src){ keyed[sh.src]=null; loadAndRefresh(); } }
+let _rkT; function rekey(){ const sh=sheet(); if(!sh||!sh.src) return;
+  if(orig[sh.src]){ keyed[sh.src]=keySheet(orig[sh.src], colorTint(sh), colorBright(sh)); buildStrip(); updateScrub(); }   // re-key from the raw copy → keeps touch-up erases
+  else { keyed[sh.src]=null; loadAndRefresh(); }
+}
 function rekeySoon(){ clearTimeout(_rkT); _rkT=setTimeout(rekey, 60); }   // debounce re-keying a big sheet while dragging
 function totalCells(){ const d=dims[sheet().src]; const cw=cellW(),ch=cellH(),cols=sheet().cols||1; if(!d) return (sheet().frames||1); return Math.max(1, Math.floor(d.w/cw)*Math.floor(d.h/ch)); }
 function buildStrip(){
@@ -306,6 +392,7 @@ function buildStrip(){
     const inRange=i>=start&&i<=end, fi=i-start, excluded=inRange && sh.exclude && sh.exclude.indexOf(fi)>=0;
     if(inRange) cv.className='in'; if(i===start||i===end) cv.className+=' edge';
     if(inRange && sh.cells && sh.cells[fi]) cv.className+=' adj';   // tagged with a per-frame nudge
+    if(inRange && fi===refFrame) cv.className+=' reff';             // reference frame (flip-test / diff)
     if(excluded) cv.className+=' excl';                             // skipped from playback
     cv.title='cell '+i+(inRange?'  ·  frame '+fi+(excluded?' (excluded)':'')+'  ·  alt-click = exclude':'');
     cv.onclick=(e)=>{
@@ -328,10 +415,15 @@ function paintSprite(g, key, cx, fy, frame){   // draw one sheet's frame with th
   let scale=sh.scale!=null?sh.scale:(gl().scale!=null?gl().scale:1), offX=sh.offX!=null?sh.offX:(gl().offX||0), offY=sh.offY!=null?sh.offY:(gl().offY||0);
   const cadj=sh.cells&&sh.cells[frame]; if(cadj){ offX+=cadj.dx||0; offY+=cadj.dy||0; scale+=cadj.ds||0; }   // per-frame nudge (matches game render)
   g.save(); g.translate(cx,fy);
-  const flip=gl().artFacesLeft?facing===1:facing===-1; if(flip) g.scale(-1,1);
-  const dw=cw*scale, dh=ch*scale;
+  const facesLeft = sh.faceLeft!=null ? sh.faceLeft : gl().artFacesLeft;   // per-sheet override, else global
+  const flip = facesLeft ? facing===1 : facing===-1; if(flip) g.scale(-1,1);
+  let dw=cw*scale, dh=ch*scale;
   g.imageSmoothingEnabled=false;   // match the game: hard pixels, no bilinear blur
-  g.drawImage(keyed[sh.src], sx,sy,cw,ch, -dw/2+offX, -dh+offY, dw,dh); g.restore(); return true;
+  let dx0=-dw/2+offX, dy0=sh.flipY?-offY:(-dh+offY);
+  if(sh.flipY) g.scale(1,-1);   // vertical mirror, feet kept at baseline
+  if(sh.snap){ dx0=Math.round(dx0); dy0=Math.round(dy0); dw=Math.round(dw); dh=Math.round(dh); }   // pixel-snap: kill sub-pixel shimmer
+  g.drawImage(keyed[sh.src], sx,sy,cw,ch, dx0,dy0, dw,dh);
+  g.restore(); return true;
 }
 function includedFrames(sh){   // frame indices that actually play (exclusions skipped); never empty
   const nf=Math.max(1,sh.frames||1), ex=sh.exclude||[], out=[];
@@ -382,6 +474,68 @@ function drawProcRef(g, cx, fy){
   g.restore();
 }
 function refLabel(g, txt, x, fy){ g.fillStyle='#8990a3'; g.font='10px sans-serif'; g.textAlign='center'; g.fillText(txt, x, fy+15); g.textAlign='left'; }
+
+// ── engine-box overlays: the GAME's actual hurtbox + head position, so art can be aligned to them ──
+function lookFor(){ return charId==='vesper'?VESPER_LOOK : charId==='xamora'?XAMORA_LOOK : BRAWLER_LOOK; }
+function hurtboxLocal(){   // matches Fighter.hurtbox(), in feet-origin coords (feet at y=0, up is −y)
+  if(typeof CFG==='undefined') return null;
+  if(slotKey==='downed'||slotKey==='fallheavy') return { x:-CFG.DOWNED_W/2, y:-CFG.CROUCH_H, w:CFG.DOWNED_W, h:CFG.CROUCH_H };
+  const mv=moveObjFor(slotKey), crouch = slotKey==='crouch' || (mv&&mv.crouching);
+  const h = crouch?CFG.CROUCH_H:CFG.BODY_H;
+  return { x:-CFG.BODY_W/2, y:-h, w:CFG.BODY_W, h };
+}
+function drawOverlays(g, cx, fy){   // drawn on TOP of the sprite, anchored at its feet
+  const b=hurtboxLocal(); if(!b) return;
+  g.save(); g.translate(cx,fy); g.textAlign='left';
+  if(showHit){
+    g.fillStyle='rgba(92,200,255,0.10)'; g.fillRect(b.x,b.y,b.w,b.h);
+    g.strokeStyle='rgba(92,200,255,0.95)'; g.lineWidth=1.5; g.strokeRect(b.x,b.y,b.w,b.h);
+    g.strokeStyle='rgba(92,200,255,0.30)'; g.beginPath(); g.moveTo(0,b.y); g.lineTo(0,0); g.stroke();   // centerline
+    g.fillStyle='#5cc8ff'; g.font='9px sans-serif'; g.fillText(`hurtbox ${b.w}×${b.h}`, b.x, b.y-4);
+  }
+  if(showHead){
+    const r=(lookFor()||{}).headR||15, hy=b.y+r;   // head center ≈ one radius below the box top (matches the idle pose)
+    g.fillStyle='rgba(255,107,107,0.14)'; g.beginPath(); g.arc(0,hy,r,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(255,107,107,0.95)'; g.lineWidth=1.5; g.stroke();
+    g.beginPath(); g.moveTo(-r-6,hy); g.lineTo(r+6,hy); g.moveTo(0,hy-r-6); g.lineTo(0,hy+r+6); g.stroke();   // crosshair
+    g.fillStyle='#ff6b6b'; g.font='9px sans-serif'; g.fillText('head', r+8, hy+3);
+  }
+  g.restore();
+}
+// ── alignment aids: onion skin + difference overlay (preview only, no data change) ──
+const _gc=document.createElement('canvas');           // offscreen for tinted onion ghosts
+function fitOff(c){ const pv=document.getElementById('pv'); if(c.width!==pv.width)c.width=pv.width; if(c.height!==pv.height)c.height=pv.height; return c.getContext('2d',{willReadFrequently:true}); }
+function drawGhost(g, cx, fy, frame, color, alpha){    // flat coloured silhouette of one frame, drawn at the same anchor
+  const o=fitOff(_gc); o.setTransform(1,0,0,1,0,0); o.clearRect(0,0,_gc.width,_gc.height);
+  if(!paintSprite(o, slotKey, cx, fy, frame)) return;
+  o.globalCompositeOperation='source-in'; o.fillStyle=color; o.fillRect(0,0,_gc.width,_gc.height); o.globalCompositeOperation='source-over';
+  g.save(); g.globalAlpha=alpha; g.drawImage(_gc,0,0); g.restore();
+}
+function drawOnion(g, cx, fy){
+  const nf=Math.max(1,sheet().frames||1);
+  for(let d=Math.max(1,onionN|0); d>=1; d--){          // farther first (fainter), nearer on top
+    if(curFrame-d>=0)     drawGhost(g, cx, fy, curFrame-d, '#ff5a6e', 0.34/d);   // previous = red
+    if(curFrame+d<=nf-1)  drawGhost(g, cx, fy, curFrame+d, '#5aa6ff', 0.34/d);   // next = blue
+  }
+}
+const _dA=document.createElement('canvas'), _dB=document.createElement('canvas');
+function drawDiff(g, cx, fy){                           // pixel diff: current frame vs reference frame
+  const A=fitOff(_dA), B=fitOff(_dB), W=_dA.width, H=_dA.height;
+  A.setTransform(1,0,0,1,0,0); A.clearRect(0,0,W,H); B.setTransform(1,0,0,1,0,0); B.clearRect(0,0,W,H);
+  const nf=Math.max(1,sheet().frames||1), rf=Math.max(0,Math.min(nf-1,refFrame));
+  paintSprite(A, slotKey, cx, fy, curFrame); paintSprite(B, slotKey, cx, fy, rf);
+  const pa=A.getImageData(0,0,W,H), pb=B.getImageData(0,0,W,H), out=A.createImageData(W,H);
+  const da=pa.data, db=pb.data, o=out.data;
+  for(let i=0;i<o.length;i+=4){
+    const aA=da[i+3]>40, aB=db[i+3]>40;
+    if(aA&&!aB){ o[i]=255;o[i+1]=46;o[i+2]=120;o[i+3]=210; }        // only in current → magenta
+    else if(aB&&!aA){ o[i]=70;o[i+1]=200;o[i+2]=255;o[i+3]=210; }   // only in reference → cyan
+    else if(aA&&aB){ const dd=Math.min(255,(Math.abs(da[i]-db[i])+Math.abs(da[i+1]-db[i+1])+Math.abs(da[i+2]-db[i+2]))/3*2); o[i]=o[i+1]=o[i+2]=dd; o[i+3]=dd>22?170:0; }
+    else o[i+3]=0;
+  }
+  g.putImageData(out,0,0);
+  refLabel(g, 'diff · frame '+curFrame+' vs ref '+rf, cx, fy);
+}
 function loop(){
   requestAnimationFrame(loop);
   const pv=document.getElementById('pv'), g=pv.getContext('2d'); g.clearRect(0,0,pv.width,pv.height); g.imageSmoothingEnabled=true;
@@ -396,6 +550,10 @@ function loop(){
       curFrame=inc[idx]; document.getElementById('scrub').value=curFrame; procClock++; }
     const exN=(sh.exclude||[]).length;
     document.getElementById('frlbl').textContent=curFrame+' / '+(nf-1)+(exN?(' ('+exN+' excl)'):'');
+  }
+  if(flipTest && sh && sh.src){   // rapidly alternate the two chosen frames so jitter pops
+    const swap=Math.floor((performance.now()-_flipT)/150)%2;
+    curFrame=Math.min(nf-1, swap?flipB:flipA); document.getElementById('scrub').value=curFrame;
   }
   if(!slotKey) return;
   const hasArt = sh && sh.src && keyed[sh.src];
@@ -415,9 +573,15 @@ function loop(){
   }
 
   // the actual sprite (right, or centre)
-  if(hasArt){ paintSprite(g, slotKey, mainX, fy, curFrame); }
+  if(hasArt){
+    if(diffMode){ drawDiff(g, mainX, fy); }
+    else { if(onion) drawOnion(g, mainX, fy); paintSprite(g, slotKey, mainX, fy, curFrame); }
+  }
   else if(sh && sh.src){ g.fillStyle='#8990a3'; g.textAlign='center'; g.fillText('loading…', pv.width*0.5, fy-120); g.textAlign='left'; }
   else if(!showProc){ g.fillStyle='#8990a3'; g.textAlign='center'; g.fillText('no art — drop a PNG (or turn Ref on for the procedural placeholder)', pv.width*0.5, fy-150); g.textAlign='left'; }
+
+  // engine hurtbox / head overlays, on the figure being aligned (centred when there's no art yet)
+  if(showHit||showHead) drawOverlays(g, hasArt?mainX:pv.width*0.5, fy);
 }
 
 // ───────────────────────── auto-align (measure feet/center) ─────────────────────────
@@ -455,10 +619,14 @@ function renderCellCtrls(){
   const sh=sheet(), nf=Math.max(1,sh.frames||1);
   editFrame=Math.max(0,Math.min(nf-1,editFrame|0));
   const a=cellAdj(editFrame), tagged=Object.keys(sh.cells||{}).length;
+  const excl=(sh.exclude||[]).indexOf(editFrame)>=0;
   box.innerHTML=`
     <div class="row"><button class="mini" id="cf_prev">◀</button>
-      <span class="val" style="width:auto;flex:1;text-align:center;color:var(--txt)">frame ${editFrame} / ${nf-1}</span>
+      <span class="val" style="width:auto;flex:1;text-align:center;color:var(--txt)">frame ${editFrame} / ${nf-1}${excl?' · <span style="color:var(--bad)">SKIPPED</span>':''}</span>
       <button class="mini" id="cf_next">▶</button></div>
+    <div class="row"><button class="mini" id="cf_excl" style="flex:1${excl?';color:var(--bad)':''}">${excl?'☑ included? no — click to include':'⊘ exclude / skip this frame'}</button></div>
+    <div class="row"><button class="mini" id="cf_touch" style="flex:1">✎ touch-up — erase pixels in this frame</button></div>
+    <div class="row"><button class="mini" id="cf_setref" style="flex:1${refFrame===editFrame?';color:#c08bff':''}">★ ${refFrame===editFrame?'IS reference frame':'set as reference frame'}</button><span class="val" style="width:auto;color:var(--dim)">ref ${refFrame}</span></div>
     <div class="row"><label>Δx</label><input type="range" id="cf_dx" min="-160" max="160" step="1" value="${a.dx||0}"><span class="val" id="cf_dxv">${a.dx||0}</span></div>
     <div class="row"><label>Δy</label><input type="range" id="cf_dy" min="-160" max="160" step="1" value="${a.dy||0}"><span class="val" id="cf_dyv">${a.dy||0}</span></div>
     <div class="row"><label>Δscale</label><input type="range" id="cf_ds" min="-0.6" max="0.6" step="0.005" value="${a.ds||0}"><span class="val" id="cf_dsv">${(a.ds||0).toFixed(3)}</span></div>
@@ -468,6 +636,9 @@ function renderCellCtrls(){
   const sync=()=>{ curFrame=editFrame; document.getElementById('scrub').value=editFrame; };
   box.querySelector('#cf_prev').onclick=()=>{ pause(); editFrame--; sync(); renderCellCtrls(); };
   box.querySelector('#cf_next').onclick=()=>{ pause(); editFrame++; sync(); renderCellCtrls(); };
+  box.querySelector('#cf_excl').onclick=()=>{ toggleExclude(editFrame); };   // exclude works on the frame currently shown
+  box.querySelector('#cf_touch').onclick=()=>{ pause(); sync(); openTouchup(); };
+  box.querySelector('#cf_setref').onclick=()=>{ refFrame=editFrame; buildStrip(); renderCellCtrls(); };   // reference for flip-test + diff
   const bind=(id,k,fmt)=>{ const el=box.querySelector('#'+id); el.oninput=()=>{ pause(); sync(); const v=parseFloat(el.value)||0; setCell(editFrame,k,v); const l=document.getElementById(id+'v'); if(l) l.textContent=fmt?fmt(v):v; }; };
   bind('cf_dx','dx'); bind('cf_dy','dy'); bind('cf_ds','ds',v=>v.toFixed(3));
   box.querySelector('#cf_clr').onclick=()=>{ const c=sheet().cells; if(c){ delete c[editFrame]; if(!Object.keys(c).length) delete sheet().cells; } buildStrip(); renderCellCtrls(); };
@@ -492,6 +663,7 @@ function upload(file){
       const name=(file.name||'sheet.png').replace(/[^a-zA-Z0-9_.-]/g,'_');
       const src='assets/sprites/'+tChar+'/'+name; sh.src=src;
       dims[src]={w:img.width,h:img.height};
+      orig[src]=rawCanvas(img);
       keyed[src]=keySheet(img, sh.tint||G.tint, sh.bright!=null?sh.bright:G.bright);   // key NOW → previews instantly, no server needed
       // SQUARE-CELL STRIP auto-detect: a wide strip whose width is a multiple of its height (the
       // normalizer's output) → square cells of size = height. Beats the per-char global cellW (e.g.
@@ -529,6 +701,65 @@ function autoSliceSheet(sh, src){   // grid from cell size + trim leading/traili
   sh.start = first<0?0:first; sh.frames = first<0?n:(last-first+1);
 }
 
+// ───────────────────────── touch-up: erase pixels in a frame ─────────────────────────
+function cellSnap(canvas,sx,sy,w,h){ return canvas.getContext('2d',{willReadFrequently:true}).getImageData(sx,sy,w,h); }
+function openTouchup(){
+  const sh=sheet(); if(!sh||!sh.src||!keyed[sh.src]) return alert('Load a sheet first.');
+  if(!orig[sh.src]) return alert('Original not loaded yet — reselect this animation, then try again.');
+  editFrame=Math.max(0,Math.min((sh.frames||1)-1, editFrame|0));
+  const cw=cellW(), ch=cellH(), cols=sh.cols||1, cell=(sh.start||0)+editFrame;
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  const z=Math.max(1, Math.min(4, Math.floor(560/Math.max(cw,ch))));
+  const cv=document.getElementById('tucv'); cv.width=cw*z; cv.height=ch*z; cv.style.width=(cw*z)+'px'; cv.style.height=(ch*z)+'px';
+  TU={ src:sh.src, sx, sy, cw, ch, z, brush:parseInt(document.getElementById('tubrush').value)||10, drawing:false, last:null, undo:[],
+       openK:cellSnap(keyed[sh.src],sx,sy,cw,ch), openO:cellSnap(orig[sh.src],sx,sy,cw,ch) };
+  document.getElementById('tulbl').textContent=`${slotKey} · frame ${editFrame} · cell ${cell} · ${cw}×${ch}`;
+  document.getElementById('tu').style.display='flex';
+  drawTouchup(null);
+}
+function closeTouchup(){ document.getElementById('tu').style.display='none'; TU=null; }
+function tuPt(e){ const cv=document.getElementById('tucv'), r=cv.getBoundingClientRect();
+  return { x: Math.max(0,Math.min(TU.cw, (e.clientX-r.left)/TU.z)), y: Math.max(0,Math.min(TU.ch, (e.clientY-r.top)/TU.z)) }; }
+function drawTouchup(cur){
+  const t=TU; if(!t) return; const cv=document.getElementById('tucv'), g=cv.getContext('2d');
+  g.imageSmoothingEnabled=false; g.clearRect(0,0,cv.width,cv.height);
+  const s=8; for(let y=0;y<cv.height;y+=s) for(let x=0;x<cv.width;x+=s){ g.fillStyle=(((x/s|0)+(y/s|0))&1)?'#1b1d27':'#101119'; g.fillRect(x,y,s,s); }   // checkerboard = transparency
+  g.drawImage(keyed[t.src], t.sx,t.sy,t.cw,t.ch, 0,0, cv.width,cv.height);
+  if(cur){ g.strokeStyle='rgba(255,107,107,0.9)'; g.lineWidth=1; g.beginPath(); g.arc(cur.x*t.z, cur.y*t.z, t.brush*t.z, 0, Math.PI*2); g.stroke(); }
+}
+function tuErase(a,b){   // clear a brush-thick segment a→b (cell coords) from BOTH the keyed + raw canvases
+  const t=TU;
+  for(const canvas of [keyed[t.src], orig[t.src]]){
+    const g=canvas.getContext('2d'); g.save(); g.globalCompositeOperation='destination-out'; g.fillStyle='#000'; g.strokeStyle='#000';
+    g.lineCap='round'; g.lineJoin='round'; g.lineWidth=t.brush*2;
+    g.beginPath(); g.moveTo(t.sx+a.x, t.sy+a.y); g.lineTo(t.sx+b.x, t.sy+b.y); g.stroke();
+    g.beginPath(); g.arc(t.sx+b.x, t.sy+b.y, t.brush, 0, Math.PI*2); g.fill();
+    g.restore();
+  }
+  buildStrip();   // live-refresh the filmstrip thumbnails; the main preview redraws every frame on its own
+}
+function tuPushUndo(){ const t=TU; t.undo.push({ k:cellSnap(keyed[t.src],t.sx,t.sy,t.cw,t.ch), o:cellSnap(orig[t.src],t.sx,t.sy,t.cw,t.ch) }); if(t.undo.length>30) t.undo.shift(); }
+function tuRestore(snap){ const t=TU; keyed[t.src].getContext('2d').putImageData(snap.k,t.sx,t.sy); orig[t.src].getContext('2d').putImageData(snap.o,t.sx,t.sy); buildStrip(); drawTouchup(null); }
+function tuSave(){ const t=TU; if(!hasServer){ status('⚠ no server — run `node server.js` to save erases to disk'); return; }
+  status('saving frame edits…');
+  fetch('/api/upload',{method:'POST',body:JSON.stringify({char:charId,name:t.src.split('/').pop(),dataUrl:orig[t.src].toDataURL('image/png')})})
+    .then(r=>r.json()).then(j=>status(j&&j.ok?'erased pixels saved to disk ✓':'save error')).catch(()=>status('save failed'));
+}
+(function wireTouchup(){
+  const cv=document.getElementById('tucv');
+  cv.onpointerdown=e=>{ if(!TU)return; e.preventDefault(); cv.setPointerCapture(e.pointerId); TU.drawing=true; tuPushUndo(); const p=tuPt(e); tuErase(p,p); TU.last=p; drawTouchup(p); };
+  cv.onpointermove=e=>{ if(!TU)return; const p=tuPt(e); if(TU.drawing){ tuErase(TU.last,p); TU.last=p; } drawTouchup(p); };
+  cv.onpointerup=cv.onpointercancel=e=>{ if(!TU)return; TU.drawing=false; TU.last=null; };
+  cv.onpointerleave=()=>{ if(TU&&!TU.drawing) drawTouchup(null); };
+  const br=document.getElementById('tubrush'); br.oninput=()=>{ if(TU)TU.brush=parseInt(br.value)||1; document.getElementById('tubrushv').textContent=br.value; drawTouchup(null); };
+  document.getElementById('tuundo').onclick=()=>{ if(TU&&TU.undo.length) tuRestore(TU.undo.pop()); };
+  document.getElementById('tucancel').onclick=()=>{ if(TU){ tuRestore({k:TU.openK,o:TU.openO}); closeTouchup(); } };
+  document.getElementById('tudone').onclick=closeTouchup;
+  document.getElementById('tuclose').onclick=closeTouchup;
+  document.getElementById('tusave').onclick=tuSave;
+  document.addEventListener('keydown',e=>{ if(!TU)return; if(e.key==='Escape') closeTouchup(); if((e.ctrlKey||e.metaKey)&&e.key==='z'){ e.preventDefault(); if(TU.undo.length) tuRestore(TU.undo.pop()); } });
+})();
+
 // ───────────────────────── save ─────────────────────────
 function status(s){ document.getElementById('status').textContent=s; }
 function clean(){ // strip runtime-only keys before save
@@ -556,6 +787,33 @@ document.getElementById('play').onclick=function(){ playing=!playing; this.textC
 document.getElementById('scrub').oninput=function(){ playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=parseInt(this.value)||0; editFrame=curFrame; renderCellCtrls(); };
 document.getElementById('facebtn').onclick=()=>facing=-facing;
 document.getElementById('refbtn').onclick=function(){ showRef=!showRef; this.textContent='Ref: '+(showRef?'on':'off'); };
+document.getElementById('hitbtn').onclick=function(){ showHit=!showHit; this.textContent='Hitbox: '+(showHit?'on':'off'); this.classList.toggle('on',showHit); };
+document.getElementById('headbtn').onclick=function(){ showHead=!showHead; this.textContent='Head: '+(showHead?'on':'off'); this.classList.toggle('on',showHead); };
+function syncAids(){ const set=(id,on,lab)=>{ const b=document.getElementById(id); if(b){ b.textContent=lab+(on?'on':'off'); b.classList.toggle('on',on); } };
+  set('onionbtn',onion,'Onion: '); set('flipbtn',flipTest,'FlipTest: '); set('diffbtn',diffMode,'Diff: '); }
+function toggleFlip(){ flipTest=!flipTest;
+  if(flipTest){ const sh=slotKey&&sheet(), nf=Math.max(1,(sh&&sh.frames)||1); flipA=Math.min(nf-1,refFrame); flipB=(editFrame!==flipA)?Math.min(nf-1,editFrame):Math.min(nf-1,flipA+1); _flipT=performance.now(); }
+  syncAids(); }
+document.getElementById('onionbtn').onclick=()=>{ onion=!onion; syncAids(); };
+document.getElementById('onionN').onchange=function(){ onionN=Math.max(1,Math.min(4,parseInt(this.value)||1)); this.value=onionN; };
+document.getElementById('flipbtn').onclick=toggleFlip;
+document.getElementById('diffbtn').onclick=()=>{ diffMode=!diffMode; syncAids(); };
+document.addEventListener('keydown',e=>{
+  if(TU) return;                                                  // touch-up modal owns the keyboard
+  const tag=e.target&&e.target.tagName; if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
+  const k=e.key;
+  if(k==='o'||k==='O'){ onion=!onion; syncAids(); e.preventDefault(); return; }
+  if(k==='t'||k==='T'){ toggleFlip(); e.preventDefault(); return; }
+  if(k==='d'||k==='D'){ diffMode=!diffMode; syncAids(); e.preventDefault(); return; }
+  if(slotKey && k.indexOf('Arrow')===0){                          // nudge current frame's per-frame delta (shift = 10px)
+    const step=e.shiftKey?10:1, a=cellAdj(editFrame);
+    let dx=a.dx||0, dy=a.dy||0;
+    if(k==='ArrowLeft')dx-=step; else if(k==='ArrowRight')dx+=step; else if(k==='ArrowUp')dy-=step; else if(k==='ArrowDown')dy+=step;
+    playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=editFrame; document.getElementById('scrub').value=editFrame;
+    setCell(editFrame,'dx',dx); setCell(editFrame,'dy',dy); renderCellCtrls();
+    e.preventDefault();
+  }
+});
 
 // ───────────────────────── boot ─────────────────────────
 fetch('../assets/sprites/sprites.json').then(r=>r.json()).then(d=>{

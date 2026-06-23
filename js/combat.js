@@ -225,7 +225,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     const cpw = move.hitstop >= CFG.HITSTOP_ENDER ? 2 : move.hitstop >= CFG.HITSTOP_MED ? 1 : 0;
     game.shake = Math.max(game.shake, cpw === 2 ? CFG.SHAKE_HEAVY : cpw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
     spawnSpark(contactPoint.x, contactPoint.y, 'hit', cpw);
-    if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
+    if (cpw === 2) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD, 2);   // heavy → chunky globs
+    else if (move.weapon === 'knife' || cpw === 1) spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);
+    else spawnBlood(contactPoint.x, contactPoint.y, away, 5, 0);   // light → fine spray
     hitSfx(move);
     pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
     if (vic.hp <= 0) { vic.hp = 0; vic.inClinch = false; att.inClinch = false; vic.setLaunched(away * 5, -10, true); }
@@ -358,8 +360,11 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   const pw = move.hitstop >= CFG.HITSTOP_ENDER ? 2 : move.hitstop >= CFG.HITSTOP_MED ? 1 : 0;   // hit strength → shake + spark scale (so a cross isn't flat, an ender reads heavy)
   game.shake = Math.max(game.shake, pw === 2 ? CFG.SHAKE_HEAVY : pw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
   spawnSpark(contactPoint.x, contactPoint.y, 'hit', pw);
-  if (move.hitstop >= CFG.HITSTOP_ENDER) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD);   // heavy hit → blood spurt
-  else if (move.weapon === 'knife') spawnBlood(contactPoint.x, contactPoint.y, away, 7);   // a knife cut always draws blood (the DoT debuff is gone, but the spurts stay)
+  // every clean hit spurts — chunkiness scales with power: heavy = big globs, light = fine spray
+  if (pw === 2) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD, 2);
+  else if (move.weapon === 'knife') spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);   // a knife cut always draws blood
+  else if (pw === 1) spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);
+  else spawnBlood(contactPoint.x, contactPoint.y, away, 5, 0);   // light hit → small fine spray
   hitSfx(move);
   pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
 
@@ -527,7 +532,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     game.flash = Math.max(game.flash, CFG.KO_FLASH); game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);
     spawnSpike(vic.x, away);                                    // the ground erupts (energy lance + splash)
     spawnRumble(vic.x, CFG.FLOOR_Y - 30, 1); spawnRumble(vic.x, CFG.FLOOR_Y - 30, -1);
-    spawnBlast(vic.x, CFG.FLOOR_Y - 50); spawnBlood(vic.x, CFG.FLOOR_Y - 24, away, 28); spawnDust(vic.x, CFG.FLOOR_Y, 22);
+    spawnBlast(vic.x, CFG.FLOOR_Y - 50); spawnBlood(vic.x, CFG.FLOOR_Y - 24, away, 28, 2); spawnDust(vic.x, CFG.FLOOR_Y, 22);
     spawnSpark(vic.x, CFG.FLOOR_Y - 60, 'hit', 2);
     playSfx('wall_spike'); playSfx('explosion');
     spawnFloatText(vic.x, CFG.FLOOR_Y - CFG.BODY_H - 30, 'SLAM!!', '#ffd54f');
@@ -811,7 +816,7 @@ function updateBeam(att, vic, game) {
     game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
     game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
     game.flash = CFG.KO_FLASH; game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);   // white detonation pop
-    spawnBlood(vic.x, cy, dir, CFG.HEAVY_BLOOD + 14);
+    spawnBlood(vic.x, cy, dir, CFG.HEAVY_BLOOD + 14, 2);
     spawnSpark(vic.x, cy, 'hit', 2);
     playSfx('explosion');
     return;

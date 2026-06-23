@@ -20,8 +20,16 @@
           "rows": 3,
           "start": 0,
           "frames": 12,
-          "fps": 12,
-          "mode": "loop"
+          "fps": 17,
+          "mode": "loop",
+          "scale": 1.005,
+          "offY": 40,
+          "offX": -4,
+          "tint": [
+            0.94,
+            1,
+            1
+          ]
         },
         "walk": {
           "src": "assets/sprites/vesper/andromedaWalk.png",
@@ -30,7 +38,15 @@
           "start": 0,
           "frames": 8,
           "fps": 17,
-          "mode": "loop"
+          "mode": "loop",
+          "scale": 1.02,
+          "offX": -7,
+          "offY": 41,
+          "tint": [
+            0.94,
+            1,
+            1
+          ]
         },
         "run": {
           "src": "assets/sprites/vesper/andromedaRun.png",
@@ -42,9 +58,15 @@
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "scale": 0.98,
-          "offY": 39,
-          "offX": -11
+          "scale": 0.945,
+          "offY": 22,
+          "offX": -12,
+          "tint": [
+            0.9,
+            1.04,
+            1
+          ],
+          "bright": 0.95
         },
         "prejump": {
           "src": "assets/sprites/vesper/andromedaJumpStart.png",
@@ -54,7 +76,9 @@
           "frames": 13,
           "fps": 45,
           "mode": "jumpStart",
-          "offX": -4
+          "offX": -8,
+          "offY": 41,
+          "scale": 1
         },
         "air": {
           "src": "assets/sprites/vesper/andromedaJumpAir.png",
@@ -64,7 +88,7 @@
           "frames": 4,
           "fps": 9,
           "mode": "jumpAir",
-          "offX": -10,
+          "offX": -13,
           "offY": 46
         },
         "land": {
@@ -75,7 +99,9 @@
           "frames": 13,
           "fps": 38,
           "mode": "jumpLand",
-          "offX": 0
+          "offX": -6,
+          "scale": 1.035,
+          "offY": 43
         },
         "jab": {
           "src": "assets/sprites/vesper/andromedaStab.png",
@@ -83,29 +109,35 @@
           "rows": 4,
           "start": 0,
           "frames": 14,
-          "fps": 20,
+          "fps": 37,
           "mode": "syncMove",
           "cw": 240,
           "ch": 240,
-          "scale": 1.15,
-          "offY": 60,
-          "offX": 13
+          "scale": 1.075,
+          "offY": 57,
+          "offX": 12,
+          "tint": [
+            0.8,
+            0.96,
+            1
+          ],
+          "bright": 1.22
         },
         "cross": {
           "src": "assets/sprites/vesper/andromedaThrust.png",
           "cols": 6,
           "rows": 5,
           "start": 0,
-          "frames": 28,
+          "frames": 13,
           "fps": 43,
           "mode": "syncMove",
           "cw": 240,
           "ch": 240,
-          "scale": 1.1,
-          "offY": 52,
-          "offX": -10,
+          "scale": 1.035,
+          "offY": 45,
+          "offX": -1,
           "tint": [
-            0.76,
+            0.7,
             1,
             1
           ],
@@ -121,14 +153,15 @@
           "mode": "syncMove",
           "cw": 240,
           "ch": 240,
-          "scale": 1.17,
-          "offY": 65,
-          "offX": 1,
+          "scale": 1.135,
+          "offY": 51,
+          "offX": -4,
           "tint": [
-            0.9,
-            1.09,
+            0.76,
+            0.99,
             1
-          ]
+          ],
+          "bright": 1.11
         },
         "crouch": {
           "src": "assets/sprites/vesper/spritesheet-table-161-240__1_.png",
@@ -139,7 +172,10 @@
           "fps": 60,
           "mode": "once",
           "cw": 161,
-          "ch": 240
+          "ch": 240,
+          "scale": 1.045,
+          "offY": 42,
+          "offX": -7
         },
         "slashup": {
           "src": "assets/sprites/vesper/andromedaRisingSlash.png",
@@ -147,22 +183,29 @@
           "rows": 1,
           "start": 0,
           "frames": 4,
-          "fps": 12,
+          "fps": 14,
           "mode": "loop",
           "cw": 240,
           "ch": 240,
           "scale": 0.965,
           "offX": 4,
-          "offY": 32,
+          "offY": 27,
           "cells": {
             "1": {
               "ds": -0.035
             },
             "2": {
-              "dy": -5,
-              "dx": 0
+              "dy": -5
+            },
+            "3": {
+              "dy": -4
             }
-          }
+          },
+          "tint": [
+            0.78,
+            1,
+            1
+          ]
         },
         "uppercut": {
           "src": "assets/sprites/vesper/andromedaUppercut.png",
@@ -170,15 +213,25 @@
           "rows": 1,
           "start": 0,
           "frames": 5,
-          "fps": 15,
+          "fps": 20,
           "mode": "once",
           "cw": 240,
           "ch": 240,
           "scale": 1.115,
-          "bright": 1.16,
+          "bright": 1.34,
+          "cells": {
+            "1": {
+              "dx": 1
+            },
+            "2": {
+              "dy": -3
+            }
+          },
+          "offY": 47,
+          "offX": 9,
           "tint": [
-            0.88,
-            1,
+            0.7,
+            0.96,
             1
           ]
         },
@@ -220,11 +273,14 @@
             }
           },
           "tint": [
-            0.76,
-            1,
+            0.62,
+            0.88,
             1
           ],
-          "bright": 1.42
+          "bright": 1.29,
+          "scale": 0.995,
+          "offY": 49,
+          "offX": -13
         },
         "slasharc": {
           "src": "assets/sprites/vesper/spritesheet-table-240-240__5_.png",
@@ -237,11 +293,14 @@
           "cw": 240,
           "ch": 240,
           "tint": [
-            0.88,
-            1,
+            0.74,
+            1.04,
             1
           ],
-          "bright": 1.33
+          "bright": 1.15,
+          "offX": -2,
+          "offY": 45,
+          "scale": 1.055
         },
         "blockstun": {
           "src": "assets/sprites/vesper/spritesheet-table-240-240__6_.png",
@@ -253,14 +312,15 @@
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "scale": 1.115,
-          "offY": 60,
+          "scale": 1.12,
+          "offY": 50,
           "bright": 1.29,
           "tint": [
             0.78,
             1,
             1
-          ]
+          ],
+          "offX": -9
         },
         "hitstun": {
           "src": "assets/sprites/vesper/andromedaSheet_clean.png",
@@ -268,26 +328,19 @@
           "rows": 1,
           "start": 1,
           "frames": 4,
-          "fps": 10,
+          "fps": 13,
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "bright": 1.28,
+          "bright": 1.37,
           "tint": [
-            0.8,
-            1,
+            0.68,
+            0.92,
             1
           ],
-          "scale": 0.925,
-          "offY": 28,
-          "cells": {
-            "2": {
-              "dx": -2
-            },
-            "3": {
-              "dx": 5
-            }
-          }
+          "scale": 0.885,
+          "offY": 14,
+          "offX": -17
         },
         "shotgun": {
           "src": "assets/sprites/vesper/andromedaShotgun.png",
@@ -299,10 +352,10 @@
           "mode": "once",
           "cw": 240,
           "ch": 240,
-          "bright": 1.19,
+          "bright": 1.37,
           "tint": [
-            0.8,
-            1,
+            0.7,
+            0.96,
             1
           ],
           "cells": {
@@ -316,18 +369,18 @@
               "ds": -0.03
             },
             "5": {
-              "dx": -7
+              "dx": -4
             },
             "6": {
-              "dx": -6
+              "dx": -3
             },
             "7": {
-              "dx": -6
+              "dx": -2
             }
           },
-          "scale": 0.905,
-          "offX": 1,
-          "offY": 28
+          "scale": 0.87,
+          "offX": -24,
+          "offY": 12
         },
         "crumple": {
           "src": "assets/sprites/vesper/andromedaPoses_sheet.png",
@@ -339,9 +392,9 @@
           "mode": "boomerang",
           "cw": 240,
           "ch": 240,
-          "offY": 25,
-          "offX": 3,
-          "scale": 0.965,
+          "offY": 16,
+          "offX": -8,
+          "scale": 0.865,
           "cells": {
             "5": {
               "ds": 0.04
@@ -360,58 +413,75 @@
           "rows": 1,
           "start": 0,
           "frames": 12,
-          "fps": 18,
+          "fps": 19,
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "scale": 0.84,
-          "offY": -4,
-          "bright": 1.08,
+          "scale": 0.745,
+          "offY": 14,
+          "bright": 1.28,
           "tint": [
-            0.88,
-            1,
+            0.78,
+            0.96,
             1
-          ]
+          ],
+          "offX": 9
         },
         "fallheavy": {
           "src": "assets/sprites/vesper/vesper_knockdown_240.png",
           "cols": 4,
           "rows": 2,
           "start": 0,
-          "frames": 7,
+          "frames": 8,
           "fps": 10,
           "mode": "once",
           "cw": 240,
           "ch": 240,
-          "scale": 0.89,
+          "scale": 0.795,
           "offY": 30,
           "cells": {
+            "0": {
+              "dy": -15
+            },
             "1": {
-              "dx": 15
+              "dx": 24,
+              "dy": -15
             },
             "2": {
-              "dx": 16
+              "dx": 27,
+              "dy": -11
             },
             "3": {
-              "dx": 17
+              "dx": 26,
+              "dy": -13,
+              "ds": 0.075
             },
             "4": {
-              "dy": 26
+              "dy": 14,
+              "dx": 5
             },
             "5": {
-              "dy": 34,
-              "dx": 11
+              "dy": 15,
+              "dx": 13
             },
             "6": {
-              "dx": 19,
-              "dy": 38
+              "dx": 25,
+              "dy": 24
             },
             "7": {
-              "dx": 22,
-              "dy": 11
+              "dx": 20,
+              "dy": 17
             }
           },
-          "offX": -9
+          "offX": -7,
+          "tint": [
+            0.88,
+            1,
+            1
+          ],
+          "exclude": [
+            0
+          ]
         },
         "rifleaim": {
           "src": "assets/sprites/vesper/andromedaRifleKneel.png",
@@ -419,44 +489,73 @@
           "rows": 1,
           "start": 3,
           "frames": 5,
-          "fps": 9,
-          "mode": "loop",
+          "fps": 11,
+          "mode": "once",
           "cw": 240,
           "ch": 240,
           "scale": 0.92,
-          "offX": 42,
-          "offY": 25,
+          "offX": 35,
+          "offY": 16,
           "cells": {
             "2": {
               "dx": -30
             },
+            "3": {
+              "dx": -8
+            },
             "4": {
-              "dx": 7
+              "dx": 1
             }
-          }
+          },
+          "bright": 1.45,
+          "tint": [
+            0.82,
+            1,
+            1
+          ]
         },
         "kipup": {
-          "src": "assets/sprites/vesper/vesper_getup_240.png",
+          "src": "assets/sprites/vesper/vesper_kipup_240.png",
           "cols": 4,
-          "rows": 2,
-          "start": 0,
-          "frames": 8,
-          "fps": 11,
+          "rows": 4,
+          "start": 1,
+          "frames": 13,
+          "fps": 16,
           "mode": "loop",
           "cw": 240,
           "ch": 240,
+          "scale": 0.865,
+          "offX": -11,
+          "offY": 20,
+          "bright": 1.4,
+          "tint": [
+            0.72,
+            0.94,
+            1
+          ],
           "cells": {
             "1": {
               "dx": -37
             },
+            "2": {
+              "dx": -40
+            },
+            "3": {
+              "dy": 3,
+              "dx": 2
+            },
             "5": {
-              "dx": -3
+              "dx": -13,
+              "dy": -8
+            },
+            "6": {
+              "dy": -25,
+              "dx": 4
             },
             "7": {
-              "dx": 6
+              "dy": 5
             }
-          },
-          "scale": 0.925
+          }
         },
         "downed": {
           "src": "assets/sprites/vesper/vesper_knockdown_240.png",
@@ -468,9 +567,20 @@
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "scale": 0.97,
-          "offX": 28,
-          "offY": 69
+          "scale": 0.76,
+          "offX": 46,
+          "offY": 50,
+          "cells": {
+            "0": {
+              "dx": -35,
+              "dy": -13
+            }
+          },
+          "tint": [
+            0.82,
+            1,
+            1
+          ]
         },
         "thrown": {
           "src": "assets/sprites/vesper/andromedaTumble.png",
@@ -482,9 +592,1279 @@
           "mode": "loop",
           "cw": 240,
           "ch": 240,
-          "scale": 0.565,
+          "scale": 0.595,
           "offX": 8,
-          "offY": -11
+          "offY": -54,
+          "tint": [
+            0.76,
+            1,
+            1
+          ],
+          "bright": 1.3
+        },
+        "getup": {
+          "src": "assets/sprites/vesper/vesper_getup2_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 7,
+          "fps": 15,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "tint": [
+            0.7,
+            0.96,
+            0.96
+          ],
+          "bright": 1.22,
+          "scale": 0.875,
+          "offX": 15,
+          "offY": 42,
+          "cells": {
+            "1": {
+              "dx": -17
+            },
+            "3": {
+              "dx": 20
+            },
+            "4": {
+              "dx": -16,
+              "dy": 7
+            },
+            "6": {
+              "ds": -0.055
+            }
+          }
+        },
+        "crouchjab": {
+          "src": "assets/sprites/vesper/vesper_riflekneel_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 3,
+          "frames": 5,
+          "fps": 17,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "offX": -17,
+          "offY": 19,
+          "cells": {
+            "1": {
+              "dx": -6
+            },
+            "2": {
+              "dx": -6
+            },
+            "3": {
+              "dx": -4
+            },
+            "4": {
+              "dx": -8
+            }
+          },
+          "scale": 1.11,
+          "tint": [
+            0.82,
+            1,
+            1
+          ],
+          "bright": 1.14
+        },
+        "elbowdrop": {
+          "src": "assets/sprites/vesper/vesper_divespin_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 6,
+          "frames": 2,
+          "fps": 10,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.655,
+          "offY": -39,
+          "cells": {
+            "0": {
+              "dy": 13
+            }
+          },
+          "tint": [
+            0.86,
+            1,
+            1
+          ],
+          "bright": 1.34
+        },
+        "gassed": {
+          "src": "assets/sprites/vesper/vesper_walk_240.png",
+          "cols": 5,
+          "rows": 2,
+          "start": 0,
+          "frames": 9,
+          "fps": 10,
+          "mode": "boomerang",
+          "cw": 240,
+          "ch": 240,
+          "offY": 22,
+          "scale": 0.82,
+          "offX": -14,
+          "tint": [
+            0.8,
+            0.92,
+            1
+          ],
+          "bright": 1.38
+        },
+        "backroll": {
+          "src": "assets/sprites/vesper/vesper_roll_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 2,
+          "frames": 4,
+          "fps": 10,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.835,
+          "offX": -9,
+          "offY": 25,
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "bright": 1.16
+        },
+        "divekick": {
+          "src": "assets/sprites/vesper/vesper_airdash_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 3,
+          "frames": 3,
+          "fps": 23,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "bright": 1.23,
+          "tint": [
+            0.74,
+            1,
+            1
+          ],
+          "scale": 0.845,
+          "offX": 3,
+          "offY": -22
+        },
+        "frontkick": {
+          "src": "assets/sprites/vesper/vesper_kick_240-1.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 5,
+          "fps": 18,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.825,
+          "offY": 15,
+          "offX": -28,
+          "exclude": [
+            0,
+            1,
+            5
+          ],
+          "cells": {
+            "0": {
+              "dx": 19
+            },
+            "2": {
+              "dx": -7
+            },
+            "3": {
+              "dx": 21
+            },
+            "4": {
+              "dx": 22
+            },
+            "5": {
+              "dx": -11
+            },
+            "6": {
+              "dx": -23
+            }
+          },
+          "tint": [
+            0.72,
+            1,
+            1
+          ],
+          "bright": 1.21
+        },
+        "airpunch": {
+          "src": "assets/sprites/vesper/vesper_airslash_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 20,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.93,
+          "offY": -12,
+          "offX": -7,
+          "cells": {
+            "1": {
+              "dy": 2,
+              "dx": -5
+            },
+            "3": {
+              "dx": 27
+            },
+            "4": {
+              "dx": 6
+            },
+            "5": {
+              "dx": 16
+            },
+            "6": {
+              "dx": 16,
+              "dy": 19
+            },
+            "7": {
+              "dx": 14,
+              "dy": 9
+            }
+          },
+          "exclude": [
+            0
+          ],
+          "tint": [
+            0.74,
+            1,
+            1
+          ],
+          "bright": 1.17
+        },
+        "wallsplat": {
+          "src": "assets/sprites/vesper/vesper_flyattack_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 2,
+          "frames": 4,
+          "fps": 14,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "offY": 4,
+          "scale": 0.895,
+          "offX": 22,
+          "faceLeft": true,
+          "tint": [
+            0.92,
+            1,
+            1
+          ],
+          "bright": 1.39
+        },
+        "aerupslash": {
+          "src": "assets/sprites/vesper/vesper_airslash2_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 27,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "offX": -13,
+          "offY": 43,
+          "cells": {
+            "2": {
+              "dx": -11,
+              "dy": -7
+            },
+            "3": {
+              "dy": -20,
+              "dx": 13
+            },
+            "4": {
+              "dx": -4,
+              "dy": -14
+            },
+            "5": {
+              "dy": -21,
+              "dx": -8
+            }
+          },
+          "exclude": [
+            0,
+            4,
+            6
+          ],
+          "tint": [
+            0.82,
+            1,
+            1
+          ],
+          "bright": 1.21
+        },
+        "legkick": {
+          "src": "assets/sprites/vesper/vesper_kick2_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 7,
+          "fps": 16,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.85,
+          "cells": {
+            "0": {
+              "dy": -44,
+              "dx": -11,
+              "ds": 0.035
+            },
+            "1": {
+              "dy": -41,
+              "dx": -11
+            },
+            "2": {
+              "dx": -47,
+              "dy": -41
+            },
+            "3": {
+              "dx": -22,
+              "dy": -44
+            },
+            "4": {
+              "dx": -8,
+              "dy": -42
+            },
+            "5": {
+              "dx": -33,
+              "dy": -38
+            },
+            "6": {
+              "dx": -45,
+              "dy": -38
+            }
+          },
+          "tint": [
+            0.68,
+            0.92,
+            1
+          ],
+          "offX": 29,
+          "offY": 56,
+          "exclude": [
+            0,
+            1,
+            4
+          ],
+          "bright": 1.49
+        },
+        "soccer": {
+          "src": "assets/sprites/vesper/vesper_soccerkick_240.png",
+          "cols": 5,
+          "rows": 2,
+          "start": 0,
+          "frames": 9,
+          "fps": 22,
+          "mode": "once",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.85,
+          "offX": -9,
+          "offY": 20,
+          "cells": {
+            "1": {
+              "dx": 1,
+              "dy": -5,
+              "ds": 0.04
+            },
+            "2": {
+              "dx": 30,
+              "dy": -7,
+              "ds": 0.04
+            },
+            "4": {
+              "dx": 21,
+              "dy": -9
+            },
+            "5": {
+              "dx": 36,
+              "dy": -9
+            },
+            "6": {
+              "dx": 37,
+              "ds": 0.035,
+              "dy": -7
+            },
+            "7": {
+              "dx": 27,
+              "dy": -8
+            },
+            "8": {
+              "ds": 0.085
+            }
+          },
+          "exclude": [
+            3
+          ],
+          "tint": [
+            0.66,
+            1,
+            1
+          ],
+          "bright": 1.17
+        },
+        "jumpkick": {
+          "src": "assets/sprites/vesper/sprite_sheet_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 6,
+          "fps": 23,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "offX": -21,
+          "offY": 10,
+          "cells": {
+            "2": {
+              "dy": -16,
+              "dx": 28
+            },
+            "3": {
+              "dy": -14,
+              "dx": 24
+            },
+            "4": {
+              "dx": 33,
+              "dy": -14
+            },
+            "5": {
+              "dx": 18,
+              "dy": -13
+            }
+          },
+          "exclude": [
+            3,
+            4
+          ],
+          "tint": [
+            0.78,
+            1,
+            1
+          ],
+          "bright": 1.07,
+          "scale": 0.925
+        },
+        "wakeuproll": {
+          "src": "assets/sprites/vesper/vesper_roll_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 1,
+          "frames": 4,
+          "fps": 13,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.875,
+          "offX": -9,
+          "offY": 24,
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "bright": 1.08
+        },
+        "electrified": {
+          "src": "assets/sprites/vesper/sprite_sheet2_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 9,
+          "mode": "boomerang",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.89,
+          "offY": 26,
+          "offX": 1,
+          "bright": 1.17,
+          "tint": [
+            0.76,
+            0.92,
+            1
+          ]
+        },
+        "upuzi": {
+          "src": "assets/sprites/vesper/sprite_sheet3_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 1,
+          "frames": 7,
+          "fps": 14,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "cells": {
+            "1": {
+              "dy": -12,
+              "dx": -1
+            },
+            "2": {
+              "dy": -10,
+              "dx": -9
+            },
+            "3": {
+              "dx": -7,
+              "dy": -9
+            },
+            "4": {
+              "dy": -9,
+              "dx": -15
+            },
+            "5": {
+              "dy": 3
+            },
+            "6": {
+              "dy": 2
+            }
+          },
+          "bright": 1.28,
+          "tint": [
+            0.76,
+            1,
+            1
+          ],
+          "offX": -2,
+          "offY": 25,
+          "scale": 0.99
+        },
+        "slidetackle": {
+          "src": "assets/sprites/vesper/vesper_lowsweep_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 1,
+          "frames": 7,
+          "fps": 14,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.84,
+          "offY": 14,
+          "offX": -21,
+          "tint": [
+            0.86,
+            1,
+            1
+          ]
+        },
+        "flipheel": {
+          "src": "assets/sprites/vesper/vesper_airspin_240.png",
+          "cols": 5,
+          "rows": 4,
+          "start": 1,
+          "frames": 19,
+          "fps": 20,
+          "mode": "once",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.775,
+          "offX": -123,
+          "offY": 32,
+          "tint": [
+            0.68,
+            0.94,
+            1
+          ],
+          "bright": 1.12,
+          "cells": {
+            "0": {
+              "dy": 3,
+              "ds": 0.04
+            },
+            "1": {
+              "dy": -58,
+              "dx": 26,
+              "ds": 0.085
+            },
+            "2": {
+              "dy": -116,
+              "dx": 80,
+              "ds": 0.055
+            },
+            "3": {
+              "dx": 160,
+              "dy": -47,
+              "ds": 0.08
+            },
+            "4": {
+              "dx": 1,
+              "dy": 0
+            },
+            "7": {
+              "dx": 55,
+              "dy": -42
+            },
+            "12": {
+              "dx": 141,
+              "dy": -22
+            },
+            "13": {
+              "dx": 158
+            },
+            "14": {
+              "dy": 15,
+              "dx": 160
+            },
+            "15": {
+              "dx": 148,
+              "dy": 20
+            },
+            "16": {
+              "dx": 160,
+              "dy": 3,
+              "ds": 0.035
+            },
+            "17": {
+              "dx": 160,
+              "dy": -3,
+              "ds": 0.06
+            },
+            "18": {
+              "dx": 160,
+              "dy": -4,
+              "ds": 0.125
+            }
+          },
+          "exclude": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        "sidekick": {
+          "src": "assets/sprites/vesper/sprite_sheet5_240.png",
+          "cols": 4,
+          "rows": 3,
+          "start": 1,
+          "frames": 11,
+          "fps": 18,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.85,
+          "offX": 0,
+          "offY": 14,
+          "tint": [
+            0.76,
+            0.96,
+            1
+          ],
+          "cells": {
+            "1": {
+              "dx": -16,
+              "dy": -1,
+              "ds": -0.055
+            },
+            "2": {
+              "dx": -8,
+              "dy": 2
+            },
+            "3": {
+              "dx": -11,
+              "dy": 5
+            },
+            "4": {
+              "dx": 2,
+              "dy": 6
+            },
+            "5": {
+              "dx": 53,
+              "dy": 7
+            },
+            "6": {
+              "dx": 31,
+              "dy": 6
+            },
+            "7": {
+              "dx": -23,
+              "dy": 3
+            },
+            "8": {
+              "dx": -22,
+              "dy": 3
+            },
+            "9": {
+              "dx": -5,
+              "dy": 5
+            },
+            "10": {
+              "dy": 4
+            }
+          },
+          "exclude": [
+            0,
+            4,
+            6
+          ]
+        },
+        "magiccombo": {
+          "src": "assets/sprites/vesper/sprite_sheet6_240.png",
+          "cols": 5,
+          "rows": 2,
+          "start": 3,
+          "frames": 2,
+          "fps": 14,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "offX": 0,
+          "cells": {
+            "0": {
+              "ds": -0.01,
+              "dy": -11,
+              "dx": 19
+            },
+            "1": {
+              "dx": 13,
+              "dy": -29
+            },
+            "2": {
+              "dy": -21,
+              "dx": 7
+            },
+            "3": {
+              "dx": 12,
+              "dy": -28
+            },
+            "4": {
+              "dx": 6,
+              "dy": -26
+            },
+            "5": {
+              "dx": 21,
+              "dy": -39,
+              "ds": 0.015
+            },
+            "6": {
+              "dx": 10,
+              "dy": -38
+            }
+          },
+          "offY": 29,
+          "scale": 0.935,
+          "tint": [
+            0.8,
+            1,
+            1
+          ]
+        },
+        "skeetkick": {
+          "src": "assets/sprites/vesper/vesper_airdash_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 3,
+          "frames": 5,
+          "fps": 19,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.78,
+          "offX": 13,
+          "offY": -36,
+          "cells": {
+            "3": {
+              "dx": 15,
+              "dy": 26
+            },
+            "4": {
+              "dy": 23,
+              "dx": 16
+            },
+            "5": {
+              "dx": 27,
+              "dy": 27
+            }
+          }
+        },
+        "airuzi": {
+          "src": "assets/sprites/vesper/vesper_airuzi_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 30,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "offX": 9,
+          "cells": {
+            "2": {
+              "dx": 15
+            },
+            "3": {
+              "dx": -8
+            },
+            "4": {
+              "dx": 12
+            },
+            "5": {
+              "dx": 8
+            },
+            "6": {
+              "dx": -3
+            },
+            "7": {
+              "dx": -3
+            }
+          },
+          "offY": 33,
+          "tint": [
+            0.72,
+            0.84,
+            0.88
+          ],
+          "bright": 1.24
+        },
+        "scissorkick": {
+          "src": "assets/sprites/vesper/sprite_sheet4_240.png",
+          "cols": 4,
+          "rows": 3,
+          "start": 1,
+          "frames": 9,
+          "fps": 16,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "cells": {
+            "1": {
+              "dx": 4,
+              "dy": -3
+            },
+            "2": {
+              "dy": 36,
+              "dx": 22
+            },
+            "3": {
+              "dy": 32,
+              "dx": 20
+            },
+            "4": {
+              "dx": 34,
+              "dy": 25
+            }
+          },
+          "scale": 0.875,
+          "offY": -32,
+          "offX": -16,
+          "exclude": [
+            4,
+            5
+          ],
+          "tint": [
+            0.78,
+            1,
+            1
+          ],
+          "bright": 1.08
+        },
+        "clinch": {
+          "src": "assets/sprites/vesper/vesper_stance_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 11,
+          "mode": "boomerang",
+          "ch": 240,
+          "cw": 240,
+          "tint": [
+            0.86,
+            1,
+            1
+          ],
+          "bright": 1.17,
+          "scale": 0.845,
+          "offX": -7,
+          "offY": 16
+        },
+        "clinched": {
+          "src": "assets/sprites/vesper/sprite_sheet7_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 8,
+          "mode": "boomerang",
+          "ch": 240,
+          "cw": 240,
+          "cells": {
+            "1": {
+              "dx": -3
+            },
+            "2": {
+              "dx": -5,
+              "dy": 0
+            },
+            "3": {
+              "dx": -6,
+              "dy": -2
+            },
+            "4": {
+              "dx": -4
+            },
+            "5": {
+              "dx": -1,
+              "dy": -3
+            },
+            "6": {
+              "dx": -2,
+              "dy": -1
+            },
+            "7": {
+              "dx": -4,
+              "dy": -2
+            }
+          },
+          "scale": 0.85,
+          "offX": 27,
+          "offY": 20,
+          "tint": [
+            0.82,
+            1.02,
+            1.08
+          ]
+        },
+        "clinchgrab": {
+          "src": "assets/sprites/vesper/sprite_sheet8_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 21,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "exclude": [
+            2
+          ],
+          "scale": 0.845,
+          "offY": 16,
+          "offX": -18,
+          "cells": {
+            "1": {
+              "dx": 14,
+              "dy": 9
+            },
+            "2": {
+              "dx": 24,
+              "dy": 10
+            },
+            "3": {
+              "dx": 43,
+              "dy": 7
+            },
+            "4": {
+              "dx": 45,
+              "dy": 8
+            },
+            "5": {
+              "dx": 18,
+              "dy": 8
+            },
+            "6": {
+              "dx": -1
+            }
+          },
+          "tint": [
+            0.78,
+            1,
+            1
+          ],
+          "bright": 1.13
+        },
+        "throwanim": {
+          "src": "assets/sprites/vesper/vesper_strike_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 1,
+          "frames": 4,
+          "fps": 12,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "offY": 21,
+          "scale": 0.955,
+          "offX": -11,
+          "tint": [
+            0.8,
+            0.92,
+            1
+          ],
+          "bright": 1.07
+        },
+        "dashpunch": {
+          "src": "assets/sprites/vesper/vesper_pistolfire_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 18,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "exclude": [
+            0,
+            3
+          ],
+          "scale": 0.86,
+          "offX": -10,
+          "offY": 23,
+          "tint": [
+            0.84,
+            1,
+            1
+          ],
+          "cells": {
+            "1": {
+              "dx": 17
+            },
+            "2": {
+              "dx": 19
+            },
+            "3": {
+              "dx": 30
+            },
+            "4": {
+              "dx": 27
+            },
+            "5": {
+              "dx": 19
+            },
+            "6": {
+              "dx": 8
+            },
+            "7": {
+              "dx": 4
+            }
+          }
+        },
+        "throwgrab": {
+          "src": "assets/sprites/vesper/sprite_sheet8_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 1,
+          "frames": 7,
+          "fps": 18,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "exclude": [
+            1,
+            3
+          ],
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "bright": 1.15,
+          "offX": -11,
+          "scale": 0.88,
+          "offY": 28
+        },
+        "dashkick": {
+          "src": "assets/sprites/vesper/vesper_dashattack_240.png",
+          "cols": 5,
+          "rows": 2,
+          "start": 0,
+          "frames": 10,
+          "fps": 10,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "cells": {
+            "1": {
+              "dx": -11,
+              "dy": 8
+            },
+            "2": {
+              "dx": 9,
+              "dy": 9
+            },
+            "3": {
+              "dy": 6,
+              "dx": -53
+            },
+            "4": {
+              "dx": -8,
+              "dy": -45
+            },
+            "5": {
+              "dx": -8,
+              "dy": -42,
+              "ds": -0.05
+            },
+            "6": {
+              "dx": -12,
+              "dy": -16,
+              "ds": -0.015
+            },
+            "7": {
+              "dx": 19,
+              "dy": 6
+            },
+            "8": {
+              "dy": 5,
+              "dx": 5
+            },
+            "9": {
+              "dx": 9,
+              "dy": 5
+            }
+          },
+          "exclude": [
+            0,
+            1
+          ],
+          "offX": -3,
+          "offY": 12,
+          "tint": [
+            0.86,
+            1,
+            1
+          ],
+          "scale": 0.98
+        },
+        "parried": {
+          "src": "assets/sprites/vesper/sprite_sheet11_240.png",
+          "cols": 5,
+          "rows": 2,
+          "start": 0,
+          "frames": 10,
+          "fps": 11,
+          "mode": "loop",
+          "cw": 240,
+          "ch": 240,
+          "scale": 0.885,
+          "offX": -4,
+          "offY": 21,
+          "tint": [
+            0.84,
+            1,
+            1
+          ],
+          "bright": 1.17,
+          "cells": {
+            "1": {
+              "dx": 4,
+              "dy": 1
+            },
+            "2": {
+              "dy": 7,
+              "dx": -7
+            },
+            "3": {
+              "dy": -4,
+              "dx": -1
+            },
+            "4": {
+              "dx": -2
+            },
+            "5": {
+              "dx": -4,
+              "dy": 2
+            },
+            "6": {
+              "dx": -7,
+              "dy": 8
+            },
+            "7": {
+              "dy": 8
+            },
+            "8": {
+              "dx": 4,
+              "dy": 10
+            },
+            "9": {
+              "dx": 3,
+              "dy": 10
+            }
+          }
+        },
+        "countered": {
+          "src": "assets/sprites/vesper/andromedaPoses_sheet.png",
+          "cols": 8,
+          "rows": 1,
+          "start": 0,
+          "frames": 2,
+          "fps": 1,
+          "mode": "loop",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.865,
+          "offX": -10,
+          "offY": 16,
+          "tint": [
+            0.8,
+            1,
+            1
+          ],
+          "bright": 1.12
+        },
+        "slipcounter": {
+          "src": "assets/sprites/vesper/vesper_swordslash_240.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 8,
+          "fps": 12,
+          "mode": "once",
+          "ch": 240,
+          "cw": 240,
+          "scale": 0.95,
+          "offX": -15,
+          "offY": 11,
+          "cells": {
+            "3": {
+              "dx": 38,
+              "dy": 0
+            },
+            "4": {
+              "dx": 37
+            },
+            "5": {
+              "dx": 12
+            },
+            "6": {
+              "dx": 9
+            },
+            "7": {
+              "dx": 11
+            }
+          },
+          "exclude": [
+            0,
+            6
+          ],
+          "tint": [
+            0.78,
+            0.9,
+            1
+          ],
+          "bright": 1.17
         }
       }
     },

@@ -464,6 +464,8 @@ class Fighter {
       if (cand === 'legkick' && this.moveName === 'legkick' && mv.cancels.includes('legkick')) { this.pad.consume(btn); this.startMove('calfkick'); return; }
       // TORNADO KICK: frontkick → back+K (resolves 'backkick').
       if (cand === 'backkick' && this.moveName === 'frontkick' && mv.cancels.includes('tornado')) cand = 'tornado';
+      // SIDE KICK: Vesper's FRONT KICK (heelshot) → K again (forward or neutral) → the side-kick ender.
+      if ((cand === 'heelshot' || cand === 'gunkick') && this.moveName === 'heelshot' && mv.cancels.includes('sidekick')) cand = 'sidekick';
       // OVERHAND / THE FLATLINER: forward+P out of the machine-gun blows; a just-frame press primes the cinematic.
       if (cand === 'cross' && this.moveName === 'machinegun' && mv.cancels.includes('overhand')) {
         cand = 'overhand';
@@ -554,7 +556,8 @@ class Fighter {
       game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
       game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
       spawnRumble(wx + into * 12, this.y - CFG.BODY_H * 0.5, into);   // debris blasted off the wall
-      spawnBlood(wx + into * 14, by, into, 38);                       // BLOOD EXPLOSION out from the wall
+      spawnBlast(wx + into * 14, by);                                  // ORANGE fireball — the wall-spike explosion
+      spawnBlood(wx + into * 14, by, into, 38, 2);                       // BLOOD EXPLOSION out from the wall
       for (let i = 0; i < 5; i++) spawnStain(wx - into * 22, by + (Math.random() - 0.5) * CFG.BODY_H * 0.7, true);   // splattered up the wall
       spawnDust(wx, CFG.FLOOR_Y, 20);
       spawnSpark(wx + into * 20, by, 'hit', 2);
@@ -564,12 +567,36 @@ class Fighter {
       playSfx('wall_spike');                                         // the punch-a-rock impact, layered
     } else {
       game.shake = Math.max(game.shake, CFG.WALLSPLAT_SHAKE);
-      spawnDust(wx, this.y, 12);
-      spawnSpark(wx + into * 20, by, 'hit');
+      spawnDust(wx, this.y, 14);
+      spawnSpark(wx + into * 20, by, 'hit', 2);        // chunky ORANGE impact burst off the wall
+      spawnBlood(wx + into * 12, by, into, 10, 1);     // a wall smack draws blood
+      spawnRumble(wx + into * 10, by, into);           // light debris kicked off the wall
     }
-    if (this.hp <= 0) spawnBlood(wx + into * 8, by, into, 24);   // corpse splats the wall
+    if (this.hp <= 0) spawnBlood(wx + into * 8, by, into, 24, 2);   // corpse splats the wall
     playSfx('wall_splat');
     pushFeed(sideSpiked ? 'WALL SPIKE!!' : 'WALL SPLAT!', this.color);
+  }
+
+  // Side-spike flight ended WITHOUT reaching a wall (open / widened arena) → detonate the spike in
+  // place so the electric-overhand payoff (orange explosion + blood) still happens with no wall to hit.
+  _sideSpikeImpact(game) {
+    if (this.state !== 'launched') return;
+    const by = this.y - CFG.BODY_H * 0.5, dir = this.facing;
+    this.hp = Math.max(0, this.hp - CFG.SIDESPIKE_WALL_DMG);
+    if (this.hp <= 0) this.pendingElectric = 0;
+    game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
+    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    spawnBlast(this.x, by);                                          // ORANGE explosion
+    spawnSpark(this.x, by, 'hit', 2);
+    spawnBlood(this.x, by, dir, 38, 2);                              // chunky blood burst
+    spawnRumble(this.x, by, dir); spawnRumble(this.x, by, -dir);     // debris both ways (no wall to bias it)
+    spawnDust(this.x, CFG.FLOOR_Y, 18);
+    if (this.pendingElectric > 0) spawnElectric(this.x, by, CFG.ELECTRIC_BURST);
+    spawnFloatText(this.x, this.y - CFG.BODY_H - 20, 'SPIKE!!', '#ffd54f');
+    playSfx('wall_spike'); playSfx('hit_heavy');
+    pushFeed('SPIKE!!', this.color);
+    this.bounced = false;
+    this.setLaunched(-dir * 3, CFG.WALLSPLAT_DROP_VY, false);        // pop down into the fall (electrocution arms on landing)
   }
 
   beginThrown(thrower) {
@@ -1410,6 +1437,7 @@ class Fighter {
       if (this.sideSpikeFrames > 0) {
         this.vy += this.stats.gravity * CFG.SIDESPIKE_GRAV_MULT; this.sideSpikeFrames--;
         spawnSideTrail(this.x, this.y - CFG.BODY_H * 0.5);   // a particle trail streaming off the flying body
+        if (this.sideSpikeFrames === 0) this._sideSpikeImpact(game);   // flight ended in open air (no wall) → detonate in place
       } else {
         // GLIDE (Xamora's wings): hold JUMP while FALLING → suppressed gravity + capped fall + a little drift.
         this.gliding = !!this.char.glide && this.pad.held.jump && this.vy > 0.5 && this.state === 'air';
@@ -1502,14 +1530,16 @@ class Fighter {
     const minX = CFG.WALL_L + 30, maxX = CFG.WALL_R - 30;
     if (this.x < minX) {
       this.x = minX;
+      const cy = this.y - CFG.BODY_H * 0.5;
       if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) this._wallSplat(minX, 1, game);
-      else if (this.state === 'launched' && this.vx < -4) { if (this.hp <= 0) spawnBlood(minX + 6, this.y - CFG.BODY_H * 0.5, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      else if (this.state === 'launched' && this.vx < -4) { spawnSpark(minX + 8, cy, 'hit', 1); spawnDust(minX, CFG.FLOOR_Y, 6); if (this.hp <= 0) spawnBlood(minX + 6, cy, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx < 0) this.vx = 0;
     }
     if (this.x > maxX) {
       this.x = maxX;
+      const cy = this.y - CFG.BODY_H * 0.5;
       if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) this._wallSplat(maxX, -1, game);
-      else if (this.state === 'launched' && this.vx > 4) { if (this.hp <= 0) spawnBlood(maxX - 6, this.y - CFG.BODY_H * 0.5, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      else if (this.state === 'launched' && this.vx > 4) { spawnSpark(maxX - 8, cy, 'hit', 1); spawnDust(maxX, CFG.FLOOR_Y, 6); if (this.hp <= 0) spawnBlood(maxX - 6, cy, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
       else if (this.vx > 0) this.vx = 0;
     }
   }

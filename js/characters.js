@@ -115,11 +115,17 @@ const VESPER_MOVES = {
     guard: 'low', kind: 'kick', kbx: 1.0, hitstop: CFG.HITSTOP_MED, gun: true, label: 'GUN KICK', popsGround: true,
     hitbox: { x: 22, y: -95, w: 78, h: 34 }, kickFollow: { kind: 'heelspike', dmg: 26, label: 'HEEL DROP' },   // on hit → front-flip heel spike into the ground
     cancels: ['gunkick', 'slash', 'hamstring', 'heelshot', 'rifleburst'] },
-  // gun-kata roundhouse: mid spacing tool, fires on contact, makes room.
+  // forward-K FRONT KICK: mid-range poke. On a CONNECTED hit, press K again → the SIDE KICK ender (a
+  // plain 2-hit combo now — the old auto SIDE KICK cinematic is gone).
   heelshot: { anim: 'frontkick', startup: 5, active: 4, recovery: 11, damage: 38, hitstun: 17, blockstun: 10, stamina: 4,
-    guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, gun: true, label: 'HEEL SHOT', popsGround: true,
-    hitbox: { x: 30, y: -140, w: 90, h: 36 }, kickFollow: { kind: 'sidekick', dmg: 22, pushVx: 16, label: 'SIDE KICK' },   // on hit → a side kick that shoves them back
-    cancels: ['upshot', 'shotgun', 'rifleburst'] },
+    guard: 'mid', kind: 'kick', kbx: 4.5, hitstop: CFG.HITSTOP_MED, gun: true, label: 'FRONT KICK', popsGround: true,
+    hitbox: { x: 30, y: -140, w: 90, h: 36 },
+    cancels: ['sidekick', 'upshot', 'shotgun', 'rifleburst'] },
+  // 2nd hit of the FRONT KICK combo (front kick → K again): a straight thrusting side kick that
+  // shoves them back and knocks down. Ender — no flow cancel, only chains off the front kick.
+  sidekick: { anim: 'sidekick', startup: 7, active: 4, recovery: 15, damage: 30, hitstun: 0, blockstun: 14, stamina: 6,
+    guard: 'mid', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER, label: 'SIDE KICK',
+    hitbox: { x: 38, y: -104, w: 96, h: 42 }, knockdown: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true },
   // ↑K UPSHOT: a rising knee that LAUNCHES grounded foes, PLUS an UZI BURST sprayed in an arc
   // overhead — the anti-air that shreds anyone already in the air (the AR rounds juggle).
   upshot: { anim: 'upuzi', startup: 7, active: 3, recovery: 16, damage: 34, hitstun: 0, blockstun: 12, stamina: 8,
@@ -155,7 +161,7 @@ const VESPER_MOVES = {
     hitbox: { x: 6, y: -130, w: 98, h: 98 }, dive: { vx: 30, vy: -1 },
     slashCombo: { hits: 2, launchVy: -13, style: 'iaido', label: 'IAIDO' }, label: 'TELE-SLASH' },
   // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
-  airuzi: { anim: 'jumpkick', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,
+  airuzi: { anim: 'airuzi', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, air: true, gun: true,
     hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, speed: 22, up: 0, interval: 2, move: 'uzi', sfx: 'uzi_burst' }, label: 'AIR UZI' },   // streamed STRAIGHT FORWARD → a horizontal line/trail, not a fan
   // air ↓K: AIR SPIKE — a downward knife slash (NO dive, she keeps her arc); SPIKES foes from above.
@@ -191,7 +197,7 @@ const VESPER_MOVES = {
 
 CHARACTERS.vesper = {
   id: 'vesper',
-  name: 'VESPER',
+  name: 'ANDROMEDA',   // display name (internal id stays 'vesper' so all sprite mappings + code keep working)
   moves: VESPER_MOVES,
   neutralMap: {
     punch: { up: 'risingslash', down: 'hamstring', forward: 'thrust', back: 'pistol', neutral: 'slash' },

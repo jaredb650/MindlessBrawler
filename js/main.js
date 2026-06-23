@@ -840,11 +840,24 @@ function runSkeetCine(game, ex) {
   }
 }
 
+// Which raw sprite frame (excluded cells counted) a cine sheet is showing now — mirrors drawSpritePose's
+// cine mapping so gameplay can sync a hit to the visible frame. Returns null if there's no ready sheet.
+function cineRawFrame(charType, key, cineF, total) {
+  const e = (typeof SPRITES !== 'undefined') && SPRITES.chars[charType];
+  const sh = e && e.sheets[key];
+  if (!sh || !sh.ready) return null;
+  const nf = sh.frames || 1;
+  const inc = (typeof spriteIncluded === 'function') ? spriteIncluded(sh, nf) : null;
+  const nfe = inc ? (inc.length || 1) : nf;
+  const idx = Math.min(nfe - 1, Math.max(0, (cineF / (total || 1) * nfe) | 0));
+  return inc ? (inc.length ? inc[idx] : 0) : idx;
+}
+
 // ── #5/#6 AUTO 2-HIT KICKS: gunkick → front-flip HEEL SPIKE (down); heelshot → SIDE KICK (shove back).
 function startKickCombo(att, vic, game, opts) {
   att.facing = Math.sign(vic.x - att.x) || att.facing;
   const vicX = Math.max(CFG.WALL_L + 60, Math.min(CFG.WALL_R - 60, vic.x));
-  startCine('kickcombo', att, vic, game, { vicX, kind: opts.kind, dmg: opts.dmg, pushVx: opts.pushVx });
+  startCine('kickcombo', att, vic, game, { vicX, kind: opts.kind, dmg: opts.dmg, pushVx: opts.pushVx, total: CFG.KICKFOLLOW_WINDUP });   // total → lets a sprite play its full sheet across the cine
   vic.setState('executed');
   vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
   if (opts.kind === 'heelspike') { att.setState('flipheel'); att.x = cineClampX(vicX - att.facing * 16); }
@@ -854,22 +867,26 @@ function startKickCombo(att, vic, game, opts) {
 }
 function runKickComboCine(game, ex) {
   const { att, vic, data } = ex;
-  vic.x = data.vicX; vic.vx = 0; vic.vy = 0;
+  if (!data.spiked) { vic.x = data.vicX; vic.vx = 0; vic.vy = 0; }   // pin the victim only until the hit lands
   if (data.kind === 'heelspike') {
-    const t = Math.min(1, ex.f / CFG.KICKFOLLOW_WINDUP);
-    att.x = cineClampX(data.vicX - att.facing * 10); att.y = CFG.FLOOR_Y - 130 * Math.sin(t * Math.PI);   // flip arc up→down
-    if (ex.f < CFG.KICKFOLLOW_WINDUP) { vic.y = CFG.FLOOR_Y; }
-    else {
+    att.y = CFG.FLOOR_Y;   // stay grounded & planted — the sprite carries the whole flip/kick now (no engine arc or reposition)
+    const total = data.total || CFG.KICKFOLLOW_WINDUP;
+    // Spike lands mid-animation, synced to the flip-heel sprite's contact frame (raw frame >= HEEL_SPIKE_FRAME,
+    // counting excluded cells). Falls back to a frame count if no sheet. Fires ONCE; the animation then plays out.
+    const HEEL_SPIKE_FRAME = 12;
+    const raw = cineRawFrame(att.charType, 'flipheel', ex.f, total);
+    const spikeNow = raw != null ? raw >= HEEL_SPIKE_FRAME : ex.f >= HEEL_SPIKE_FRAME;
+    const doSpike = () => {
+      data.spiked = true;
       vic.hp = Math.max(0, vic.hp - data.dmg);
       const away = att.facing;
       vic.receiveSpike(CFG.AXEKICK_SPIKE_VY, away, game);
       spawnSpike(vic.x, away); spawnSpark(vic.x, CFG.FLOOR_Y - 30, 'hit', 2); spawnDust(vic.x, CFG.FLOOR_Y, 12);
       game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 2); game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
       playSfx('spike');
-      att.x = cineClampX(vic.x - att.facing * 54); att.y = CFG.FLOOR_Y;
-      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
-      game.cine = null;
-    }
+    };
+    if (!data.spiked) { vic.y = CFG.FLOOR_Y; if (spikeNow) doSpike(); }
+    if (ex.f >= total) { if (!data.spiked) doSpike(); att.setState(att.stamina <= 0 ? 'gassed' : 'idle'); game.cine = null; }   // animation finished → release
   } else {
     att.x = cineClampX(data.vicX - att.facing * 56); att.y = CFG.FLOOR_Y; vic.y = CFG.FLOOR_Y;
     if (ex.f >= CFG.KICKFOLLOW_WINDUP) {
@@ -927,7 +944,7 @@ const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatl
 function runCine(game) {
   const ex = game.cine;
   ex.f++;
-  ex.att.f = ex.f; ex.vic.f = ex.f;   // drive both anim clocks from the sequencer
+  ex.att.f = ex.f; if (!ex.data || !ex.data.spiked) ex.vic.f = ex.f;   // drive both anim clocks; once a mid-cine hit has landed, let the victim's clock run on its own
   CINE_RUN[ex.kind](game, ex);        // per-kind body sets states/dmg + clears game.cine when done
 }
 

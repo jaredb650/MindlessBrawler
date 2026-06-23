@@ -273,7 +273,7 @@ const CFG = {
   ELECTRIC_DMG: 7,                 // HP per jolt (~12 jolts → ~84 over the shock)
 
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
-  THROW_RANGE: 120,
+  THROW_RANGE: 360,            // 3x reach (was 120) — extended P+K grab range
   THROW_DMG: 50,
   THROW_FRAMES: 26,             // canned arc over your head
 
@@ -321,7 +321,7 @@ const CFG = {
   SKEET_BLAST_DMG: 95,
   SKEET_BLAST_VX: 10,
   SKEET_BLAST_VY: -7,
-  KICKFOLLOW_WINDUP: 7,        // frames before the auto-followup (heel-spike / side-kick) 2nd hit lands
+  KICKFOLLOW_WINDUP: 32,       // frames before the auto-followup (heel-spike / side-kick) 2nd hit lands — also the window the follow-up sprite animates across (raised from 7 so sheets play out)
   KEBAB_CARRY_FRAMES: 14,      // SHISH KEBAB: frames spent dragging the impaled victim to the wall
   KEBAB_REACH: 96,             // how far behind the victim Vesper stays (blade-length) during the carry
   KEBAB_DMG: 120,              // the stab-through-and-pin damage
@@ -346,7 +346,7 @@ const CFG = {
 
   // Clinch — neutral P+K locks the bodies together: dirty boxing, body knees,
   // a judo throw off BACK, and a mash-escape for the victim. Auto-releases.
-  CLINCH_GRAB_RANGE: 125,        // reach at the lock frame (a touch longer than THROW_RANGE)
+  CLINCH_GRAB_RANGE: 375,        // 3x reach (was 125) — extended P+K grab range (clinch grab / Xamora Talon)
   // grabs slide INTO the reach with leftover momentum → a walk/dash grab reaches further
   GRAB_SLIDE_WALK: 4.5,          // forward px/frame a grab carries when started from a walk
   GRAB_SLIDE_RUN: 8.5,           // ...and from a dash (run) — a real lunging snatch
