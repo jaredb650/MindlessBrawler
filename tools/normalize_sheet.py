@@ -156,6 +156,7 @@ def main():
     ap.add_argument('--detect', choices=['grid', 'components'], default='grid',
                     help='components = find each character as a blob (NEVER clips poses that overflow a cell); best for big/rotated/tumbling sheets')
     ap.add_argument('--cell', type=int, default=240, help='output cell size (square)')
+    ap.add_argument('--floor', type=int, default=3, help='px gap between the feet and the cell bottom edge (spec suggests ~40 so low poses like sweep do not clip)')
     ap.add_argument('--margin', type=float, default=0.92, help='tallest char fills this fraction of cell height')
     ap.add_argument('--anchor', choices=['feet', 'center'], default='feet')
     ap.add_argument('--fit', choices=['height', 'safe'], default='height',
@@ -220,7 +221,7 @@ def main():
             ox = round(CELL / 2 - (fcx[i] - minx) * SCALE)
         else:
             ox = (CELL - nw) // 2
-        oy = CELL - nh - 3
+        oy = CELL - nh - a.floor
         cell.paste(crop, (ox, oy))
         return cell
 

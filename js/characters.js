@@ -87,7 +87,7 @@ const VESPER_MOVES = {
     cancels: [] },
   // advancing lunge DOUBLE-stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
   thrust: { anim: 'cross', startup: 4, active: 6, recovery: 9, damage: 16, hitstun: 16, blockstun: 10, stamina: 4,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'THRUST', lungeVx: 6,
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'THRUST', lungeVx: 6, dashTrail: true,   // trails when the combo magnet dashes her across the ground (slash→thrust)
     hitbox: { x: 26, y: -150, w: 100, h: 32 }, multihit: { times: 2, interval: 3 },
     cancels: ['risingslash', 'pistol', 'heelshot', 'hamstring', 'upshot'] },
   // upward gut → LAUNCHER (juggle starter). Can flow into a point-blank air shot.
@@ -158,7 +158,7 @@ const VESPER_MOVES = {
   // air ▶P: TELE-SLASH — a fast forward BLINK-slash (iaido). On hit → a stun-burst slash combo.
   teleslash: { anim: 'airpunch', startup: 3, active: 999, recovery: 0, damage: 18, hitstun: 0, blockstun: 12, stamina: 8,
     guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
-    hitbox: { x: 6, y: -130, w: 98, h: 98 }, dive: { vx: 30, vy: -1 },
+    hitbox: { x: 6, y: -130, w: 98, h: 98 }, dive: { vx: 30, vy: -1 }, dashTrail: true,
     slashCombo: { hits: 2, launchVy: -13, style: 'iaido', label: 'IAIDO' }, label: 'TELE-SLASH' },
   // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
   airuzi: { anim: 'airuzi', startup: 4, active: 999, recovery: 0, damage: 0, hitstun: 0, blockstun: 6, stamina: 4,

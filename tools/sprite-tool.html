@@ -27,12 +27,12 @@
   .slot .sub { color:var(--dim); font-size:11px; } .slot.on .sub { color:#0a2535; }
   #editor { flex:1; display:flex; min-width:0; }
   #stage { flex:1; display:flex; flex-direction:column; align-items:center; padding:14px; gap:8px; background:#101117; min-width:0; overflow:auto; }
-  #pv { background:#0b0c11; border:1px solid var(--line); border-radius:8px; }
+  #pv { background:#0b0c11; border:1px solid var(--line); border-radius:8px; image-rendering:pixelated; }
   #pvbar { display:flex; align-items:center; gap:10px; }
   #pvbar button, #ctrls button.mini { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:4px 10px; cursor:pointer; }
   #pvbar #hitbtn.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
   #pvbar #headbtn.on { background:var(--bad); color:#2a0808; border-color:var(--bad); }
-  #pvbar #onionbtn.on, #pvbar #flipbtn.on, #pvbar #diffbtn.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
+  #pvbar #onionbtn.on, #pvbar #flipbtn.on, #pvbar #diffbtn.on, #pvbar #anchorbtn.on { background:var(--acc); color:#06131c; border-color:var(--acc); }
   #pvbar input.cnt { width:34px; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:3px 4px; }
   #strip canvas.reff { box-shadow:0 0 0 2px #c08bff inset; }
   #strip { display:flex; flex-wrap:wrap; gap:3px; max-width:640px; justify-content:center; }
@@ -40,6 +40,7 @@
   #strip canvas.in { border-color:var(--acc); } #strip canvas.edge { box-shadow:0 0 0 2px var(--good) inset; }
   #strip canvas.adj { outline:2px solid #e0a23a; outline-offset:-2px; }
   #strip canvas.excl { opacity:0.3; filter:grayscale(1); box-shadow:0 0 0 2px var(--bad) inset; }
+  #strip canvas.loopf { box-shadow:0 0 0 2px #e0a32a inset; }   /* frames inside the loop segment */
   #ctrls { width:300px; border-left:1px solid var(--line); background:var(--panel); padding:12px; overflow-y:auto; }
   #ctrls h3 { margin:0 0 4px; font-size:12px; color:var(--acc); }
   .row { display:flex; align-items:center; gap:8px; margin:7px 0; }
@@ -67,6 +68,41 @@
   #tubar label { color:var(--dim); }
   #tubar button, #tuhdr button { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:5px 12px; cursor:pointer; font-weight:600; }
   #tubar button:hover { border-color:var(--acc); }
+  /* ── True Pixel tab (full-screen overlay) ── */
+  #tp { position:fixed; inset:0; background:#0b0c11; display:none; z-index:55; flex-direction:column; }
+  #tp.open { display:flex; }
+  #tphdr { display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  #tphdr h2 { font-size:15px; margin:0; color:var(--acc); }
+  #tphdr .grow { flex:1; }
+  #tphdr button { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:6px; padding:7px 12px; cursor:pointer; font-weight:600; }
+  #tphdr button.go { background:var(--good); color:#06210f; border-color:var(--good); }
+  #tphdr button:hover { border-color:var(--acc); }
+  #tpwrap { flex:1; display:flex; min-height:0; }
+  #tpctrls { width:288px; border-right:1px solid var(--line); padding:12px; overflow-y:auto; background:var(--panel); }
+  #tpctrls h3 { font-size:11px; color:var(--acc); margin:14px 0 6px; text-transform:uppercase; letter-spacing:.04em; }
+  #tpctrls h3:first-child { margin-top:0; }
+  #tpctrls .row2 { display:flex; gap:8px; align-items:center; margin:6px 0; font-size:12px; }
+  #tpctrls .row2 label { color:var(--dim); min-width:64px; }
+  #tpctrls input[type=number] { width:62px; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:4px; }
+  #tpctrls input[type=range] { flex:1; }
+  #tpctrls .sws { display:flex; gap:5px; }
+  #tpctrls .sws button { width:22px; height:22px; border:2px solid var(--line); border-radius:5px; cursor:pointer; padding:0; }
+  #tpctrls .sws button.on { border-color:var(--acc); }
+  #tpctrls .full { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:6px; padding:7px; cursor:pointer; margin-top:8px; }
+  #tpctrls .full:hover { border-color:var(--acc); }
+  #tp .seg { display:flex; gap:4px; margin:4px 0; }
+  #tp .seg button { flex:1; padding:5px 2px; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; cursor:pointer; font-size:11px; }
+  #tp .seg button.on { background:var(--acc); color:#06210f; border-color:var(--acc); font-weight:700; }
+  #tpmain { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #tpbar2 { display:flex; align-items:center; gap:8px; padding:8px 14px; border-bottom:1px solid var(--line); }
+  #tpbar2 .grow { flex:1; }
+  #tpbar2 button { background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:5px; padding:5px 12px; cursor:pointer; font-weight:600; }
+  #tpbar2 button:hover { border-color:var(--acc); }
+  #tpbar2 #tpAB { min-width:148px; }
+  #tphdr button.go.dirty { box-shadow:0 0 0 2px #ffffff88; animation:tppulse 1.1s ease-in-out infinite; }
+  @keyframes tppulse { 50%{ opacity:.55; } }
+  #tpview { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; padding:18px; }
+  #tpCell { background:#15171f; border:1px solid var(--line); image-rendering:pixelated; }
 </style>
 </head>
 <body>
@@ -76,6 +112,7 @@
   <span id="srv" title="checking server…" style="font-size:16px;color:#8990a3">●</span>
   <div class="grow"></div>
   <span id="status"></span>
+  <button id="tpbtn" title="True Pixel — pixel-art process each frame of this sheet individually" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer">✨ True Pixel</button>
   <button id="dl" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer">Download</button>
   <button id="save">Save</button>
 </header>
@@ -96,6 +133,7 @@
         <input type="number" class="cnt" id="onionN" min="1" max="4" value="1" title="onion neighbour count">
         <button id="flipbtn" title="flip test: rapidly alternate reference frame ↔ current frame · hotkey T">FlipTest: off</button>
         <button id="diffbtn" title="difference vs reference frame · hotkey D">Diff: off</button>
+        <button id="anchorbtn" title="anchor align: click a point (e.g. rear foot) to set a reference, then click the SAME point on other frames to snap them into line (sets each frame's per-frame nudge)">⚓ Anchor: off</button>
       </div>
       <div id="strip"></div>
     </div>
@@ -116,6 +154,77 @@
       <button id="tusave" style="background:var(--good);color:#06210f;border-color:var(--good)">save to disk</button>
     </div>
     <div class="hint">drag on the frame to erase pixels (they become transparent). <b>done</b> keeps edits in memory for this session · <b>save to disk</b> writes the PNG. <b>cancel</b> reverts this frame.</div>
+  </div>
+</div>
+
+<!-- ── True Pixel tab (per-cell pixel-art processing) ── -->
+<div id="tp">
+  <div id="tphdr">
+    <h2>✨ True Pixel</h2>
+    <span id="tplbl" class="hint"></span>
+    <div class="grow"></div>
+    <button id="tpApply" class="go" title="process all frames with the current settings (Enter)">✓ Apply</button>
+    <button id="tpdlraw">⬇ Raw</button>
+    <button id="tpdlscaled">⬇ Scaled</button>
+    <button id="tpexit">← Back</button>
+  </div>
+  <div id="tpwrap">
+    <div id="tpctrls">
+      <h3>Target Resolution <span class="hint" style="text-transform:none">· per cell</span></h3>
+      <div class="row2"><label>width</label><input type="number" id="tpW" min="8" max="512" value="96">
+        <label style="min-width:0">height</label><input type="number" id="tpH" min="8" max="512" value="96"></div>
+      <div class="row2"><label>lock aspect</label><input type="checkbox" id="tpLock" checked> <span class="hint">match the cell's shape</span></div>
+
+      <h3>Color Palette</h3>
+      <div class="row2"><label>palette</label><input type="checkbox" id="tpUsePal" checked> <span class="hint">auto-extract (shared across all frames)</span></div>
+      <div class="row2"><label>max colors</label><input type="number" id="tpMax" min="2" max="256" value="32"></div>
+
+      <h3>Dithering</h3>
+      <div class="seg" id="tpDith">
+        <button data-d="none" class="on">None</button>
+        <button data-d="ordered">Ordered</button>
+        <button data-d="floyd">Floyd-S</button>
+      </div>
+
+      <h3>Pixel Scale <span class="hint" style="text-transform:none">· upscale</span></h3>
+      <div class="seg" id="tpScale">
+        <button data-s="1">1×</button><button data-s="2">2×</button>
+        <button data-s="3">3×</button><button data-s="4" class="on">4×</button>
+        <button data-s="5">5×</button>
+      </div>
+
+      <h3>Enhancement</h3>
+      <div class="row2"><label>edge enhance</label><input type="checkbox" id="tpEE"><input type="number" id="tpEEAmt" min="0" max="100" value="40"><span class="hint">% sharpen</span></div>
+      <div class="row2"><label>outline</label><input type="checkbox" id="tpOutline"><span class="hint">dark edges</span></div>
+      <div class="row2" style="padding-left:10px"><label style="min-width:54px">threshold</label><input type="number" id="tpOLThresh" min="0" max="100" value="40"><span class="hint">%</span></div>
+      <div class="row2" style="padding-left:10px"><label style="min-width:54px">opacity</label><input type="number" id="tpOLOp" min="0" max="100" value="35"><span class="hint">%</span></div>
+      <div class="row2" style="padding-left:10px"><label style="min-width:54px">color</label><span class="sws" id="tpOLColor">
+        <button data-c="0,0,0" class="on" style="background:#000" title="black"></button>
+        <button data-c="42,42,42" style="background:#2a2a2a" title="dark gray"></button>
+        <button data-c="58,36,24" style="background:#3a2418" title="brown"></button>
+        <button data-c="16,24,58" style="background:#10183a" title="navy"></button>
+      </span></div>
+      <div class="row2"><label>crisp alpha</label><input type="checkbox" id="tpEdge" checked><span class="hint">1-bit edges</span></div>
+      <div class="row2"><label>contrast</label><input type="range" id="tpContrast" min="-100" max="100" value="0"><span class="val" id="tpContrastV">0</span></div>
+      <div class="row2"><label>brightness</label><input type="range" id="tpBright" min="-100" max="100" value="0"><span class="val" id="tpBrightV">0</span></div>
+      <button class="full" id="tpReset">Reset Enhancements</button>
+
+      <h3>Output</h3>
+      <div class="hint" id="tpInfo">—</div>
+    </div>
+    <div id="tpmain">
+      <div id="tpbar2">
+        <button id="tpPrev" title="previous frame (←)">◀ Prev</button>
+        <span id="tpFrLbl" class="val">1 / 1</span>
+        <button id="tpNext" title="next frame (→)">Next ▶</button>
+        <button id="tpAB" title="toggle before/after (Space)">Showing: AFTER</button>
+        <div class="grow"></div>
+        <button id="tpZoomOut" title="zoom out">−</button>
+        <span id="tpZoomLbl" class="val">100%</span>
+        <button id="tpZoomIn" title="zoom in">+</button>
+      </div>
+      <div id="tpview"><canvas id="tpCell"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -150,13 +259,14 @@ const STATE_SLOTS = [
   ['execute','Execute'],['executed','Executed (victim)'],['execkneel','Execution · kneel (victim)'],
   ['sidekick','Side kick'],['flipheel','Flip heel'],
 ];
-const DEFAULT_GLOBAL = { scale:1, offX:0, offY:0, artFacesLeft:false, tint:null, bright:1, cellW:240, cellH:240 };
+const DEFAULT_GLOBAL = { scale:1, offX:0, offY:0, artFacesLeft:false, tint:null, bright:1, contrast:0, sat:1, cellW:240, cellH:240 };
 let refKey = '';   // a sheet to colour-compare against (opt-in via the dropdown); empty = show the PROCEDURAL placeholder instead
 const JUMP_MODE = { prejump:'jumpStart', air:'jumpAir', land:'jumpLand' };
 
 let DATA = null, charId = null, slotKey = null, playing = true, facing = 1, showRef = true, editFrame = 0;
 let showHit = false, showHead = false;   // engine hurtbox / head-position overlays (for aligning art to the game's boxes)
 let onion = false, onionN = 1, flipTest = false, diffMode = false;   // alignment aids (preview-only, no save-format change)
+let anchorMode = false, anchorRef = null;   // ⚓ anchor-align: anchorRef = { lx, ly, frame } in the figure's LOCAL draw space
 let refFrame = 0, flipA = 0, flipB = 1, _flipT = 0;                  // reference frame (session-only) for flip-test + diff
 const keyed = {}, dims = {}, orig = {};   // src → keyed canvas / {w,h} / raw (green-screen) canvas, kept so erases survive re-keying
 let TU = null;                 // active touch-up session
@@ -191,22 +301,27 @@ function moveDuration(id, animKey){
 }
 
 // ───────────────────────── chroma key (same as the game) ─────────────────────────
-function keySheet(img, tint, bright){
+function keySheet(img, tint, bright, contrast, sat){
   const cv=document.createElement('canvas'); cv.width=img.width; cv.height=img.height;
   const cx=cv.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0);
   const id=cx.getImageData(0,0,cv.width,cv.height), d=id.data;
-  const br=bright||1, adj=tint||br!==1, tr=tint?tint[0]:1, tg=tint?tint[1]:1, tb=tint?tint[2]:1;
+  const br=bright||1, tr=tint?tint[0]:1, tg=tint?tint[1]:1, tb=tint?tint[2]:1;
+  const c100=contrast||0, C=c100*2.55, cf=(259*(C+255))/(255*(259-C)), sv=(sat==null?1:sat);
+  const adj=tint||br!==1||c100!==0||sv!==1, cl=v=>v<0?0:v>255?255:v;
   for(let i=0;i<d.length;i+=4){ let r=d[i],g=d[i+1],b=d[i+2];
     if(g>80&&g>r*1.2&&g>b*1.2){ d[i+3]=0; continue; }
     const mx=r>b?r:b; if(g>mx){ g=mx; d[i+1]=g; }
-    if(adj){ d[i]=Math.min(255,r*tr*br); d[i+1]=Math.min(255,g*tg*br); d[i+2]=Math.min(255,b*tb*br); }
+    if(adj){ let R=Math.min(255,r*tr*br),G=Math.min(255,g*tg*br),B=Math.min(255,b*tb*br);
+      if(c100!==0){ R=cf*(R-128)+128; G=cf*(G-128)+128; B=cf*(B-128)+128; }                                  // contrast
+      if(sv!==1){ const gy=0.299*R+0.587*G+0.114*B; R=gy+(R-gy)*sv; G=gy+(G-gy)*sv; B=gy+(B-gy)*sv; }          // saturation
+      d[i]=cl(R); d[i+1]=cl(G); d[i+2]=cl(B); }
   }
   cx.putImageData(id,0,0); return cv;
 }
-function loadSheet(src, tint, bright, cb){
+function loadSheet(src, tint, bright, contrast, sat, cb){
   if(keyed[src]) return cb(keyed[src]);
   const img=new Image();
-  img.onload=()=>{ dims[src]={w:img.width,h:img.height}; orig[src]=rawCanvas(img); keyed[src]=keySheet(img,tint||null,bright); cb(keyed[src]); };
+  img.onload=()=>{ dims[src]={w:img.width,h:img.height}; orig[src]=rawCanvas(img); keyed[src]=keySheet(img,tint||null,bright,contrast,sat); cb(keyed[src]); };
   img.onerror=()=>cb(null);
   img.src = '../'+src;   // tool lives in /tools/, art paths are repo-root-relative
 }
@@ -214,6 +329,8 @@ function rawCanvas(img){   // a writable copy of the source image, kept so touch
   const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
   c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0); return c;
 }
+function colorContrast(sh){ return sh.contrast!=null ? sh.contrast : (gl().contrast!=null?gl().contrast:0); }
+function colorSat(sh){ return sh.sat!=null ? sh.sat : (gl().sat!=null?gl().sat:1); }
 function colorTint(sh){ return sh.tint || gl().tint; }
 function colorBright(sh){ return sh.bright!=null ? sh.bright : (gl().bright!=null?gl().bright:1); }
 
@@ -295,8 +412,8 @@ function renderEditor(){
     <hr>
     <h3>Alignment</h3>
     ${ctrlRange('scale','scale',0.3,2.5,0.005,v=>(+v).toFixed(3))}
-    ${ctrlRange('offX','offX',-180,180,1)}
-    ${ctrlRange('offY','offY',-120,200,1)}
+    ${ctrlRange('offX','offX',-400,400,1)}
+    ${ctrlRange('offY','offY',-300,500,1)}
     <button class="full" id="autobtn">⊿ Auto-align (feet to floor + center)</button>
     <div class="row"><label>pixel-snap</label><input type="checkbox" data-k2="snap" ${sh.snap?'checked':''}> <span class="hint">round x/y/size → kills shimmer (in-game too)</span></div>
     <hr>
@@ -309,9 +426,18 @@ function renderEditor(){
     </select></div>
     ${ctrlRange('speed','fps',1,60,1,v=>v+' fps')}
     <div class="hint">${sh.mode==='syncMove'?"in-game this locks to the move's frame length; the slider sets PREVIEW speed":'frames per second (controls in-game + preview speed)'}</div>
+    <div class="row"><label>loop frames</label>
+      <input type="number" id="loopFrom" min="0" value="${sh.loop?sh.loop.from:0}" style="width:50px" title="first frame of the looped range">
+      <span class="hint">to</span>
+      <input type="number" id="loopTo" min="0" value="${sh.loop?sh.loop.to:Math.max(0,(sh.frames||1)-1)}" style="width:50px" title="last frame of the looped range">
+      <span class="hint">×</span>
+      <input type="number" id="loopTimes" min="1" max="12" value="${sh.loop?sh.loop.times:1}" style="width:46px" title="how many times the range plays (1 = off)"></div>
+    <div class="hint">repeat frames [from–to] this many times (e.g. 2 stab frames ×2 → 4 stabs). ×1 = off. Orange-outlined cells below are the looped range.</div>
     <hr>
     <h3>Colour match</h3>
     ${ctrlRange('brightness','bright',0.4,1.8,0.01,v=>(+v).toFixed(2))}
+    ${ctrlRange('contrast','contrast',-100,100,1)}
+    ${ctrlRange('saturation','sat',0,2,0.01,v=>(+v).toFixed(2))}
     <div class="row"><label>tint R/G/B</label>
       <input type="number" step="0.02" id="tr" value="${(val('tint')||[1,1,1])[0]}">
       <input type="number" step="0.02" id="tg" value="${(val('tint')||[1,1,1])[1]}">
@@ -322,7 +448,7 @@ function renderEditor(){
       ${Object.keys(sheets()).filter(k=>sheets()[k].src && k!==slotKey).map(k=>`<option value="${k}" ${refKey===k?'selected':''}>${k}</option>`).join('')}
     </select></div>
     <div class="hint">shows that sheet beside this one in the preview as a colour reference.</div>
-    <button class="full" id="delcolor">reset colour (tint + brightness)</button>
+    <button class="full" id="delcolor">reset colour (tint + brightness + contrast + saturation)</button>
     <hr>
     <h3>Orientation <span class="hint" style="text-transform:none;font-weight:400">· this animation</span></h3>
     <div class="row wide"><label>facing</label><select id="faceLeft">
@@ -346,7 +472,7 @@ function bindControls(){
   const c=document.getElementById('ctrls'), sh=sheet();
   c.querySelectorAll('input[type=range]').forEach(inp=> inp.oninput=()=>{ const k=inp.dataset.k, v=parseFloat(inp.value); setKey(k,v);
     const lbl=document.getElementById('v_'+k); if(lbl) lbl.textContent = k==='scale'?v.toFixed(3):(k==='bright'?v.toFixed(2):v);
-    if(k==='bright') rekeySoon(); });
+    if(k==='bright'||k==='contrast'||k==='sat') rekeySoon(); });
   c.querySelectorAll('input[type=number][data-k]').forEach(inp=> inp.onchange=()=>{
     setKey(inp.dataset.k, parseFloat(inp.value));
     if(['cw','ch'].includes(inp.dataset.k)){ const s=sheet(), d=dims[s.src]; if(d){ s.cols=Math.max(1,Math.floor(d.w/cellW())); s.rows=Math.max(1,Math.floor(d.h/cellH())); } renderEditor(); }
@@ -356,8 +482,11 @@ function bindControls(){
   const fl=c.querySelector('[data-k=artFacesLeft]'); if(fl) fl.onchange=()=>{ gl().artFacesLeft=fl.checked; renderEditor(); };
   const fsel=document.getElementById('faceLeft'); if(fsel) fsel.onchange=()=>{ const v=fsel.value, s=sheet(); if(v==='') delete s.faceLeft; else s.faceLeft=(v==='1'); };
   const fyc=document.getElementById('flipY'); if(fyc) fyc.onchange=()=>{ const s=sheet(); if(fyc.checked) s.flipY=true; else delete s.flipY; };
+  const setLoop=()=>{ const s=sheet(); const from=Math.max(0,+document.getElementById('loopFrom').value|0), to=Math.max(0,+document.getElementById('loopTo').value|0), times=Math.max(1,+document.getElementById('loopTimes').value|0);
+    if(times>1 && to>=from) s.loop={from,to,times}; else delete s.loop; buildStrip(); };   // ×1 or invalid range → off
+  ['loopFrom','loopTo','loopTimes'].forEach(id=>{ const e=document.getElementById(id); if(e) e.onchange=setLoop; });
   ['tr','tg','tb'].forEach(id=>{ const e=document.getElementById(id); if(e) e.onchange=setTint; });
-  const dc=document.getElementById('delcolor'); if(dc) dc.onclick=()=>{ delete sh.tint; delete sh.bright; rekey(); renderEditor(); };
+  const dc=document.getElementById('delcolor'); if(dc) dc.onclick=()=>{ delete sh.tint; delete sh.bright; delete sh.contrast; delete sh.sat; rekey(); renderEditor(); };
   const rsel=document.getElementById('refsel'); if(rsel) rsel.onchange=()=>{ refKey=rsel.value; loadAndRefresh(); };
   document.getElementById('autobtn').onclick=autoAlign;
   const sn=c.querySelector('[data-k2=snap]'); if(sn) sn.onchange=()=>{ const s=sheet(); if(sn.checked) s.snap=true; else delete s.snap; };
@@ -365,18 +494,20 @@ function bindControls(){
   document.getElementById('delsheet').onclick=()=>{ if(confirm('Remove '+slotKey+'?')){ delete sheets()[slotKey]; slotKey=null; renderList(); renderEditor(); } };
   setupDrop();
 }
-function setKey(k,v){ const sh=sheet(); if(['cw','ch'].includes(k) && v===(gl().cellW||240)){} sh[k]=v; }
+function setKey(k,v){ const sh=sheet();
+  if((k==='contrast'&&v===0)||(k==='sat'&&v===1)){ delete sh[k]; return; }   // drop neutral colour tweaks so they don't bloat sprites.json
+  sh[k]=v; }
 function setTint(){ const t=[parseFloat(document.getElementById('tr').value),parseFloat(document.getElementById('tg').value),parseFloat(document.getElementById('tb').value)]; const sh=sheet(); if(t[0]===1&&t[1]===1&&t[2]===1) delete sh.tint; else sh.tint=t; rekey(); }
 function refreshAfterGrid(){ buildStrip(); updateScrub(); }
 
 // ───────────────────────── sheet load + filmstrip + preview ─────────────────────────
 function loadAndRefresh(){
   const sh=sheet(); if(!sh||!sh.src){ buildStrip(); return; }
-  loadSheet(sh.src, colorTint(sh), colorBright(sh), ()=>{ buildStrip(); updateScrub(); });
-  const rs = refKey && sheets()[refKey]; if(rs && rs.src && rs!==sh) loadSheet(rs.src, colorTint(rs), colorBright(rs), ()=>{});   // preload the colour reference
+  loadSheet(sh.src, colorTint(sh), colorBright(sh), colorContrast(sh), colorSat(sh), ()=>{ buildStrip(); updateScrub(); });
+  const rs = refKey && sheets()[refKey]; if(rs && rs.src && rs!==sh) loadSheet(rs.src, colorTint(rs), colorBright(rs), colorContrast(rs), colorSat(rs), ()=>{});   // preload the colour reference
 }
 let _rkT; function rekey(){ const sh=sheet(); if(!sh||!sh.src) return;
-  if(orig[sh.src]){ keyed[sh.src]=keySheet(orig[sh.src], colorTint(sh), colorBright(sh)); buildStrip(); updateScrub(); }   // re-key from the raw copy → keeps touch-up erases
+  if(orig[sh.src]){ keyed[sh.src]=keySheet(orig[sh.src], colorTint(sh), colorBright(sh), colorContrast(sh), colorSat(sh)); buildStrip(); updateScrub(); }   // re-key from the raw copy → keeps touch-up erases
   else { keyed[sh.src]=null; loadAndRefresh(); }
 }
 function rekeySoon(){ clearTimeout(_rkT); _rkT=setTimeout(rekey, 60); }   // debounce re-keying a big sheet while dragging
@@ -394,7 +525,9 @@ function buildStrip(){
     if(inRange && sh.cells && sh.cells[fi]) cv.className+=' adj';   // tagged with a per-frame nudge
     if(inRange && fi===refFrame) cv.className+=' reff';             // reference frame (flip-test / diff)
     if(excluded) cv.className+=' excl';                             // skipped from playback
-    cv.title='cell '+i+(inRange?'  ·  frame '+fi+(excluded?' (excluded)':'')+'  ·  alt-click = exclude':'');
+    const looped=inRange && !excluded && sh.loop && sh.loop.times>1 && fi>=sh.loop.from && fi<=sh.loop.to;
+    if(looped) cv.className+=' loopf';                              // inside the repeated loop segment
+    cv.title='cell '+i+(inRange?'  ·  frame '+fi+(excluded?' (excluded)':looped?(' (loop ×'+sh.loop.times+')'):'')+'  ·  alt-click = exclude':'');
     cv.onclick=(e)=>{
       if(e.altKey){ if(inRange) toggleExclude(fi); return; }       // alt-click = toggle exclude (dial out a bad frame)
       if(e.shiftKey){ const s=sh.start||0; sh.frames=Math.max(1, i-s+1); } else { sh.start=i; sh.frames=Math.max(1, end-i+1>0?(end-i+1):1); }
@@ -429,6 +562,14 @@ function includedFrames(sh){   // frame indices that actually play (exclusions s
   const nf=Math.max(1,sh.frames||1), ex=sh.exclude||[], out=[];
   for(let i=0;i<nf;i++) if(ex.indexOf(i)<0) out.push(i);
   return out.length?out:[0];
+}
+function playOrder(sh){   // play sequence: included frames + an optional loop segment repeated (mirrors render.js)
+  const base=includedFrames(sh), loop=sh.loop&&sh.loop.times>1?sh.loop:null;
+  if(!loop) return base;
+  const from=loop.from|0, to=loop.to|0; if(to<from) return base;
+  const seg=base.filter(i=>i>=from&&i<=to); if(!seg.length) return base;
+  let out=base.filter(i=>i<from); for(let t=0;t<loop.times;t++) out=out.concat(seg);
+  return out.concat(base.filter(i=>i>to));
 }
 function toggleExclude(fi){   // fi = frame index within the animation (0..frames-1)
   const sh=sheet(), ex=sh.exclude||(sh.exclude=[]), k=ex.indexOf(fi);
@@ -545,9 +686,9 @@ function loop(){
   const sh=slotKey&&sheet();
   const nf=Math.max(1,(sh&&sh.frames)||1);
   if(sh){
-    if(playing){ const inc=includedFrames(sh), m=inc.length, ft=Math.floor((performance.now()-t0)/1000*effFps());
-      let idx; if(sh.mode==='boomerang'&&m>1){ const per=2*(m-1), p=((ft%per)+per)%per; idx=p<m?p:per-p; } else idx=ft%m;   // ping-pong else loop
-      curFrame=inc[idx]; document.getElementById('scrub').value=curFrame; procClock++; }
+    if(playing){ const ord=playOrder(sh), m=ord.length, ft=Math.floor((performance.now()-t0)/1000*effFps());
+      let idx; if(sh.mode==='boomerang'&&m>1){ const per=2*(m-1), p=((ft%per)+per)%per; idx=p<m?p:per-p; } else idx=ft%m;   // ping-pong else loop (loop segment expands ord)
+      curFrame=ord[idx]; document.getElementById('scrub').value=curFrame; procClock++; }
     const exN=(sh.exclude||[]).length;
     document.getElementById('frlbl').textContent=curFrame+' / '+(nf-1)+(exN?(' ('+exN+' excl)'):'');
   }
@@ -557,6 +698,18 @@ function loop(){
   }
   if(!slotKey) return;
   const hasArt = sh && sh.src && keyed[sh.src];
+  // ⚓ ANCHOR ALIGN — draw the single current frame at a FIXED center so click→nudge math is exact
+  if(anchorMode){
+    const cx=pv.width*0.5;
+    if(hasArt) paintSprite(g, slotKey, cx, fy, curFrame);
+    const facesLeft = sh && sh.faceLeft!=null ? sh.faceLeft : gl().artFacesLeft, flip = facesLeft?facing===1:facing===-1;
+    if(anchorRef){ const gx=cx+(flip?-anchorRef.lx:anchorRef.lx), gy=fy+anchorRef.ly; drawCross(g,gx,gy,'#5cff9b'); }   // target marker
+    if(showHit||showHead) drawOverlays(g, cx, fy);
+    g.fillStyle='#cdd3e1'; g.textAlign='center'; g.font='12px system-ui';
+    g.fillText(anchorRef ? 'click the SAME point on this frame to align  ·  shift-click = re-set reference' : 'click the anchor point (e.g. rear foot) to set the reference', cx, 16);
+    g.textAlign='left';
+    return;
+  }
   const cmp = sh && refKey && sheets()[refKey] && sheets()[refKey].src && refKey!==slotKey ? refKey : null;  // a SHEET to colour-compare against
   const showProc = showRef && !cmp;                              // procedural placeholder takes the reference slot unless you've picked a sheet to compare
   const split = hasArt && (cmp || showProc);                     // two figures side by side
@@ -566,7 +719,7 @@ function loop(){
   // reference figure (left, or centre when empty): a colour-compare sheet, else the procedural placeholder
   if(cmp){
     const rsh=sheets()[cmp], rfr=((Math.max(1,rsh.frames||1))/2)|0;
-    if(!keyed[rsh.src]) loadSheet(rsh.src, colorTint(rsh), colorBright(rsh), ()=>{});
+    if(!keyed[rsh.src]) loadSheet(rsh.src, colorTint(rsh), colorBright(rsh), colorContrast(rsh), colorSat(rsh), ()=>{});
     paintSprite(g, cmp, refX, fy, rfr); refLabel(g,'ref · '+cmp, refX, fy);
   } else if(showProc){
     drawProcRef(g, refX, fy); refLabel(g,'procedural · '+slotKey, refX, fy);
@@ -606,6 +759,7 @@ function autoAlign(){
 }
 
 // ───────────────────────── per-frame nudge (deltas on top of sheet alignment) ─────────────────────────
+function drawCross(g,x,y,col){ g.save(); g.strokeStyle=col; g.lineWidth=1.5; g.beginPath(); g.moveTo(x-9,y); g.lineTo(x+9,y); g.moveTo(x,y-9); g.lineTo(x,y+9); g.stroke(); g.beginPath(); g.arc(x,y,4.5,0,7); g.stroke(); g.restore(); }
 function cellAdj(i){ const c=sheet().cells; return (c&&c[i])||{}; }
 function setCell(i,k,v){
   const sh=sheet(), cells=sh.cells||(sh.cells={});
@@ -664,7 +818,7 @@ function upload(file){
       const src='assets/sprites/'+tChar+'/'+name; sh.src=src;
       dims[src]={w:img.width,h:img.height};
       orig[src]=rawCanvas(img);
-      keyed[src]=keySheet(img, sh.tint||G.tint, sh.bright!=null?sh.bright:G.bright);   // key NOW → previews instantly, no server needed
+      keyed[src]=keySheet(img, sh.tint||G.tint, sh.bright!=null?sh.bright:G.bright, sh.contrast!=null?sh.contrast:G.contrast, sh.sat!=null?sh.sat:G.sat);   // key NOW → previews instantly, no server needed
       // SQUARE-CELL STRIP auto-detect: a wide strip whose width is a multiple of its height (the
       // normalizer's output) → square cells of size = height. Beats the per-char global cellW (e.g.
       // Vesper's 161) which would mis-slice a 240-cell sheet. Falls back to the global otherwise.
@@ -786,6 +940,23 @@ fetch('/api/ping').then(r=>r.ok&&r.json()).then(j=>{ hasServer=!!(j&&j.ok); mark
 document.getElementById('play').onclick=function(){ playing=!playing; this.textContent=playing?'⏸ Pause':'▶ Play'; if(playing) t0=performance.now(); };
 document.getElementById('scrub').oninput=function(){ playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=parseInt(this.value)||0; editFrame=curFrame; renderCellCtrls(); };
 document.getElementById('facebtn').onclick=()=>facing=-facing;
+document.getElementById('anchorbtn').onclick=function(){ anchorMode=!anchorMode; anchorRef=null;
+  if(anchorMode){ playing=false; document.getElementById('play').textContent='▶ Play'; status('⚓ click the anchor point (e.g. rear foot) on this frame to set the reference'); }
+  this.textContent='⚓ Anchor: '+(anchorMode?'on':'off'); this.classList.toggle('on',anchorMode); };
+document.getElementById('pv').addEventListener('pointerdown', e=>{
+  if(!anchorMode) return;
+  const sh=slotKey&&sheet(); if(!sh||!sh.src||!keyed[sh.src]) return;
+  const cv=document.getElementById('pv'), rect=cv.getBoundingClientRect();
+  const X=(e.clientX-rect.left)*(cv.width/rect.width), Y=(e.clientY-rect.top)*(cv.height/rect.height);
+  const cx=cv.width*0.5, fy=cv.height-70;
+  const facesLeft = sh.faceLeft!=null ? sh.faceLeft : gl().artFacesLeft, flip = facesLeft?facing===1:facing===-1;
+  const lx=(flip?-(X-cx):(X-cx)), ly=Y-fy;
+  if(e.shiftKey || !anchorRef){ anchorRef={lx,ly,frame:curFrame}; status('⚓ reference set on frame '+curFrame+' — now click the same point on other frames to align them'); return; }
+  const a=cellAdj(curFrame);
+  setCell(curFrame,'dx',Math.round((a.dx||0)+(anchorRef.lx-lx)));
+  setCell(curFrame,'dy',Math.round((a.dy||0)+(anchorRef.ly-ly)));
+  renderCellCtrls(); status('aligned frame '+curFrame+' to the reference anchor');
+});
 document.getElementById('refbtn').onclick=function(){ showRef=!showRef; this.textContent='Ref: '+(showRef?'on':'off'); };
 document.getElementById('hitbtn').onclick=function(){ showHit=!showHit; this.textContent='Hitbox: '+(showHit?'on':'off'); this.classList.toggle('on',showHit); };
 document.getElementById('headbtn').onclick=function(){ showHead=!showHead; this.textContent='Head: '+(showHead?'on':'off'); this.classList.toggle('on',showHead); };
@@ -800,6 +971,7 @@ document.getElementById('flipbtn').onclick=toggleFlip;
 document.getElementById('diffbtn').onclick=()=>{ diffMode=!diffMode; syncAids(); };
 document.addEventListener('keydown',e=>{
   if(TU) return;                                                  // touch-up modal owns the keyboard
+  { const tp=document.getElementById('tp'); if(tp&&tp.classList.contains('open')) return; }   // True Pixel tab owns the keyboard
   const tag=e.target&&e.target.tagName; if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA') return;
   const k=e.key;
   if(k==='o'||k==='O'){ onion=!onion; syncAids(); e.preventDefault(); return; }
@@ -822,6 +994,195 @@ fetch('../assets/sprites/sprites.json').then(r=>r.json()).then(d=>{
     DATA.characters[id].global=Object.assign({},DEFAULT_GLOBAL,DATA.characters[id].global); DATA.characters[id].sheets=DATA.characters[id].sheets||{}; });
   charId=ROSTER[0]; buildTabs(); renderList(); renderEditor(); requestAnimationFrame(loop);
 }).catch(e=>{ document.body.innerHTML='<p style="padding:40px;color:#ff6b6b">Could not load sprites.json — run <code>node server.js</code> and open this via http://localhost:8000/tools/sprite-tool.html</p>'; });
+
+// ───────────────────────── TRUE PIXEL tab ─────────────────────────
+// Per-CELL pixel-art processing: each frame is downsampled to its own target
+// resolution (fixing the "whole-sheet target res = mush" problem), quantized to a
+// SHARED auto-extracted palette (so colors don't shimmer between frames), optionally
+// dithered, edge-cleaned/outlined, then upscaled. Source is keyed[] (chroma already cut).
+const TP = { tw:96, th:96, lock:true, usePal:true, maxColors:32, dither:'none', scale:4,
+  edge:true, ee:false, eeAmt:40, outline:false, olThresh:40, olOpacity:35, olColor:[0,0,0],
+  contrast:0, brightness:0,
+  frame:0, zoom:100, ab:true, _after:null, _pal:null, _tw:96, _th:96, _dirty:true };
+const _BAYER4=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+const _clamp=v=>v<0?0:v>255?255:v|0;
+
+function tpDownCell(frame){   // → ImageData (tw×th): keyed cell, area-downsampled, alpha-cleaned, level-adjusted
+  const sh=sheet(); const cw=cellW(),ch=cellH(),cols=sh.cols||1,cell=(sh.start||0)+frame;
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  const cc=document.createElement('canvas'); cc.width=cw; cc.height=ch;
+  cc.getContext('2d').drawImage(keyed[sh.src], sx,sy,cw,ch, 0,0,cw,ch);
+  const sc=document.createElement('canvas'); sc.width=TP.tw; sc.height=TP.th;
+  const sg=sc.getContext('2d',{willReadFrequently:true}); sg.imageSmoothingEnabled=true; sg.imageSmoothingQuality='high';
+  sg.drawImage(cc, 0,0,cw,ch, 0,0,TP.tw,TP.th);
+  const id=sg.getImageData(0,0,TP.tw,TP.th), d=id.data;
+  if(TP.edge) for(let i=3;i<d.length;i+=4) d[i]=d[i]<128?0:255;   // crisp alpha edges
+  if(TP.contrast||TP.brightness){                                 // level adjust (skip transparent)
+    const C=TP.contrast*2.55, cf=(259*(C+255))/(255*(259-C)), add=TP.brightness*2.55;
+    for(let i=0;i<d.length;i+=4){ if(d[i+3]<8) continue;
+      d[i]=_clamp(cf*(d[i]-128)+128+add); d[i+1]=_clamp(cf*(d[i+1]-128)+128+add); d[i+2]=_clamp(cf*(d[i+2]-128)+128+add); } }
+  if(TP.ee && TP.eeAmt>0) tpSharpen(id, TP.eeAmt);                 // edge enhance (unsharp)
+  return id;
+}
+function tpSharpen(id, amt){   // unsharp mask: out = px + a·(px − neighborAvg); opaque pixels only
+  const a=amt/100*1.4, d=id.data, w=id.width, h=id.height, src=new Uint8ClampedArray(d), I=(x,y)=>(y*w+x)*4;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=I(x,y); if(src[i+3]<8) continue;
+    for(let c=0;c<3;c++){ let s=0,n=0;
+      if(x>0&&src[I(x-1,y)+3]>8){s+=src[I(x-1,y)+c];n++;} if(x<w-1&&src[I(x+1,y)+3]>8){s+=src[I(x+1,y)+c];n++;}
+      if(y>0&&src[I(x,y-1)+3]>8){s+=src[I(x,y-1)+c];n++;} if(y<h-1&&src[I(x,y+1)+3]>8){s+=src[I(x,y+1)+c];n++;}
+      if(n) d[i+c]=_clamp(src[i+c]+a*(src[i+c]-s/n)); } }
+}
+function _boxSplitCh(box){ let mn=[255,255,255],mx=[0,0,0]; for(const p of box) for(let c=0;c<3;c++){ if(p[c]<mn[c])mn[c]=p[c]; if(p[c]>mx[c])mx[c]=p[c]; }
+  let ch=0,rg=-1; for(let c=0;c<3;c++){ const dd=mx[c]-mn[c]; if(dd>rg){rg=dd;ch=c;} } return {ch,rg}; }
+function tpMedianCut(px, max){   // px: [[r,g,b]...] → palette of ≤max colors
+  if(!px.length) return [[0,0,0]];
+  let boxes=[px.slice()];
+  while(boxes.length<max){ let bi=-1,br=-1;
+    for(let i=0;i<boxes.length;i++){ if(boxes[i].length<2) continue; const r=_boxSplitCh(boxes[i]).rg; if(r>br){br=r;bi=i;} }
+    if(bi<0) break;
+    const box=boxes[bi], ch=_boxSplitCh(box).ch; box.sort((a,b)=>a[ch]-b[ch]); const m=box.length>>1;
+    boxes.splice(bi,1,box.slice(0,m),box.slice(m)); }
+  return boxes.map(b=>{ let r=0,g=0,bl=0; for(const p of b){r+=p[0];g+=p[1];bl+=p[2];} const n=b.length||1; return [Math.round(r/n),Math.round(g/n),Math.round(bl/n)]; });
+}
+function tpPalette(frames){   // shared palette extracted from ALL frames' opaque pixels
+  if(!TP.usePal) return null;
+  let s=[]; frames.forEach(fr=>{ const d=tpDownCell(fr).data; for(let i=0;i<d.length;i+=4) if(d[i+3]>8) s.push([d[i],d[i+1],d[i+2]]); });
+  if(s.length>7000){ const st=Math.ceil(s.length/7000); s=s.filter((_,i)=>i%st===0); }
+  return tpMedianCut(s, Math.max(2,TP.maxColors));
+}
+function _near(r,g,b,pal){ let bi=0,bd=1e12; for(let i=0;i<pal.length;i++){ const p=pal[i],dr=r-p[0],dg=g-p[1],db=b-p[2],d=dr*dr+dg*dg+db*db; if(d<bd){bd=d;bi=i;} } return pal[bi]; }
+function tpQuantize(id, pal){
+  if(!pal) return; const d=id.data,w=id.width,h=id.height;
+  if(TP.dither==='floyd'){
+    const df=(x,y,er,eg,eb,f)=>{ if(x<0||x>=w||y<0||y>=h) return; const i=(y*w+x)*4; if(d[i+3]<8) return; d[i]=_clamp(d[i]+er*f);d[i+1]=_clamp(d[i+1]+eg*f);d[i+2]=_clamp(d[i+2]+eb*f); };
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=(y*w+x)*4; if(d[i+3]<8) continue;
+      const or=d[i],og=d[i+1],ob=d[i+2],np=_near(or,og,ob,pal),er=or-np[0],eg=og-np[1],eb=ob-np[2];
+      d[i]=np[0];d[i+1]=np[1];d[i+2]=np[2];
+      df(x+1,y,er,eg,eb,7/16); df(x-1,y+1,er,eg,eb,3/16); df(x,y+1,er,eg,eb,5/16); df(x+1,y+1,er,eg,eb,1/16); }
+  } else if(TP.dither==='ordered'){
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=(y*w+x)*4; if(d[i+3]<8) continue;
+      const t=(_BAYER4[y&3][x&3]/16-0.5)*42, np=_near(_clamp(d[i]+t),_clamp(d[i+1]+t),_clamp(d[i+2]+t),pal); d[i]=np[0];d[i+1]=np[1];d[i+2]=np[2]; }
+  } else {
+    for(let i=0;i<d.length;i+=4){ if(d[i+3]<8) continue; const np=_near(d[i],d[i+1],d[i+2],pal); d[i]=np[0];d[i+1]=np[1];d[i+2]=np[2]; }
+  }
+}
+function tpOutlineEdges(id){   // outline: blend SILHOUETTE-boundary + high-contrast internal edges toward olColor
+  const d=id.data,w=id.width,h=id.height,op=new Uint8Array(w*h),lum=new Float32Array(w*h);
+  for(let p=0;p<w*h;p++){ const i=p*4; op[p]=d[i+3]>8?1:0; lum[p]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; }
+  const thr=(TP.olThresh/100)*255, k=TP.olOpacity/100, cr=TP.olColor[0],cg=TP.olColor[1],cb=TP.olColor[2];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const p=y*w+x; if(!op[p]) continue;
+    let edge=false;
+    if(x===0||y===0||x===w-1||y===h-1||!op[p-1]||!op[p+1]||!op[p-w]||!op[p+w]) edge=true;   // silhouette boundary
+    else if(thr<255){ const L=lum[p];                                                       // internal dark edges (gradient > threshold)
+      if(Math.abs(L-lum[p-1])>thr||Math.abs(L-lum[p+1])>thr||Math.abs(L-lum[p-w])>thr||Math.abs(L-lum[p+w])>thr) edge=true; }
+    if(edge){ const i=p*4; d[i]=_clamp(d[i]*(1-k)+cr*k); d[i+1]=_clamp(d[i+1]*(1-k)+cg*k); d[i+2]=_clamp(d[i+2]*(1-k)+cb*k); } }
+}
+function _idCanvas(id){ const c=document.createElement('canvas'); c.width=id.width; c.height=id.height; c.getContext('2d').putImageData(id,0,0); return c; }
+function tpProcessFrame(fr, pal){ const id=tpDownCell(fr); tpQuantize(id,pal); if(TP.outline) tpOutlineEdges(id); return _idCanvas(id); }
+
+function tpAssemble(scale){   // build the full processed sheet at the given pixel scale
+  const sh=sheet(), frames=includedFrames(sh), pal=tpPalette(frames);
+  const cols=Math.max(1, Math.min(frames.length, sh.cols||Math.ceil(Math.sqrt(frames.length))));
+  const rows=Math.ceil(frames.length/cols), cwO=TP.tw*scale, chO=TP.th*scale;
+  const out=document.createElement('canvas'); out.width=cols*cwO; out.height=rows*chO;
+  const g=out.getContext('2d'); g.imageSmoothingEnabled=false;
+  frames.forEach((fr,idx)=>{ const sm=tpProcessFrame(fr,pal); const c=idx%cols, r=(idx/cols)|0; g.drawImage(sm, 0,0,TP.tw,TP.th, c*cwO,r*chO, cwO,chO); });
+  return { canvas:out, cols, rows };
+}
+
+function tpDispScale(){ const ch=cellH()||1; return (460/ch)*(TP.zoom/100); }   // fit cell to ~460px at 100%, × zoom
+function tpInfo(){ const n=includedFrames(sheet()).length;
+  document.getElementById('tpInfo').textContent = TP._after ? `${n} frames · cell ${TP._tw}×${TP._th} → ${TP._tw*TP.scale}×${TP._th*TP.scale} on Scaled export` : 'click ✓ Apply to process'; }
+function tpRenderCell(){   // draw ONE frame (before or after) at the current zoom
+  const sh=slotKey&&sheet(); if(!sh||!sh.src||!keyed[sh.src]) return;
+  const frames=includedFrames(sh); if(!frames.length) return;
+  TP.frame=Math.max(0,Math.min(TP.frame,frames.length-1));
+  const fr=frames[TP.frame], cw=cellW(),ch=cellH(),cols=sh.cols||1,cell=(sh.start||0)+fr;
+  const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+  const disp=tpDispScale(), W=Math.max(1,Math.round(cw*disp)), H=Math.max(1,Math.round(ch*disp));
+  const cv=document.getElementById('tpCell'); cv.width=W; cv.height=H; const g=cv.getContext('2d'); g.clearRect(0,0,W,H);
+  const after = TP.ab && TP._after && TP._after[TP.frame];
+  if(after){ g.imageSmoothingEnabled=false; const sm=TP._after[TP.frame]; g.drawImage(sm, 0,0,sm.width,sm.height, 0,0,W,H); }
+  else { g.imageSmoothingEnabled=true; g.drawImage(keyed[sh.src], sx,sy,cw,ch, 0,0,W,H); }   // BEFORE = original cell
+  document.getElementById('tpFrLbl').textContent=(TP.frame+1)+' / '+frames.length;
+  document.getElementById('tpAB').textContent='Showing: '+(TP.ab?'AFTER':'BEFORE')+(TP._dirty&&TP.ab?' (stale)':'');
+  document.getElementById('tpZoomLbl').textContent=Math.round(TP.zoom)+'%';
+}
+function tpApply(){   // (re)process EVERY frame with the current settings → cache; only runs on demand
+  const sh=slotKey&&sheet(); if(!sh||!sh.src||!keyed[sh.src]) return status('load a sheet first');
+  const frames=includedFrames(sh), pal=tpPalette(frames);
+  TP._pal=pal; TP._after=frames.map(fr=>tpProcessFrame(fr,pal)); TP._tw=TP.tw; TP._th=TP.th;
+  TP._dirty=false; const b=document.getElementById('tpApply'); if(b) b.classList.remove('dirty');
+  TP.ab=true; tpRenderCell(); tpInfo();
+}
+function tpDirty(){ TP._dirty=true; const b=document.getElementById('tpApply'); if(b) b.classList.add('dirty'); if(!TP.ab) tpRenderCell(); }
+function tpAssemble(scale){   // build the full sheet from the cache (applies first if stale)
+  if(TP._dirty || !TP._after || !TP._after.length) tpApply();
+  const sh=sheet(), frames=includedFrames(sh);
+  const cols=Math.max(1, Math.min(frames.length, sh.cols||Math.ceil(Math.sqrt(frames.length))));
+  const rows=Math.ceil(frames.length/cols), sm0=TP._after[0], cwO=sm0.width*scale, chO=sm0.height*scale;
+  const out=document.createElement('canvas'); out.width=cols*cwO; out.height=rows*chO;
+  const g=out.getContext('2d'); g.imageSmoothingEnabled=false;
+  frames.forEach((fr,idx)=>{ const sm=TP._after[idx]; const c=idx%cols,r=(idx/cols)|0; g.drawImage(sm, 0,0,sm.width,sm.height, c*cwO,r*chO, cwO,chO); });
+  return { canvas:out, cols, rows };
+}
+function tpSyncH(){ if(TP.lock){ const cw=cellW()||1, ch=cellH()||1; TP.th=Math.max(8,Math.round(TP.tw*ch/cw)); const h=document.getElementById('tpH'); if(h){ h.value=TP.th; h.disabled=true; } } else { const h=document.getElementById('tpH'); if(h) h.disabled=false; } }
+function tpZoom(d){ TP.zoom=Math.max(25,Math.min(800,TP.zoom+d)); tpRenderCell(); }
+function tpOpen(){
+  const sh=slotKey&&sheet(); if(!sh||!sh.src||!keyed[sh.src]) return status('load a sheet first');
+  TP.tw=parseInt(document.getElementById('tpW').value)||96; TP.frame=0; TP.zoom=100; TP.ab=true; TP._after=null; tpSyncH();
+  document.getElementById('tplbl').textContent=charId+' · '+slotKey;
+  document.getElementById('tp').classList.add('open'); tpApply();   // process once on open
+}
+function tpClose(){ document.getElementById('tp').classList.remove('open'); }
+function tpDownload(canvas,name){ canvas.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); status('⬇ '+name); }); }
+function tpBaseName(){ const sh=sheet(); const base=(sh.src||'sheet').split('/').pop().replace(/\.png$/i,''); return base+'_truepixel'; }
+
+document.getElementById('tpbtn').onclick=tpOpen;
+document.getElementById('tpexit').onclick=tpClose;
+document.getElementById('tpApply').onclick=tpApply;
+document.getElementById('tpPrev').onclick=()=>{ TP.frame--; tpRenderCell(); };
+document.getElementById('tpNext').onclick=()=>{ TP.frame++; tpRenderCell(); };
+document.getElementById('tpAB').onclick=()=>{ TP.ab=!TP.ab; tpRenderCell(); };
+document.getElementById('tpZoomIn').onclick=()=>tpZoom(25);
+document.getElementById('tpZoomOut').onclick=()=>tpZoom(-25);
+document.getElementById('tpdlscaled').onclick=()=>{ const r=tpAssemble(TP.scale); tpDownload(r.canvas, tpBaseName()+`_${TP._tw}x${TP._th}_${TP.scale}x.png`); };
+document.getElementById('tpdlraw').onclick=()=>{ const r=tpAssemble(1); tpDownload(r.canvas, tpBaseName()+`_${TP._tw}x${TP._th}_raw.png`); };
+document.getElementById('tpW').oninput=function(){ TP.tw=Math.max(8,parseInt(this.value)||8); tpSyncH(); tpDirty(); };
+document.getElementById('tpH').oninput=function(){ if(TP.lock) return; TP.th=Math.max(8,parseInt(this.value)||8); tpDirty(); };
+document.getElementById('tpLock').onchange=function(){ TP.lock=this.checked; tpSyncH(); tpDirty(); };
+document.getElementById('tpUsePal').onchange=function(){ TP.usePal=this.checked; tpDirty(); };
+document.getElementById('tpMax').oninput=function(){ TP.maxColors=Math.max(2,Math.min(256,parseInt(this.value)||32)); tpDirty(); };
+document.getElementById('tpEdge').onchange=function(){ TP.edge=this.checked; tpDirty(); };
+document.getElementById('tpOutline').onchange=function(){ TP.outline=this.checked; tpDirty(); };
+document.getElementById('tpContrast').oninput=function(){ TP.contrast=parseInt(this.value)||0; document.getElementById('tpContrastV').textContent=TP.contrast; tpDirty(); };
+document.getElementById('tpBright').oninput=function(){ TP.brightness=parseInt(this.value)||0; document.getElementById('tpBrightV').textContent=TP.brightness; tpDirty(); };
+document.getElementById('tpEE').onchange=function(){ TP.ee=this.checked; tpDirty(); };
+document.getElementById('tpEEAmt').oninput=function(){ TP.eeAmt=Math.max(0,Math.min(100,parseInt(this.value)||0)); tpDirty(); };
+document.getElementById('tpOLThresh').oninput=function(){ TP.olThresh=Math.max(0,Math.min(100,parseInt(this.value)||0)); tpDirty(); };
+document.getElementById('tpOLOp').oninput=function(){ TP.olOpacity=Math.max(0,Math.min(100,parseInt(this.value)||0)); tpDirty(); };
+document.querySelectorAll('#tpOLColor button').forEach(b=> b.onclick=()=>{ TP.olColor=b.dataset.c.split(',').map(Number); document.querySelectorAll('#tpOLColor button').forEach(x=>x.classList.toggle('on',x===b)); tpDirty(); });
+document.getElementById('tpReset').onclick=function(){
+  Object.assign(TP,{ee:false,eeAmt:40,outline:false,olThresh:40,olOpacity:35,olColor:[0,0,0],contrast:0,brightness:0,edge:true});
+  document.getElementById('tpEE').checked=false; document.getElementById('tpEEAmt').value=40;
+  document.getElementById('tpOutline').checked=false; document.getElementById('tpOLThresh').value=40; document.getElementById('tpOLOp').value=35;
+  document.getElementById('tpEdge').checked=true;
+  document.getElementById('tpContrast').value=0; document.getElementById('tpContrastV').textContent='0';
+  document.getElementById('tpBright').value=0; document.getElementById('tpBrightV').textContent='0';
+  document.querySelectorAll('#tpOLColor button').forEach((x,i)=>x.classList.toggle('on',i===0));
+  tpApply();
+};
+document.querySelectorAll('#tpDith button').forEach(b=> b.onclick=()=>{ TP.dither=b.dataset.d; document.querySelectorAll('#tpDith button').forEach(x=>x.classList.toggle('on',x===b)); tpDirty(); });
+document.querySelectorAll('#tpScale button').forEach(b=> b.onclick=()=>{ TP.scale=parseInt(b.dataset.s); document.querySelectorAll('#tpScale button').forEach(x=>x.classList.toggle('on',x===b)); tpInfo(); });   // export-only → no reprocess
+document.addEventListener('keydown',e=>{
+  const tp=document.getElementById('tp'); if(!tp.classList.contains('open')) return;
+  if(e.key==='Escape'){ tpClose(); return; }
+  const tag=e.target&&e.target.tagName; if(tag==='INPUT'||tag==='SELECT') return;
+  if(e.key===' '){ TP.ab=!TP.ab; tpRenderCell(); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ TP.frame--; tpRenderCell(); e.preventDefault(); }
+  else if(e.key==='ArrowRight'){ TP.frame++; tpRenderCell(); e.preventDefault(); }
+  else if(e.key==='Enter'){ tpApply(); e.preventDefault(); }
+});
 </script>
 </body>
 </html>

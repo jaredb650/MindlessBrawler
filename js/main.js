@@ -4,8 +4,9 @@
 // ─────────────────────────────────────────────────────────────
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-// crisp nearest-neighbor scaling ONLY when the retro filter is on; smooth otherwise
-canvas.style.imageRendering = Retro.enabled ? 'pixelated' : 'auto';
+// ALWAYS nearest-neighbor on the canvas→screen upscale: sprites are pixel art (incl. True Pixel
+// sheets), so a bilinear screen-scale (or Retina DPR upscale) softens their chunky pixels → blur.
+canvas.style.imageRendering = 'pixelated';
 
 const pad1 = new Pad(P1_MAP);
 const pad2 = new Pad(P2_MAP);
@@ -202,7 +203,9 @@ function startGroundPound(att, vic, game) {
   att.setState('gpmount');
   vic.setState('gpmounted');
   vic.invuln = 0;            // pinned + owned by the sequencer — no stray hits reach them anyway
-  startCine('groundpound', att, vic, game);   // the harness owns both bodies + faces them from here
+  // total → the gpmount/gpmounted sprite sheets scale start→finish across the whole sequence
+  // (mount → flurry → dismount), so a looped stab segment plays out in sync with the hits.
+  startCine('groundpound', att, vic, game, { total: CFG.GP_MOUNT + CFG.GP_FLURRY + CFG.GP_OUT });   // the harness owns both bodies + faces them from here
   playSfx('throw_grab');
   pushFeed('MOUNT!', att.color);
 }
@@ -1007,7 +1010,7 @@ function logicStep() {
   // before the scene branch drains the queue so the menu doesn't eat them)
   for (let i = KeyQueue.length - 1; i >= 0; i--) {
     if (KeyQueue[i] === 'KeyM') { KeyQueue.splice(i, 1); game.muted = toggleMute(); }
-    else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); canvas.style.imageRendering = Retro.enabled ? 'pixelated' : 'auto'; }
+    else if (KeyQueue[i] === 'KeyV') { KeyQueue.splice(i, 1); retroToggle(); }   // canvas stays pixelated either way
   }
   // RENDER INTERP: capture each body's position at the START of this tick (unconditionally,
   // so it stays correct through freezes AND cinematics where update() doesn't run) — render()
@@ -1086,6 +1089,9 @@ function logicStep() {
   if (!(wtSkip && f1 !== wtFast)) f1.update(f2, game);
   if (!(wtSkip && f2 !== wtFast)) f2.update(f1, game);
   combatUpdate(f1, f2, game);
+
+  // afterimage trail: log each settled position (only on real logic frames — not during freezes/cines)
+  for (const f of game.fighters) { (f.trailHist || (f.trailHist = [])).push({ x: f.x, y: f.y }); if (f.trailHist.length > 14) f.trailHist.shift(); }
 
   // super flash trigger (set by Fighter.tryActions) — only if the activator is
   // still winding up (a same-frame counter-hit cancels the cinematic, not just the shot)

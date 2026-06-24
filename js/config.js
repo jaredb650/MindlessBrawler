@@ -59,6 +59,10 @@ const CFG = {
   // Forward pressure — never stop dead to throw hands.
   MOMENTUM_KEEP: 0.6,           // fraction of walk/run speed carried into a strike
   PRESS_DRIFT: 1.6,             // px/frame advancing while striking (hold toward)
+  // AFTERIMAGE TRAIL — when a body moves THIS fast (px/frame), draw fading ghost copies along its path
+  // so lunges/dashes/slides/air-flies read as an intentional dash, not a teleport glitch. Tune by feel.
+  TRAIL_MIN_SPEED: 8,         // speed floor (px/frame) — a `dashTrail` move only trails while actually dashing this fast (so a standalone thrust's small lunge stays quiet; the combo-magnet dash trails)
+  TRAIL_GHOSTS: 5,            // how many ghost copies trail behind (more = longer/heavier trail)
   // Air-dash (Vesper, gated on char.airDash): a double-tap in the air blinks her horizontally once per jump.
   AIR_DASH_VX: 13,              // horizontal blink speed
   AIR_DASH_VY: -2,              // slight lift so it reads as a dash, not a fall

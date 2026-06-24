@@ -96,7 +96,7 @@ const MOVES = {
     damage: 70, hitstun: 22, blockstun: 14, stamina: CFG.DASH_ATTACK_STAMINA,
     guard: 'mid', kbx: 5.0, hitstop: CFG.HITSTOP_MED, kind: 'punch',
     hitbox: { x: 24, y: -150, w: 82, h: 42 },
-    lungeVx: CFG.DASH_ATTACK_LUNGE, heavy: true, popsGround: true,
+    lungeVx: CFG.DASH_ATTACK_LUNGE, dashTrail: true, heavy: true, popsGround: true,
   },
   // run+K: dash kick — knocks down and BLASTS them toward the wall. The corner
   // carry: hit a launched/cornered body with this and they wall-splat.
@@ -105,7 +105,7 @@ const MOVES = {
     damage: 65, hitstun: 0, blockstun: 14, stamina: CFG.DASH_ATTACK_STAMINA,
     guard: 'mid', kbx: 7.0, hitstop: CFG.HITSTOP_ENDER, kind: 'kick',
     hitbox: { x: 28, y: -120, w: 90, h: 48 },
-    lungeVx: CFG.DASH_ATTACK_LUNGE, knockdown: true, heavy: true, popsGround: true,
+    lungeVx: CFG.DASH_ATTACK_LUNGE, dashTrail: true, knockdown: true, heavy: true, popsGround: true,
   },
   // down+P: quick crouching body jab.
   crouchjab: {

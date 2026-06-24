@@ -26,7 +26,7 @@ const SFX = {
   pitchVary: 0.06,      // ±6% random playbackRate on every sfx → no two hits sound identical
   throttleMs: 32,       // don't re-stack the SAME sound faster than this
   throttle: { gunshot: 0 },   // per-sound throttle override (ms): gunshot fires EVERY machine-gun blow (no throttle)
-  gain: { hit_heavy: 0.8, beam_fire: 0.8 },   // per-sound volume trim (tune by ear): hit_heavy -20%; beam_fire layers on explosion → -20%
+  gain: { hit_heavy: 0.8, beam_fire: 0.8, swipe: 0.6 },   // per-sound volume trim (tune by ear): hit_heavy -20%; beam_fire layers on explosion → -20%; swipe (dash trail) -40%
   ctx: null,            // AudioContext (lazy)
   masterGain: null,     // master GainNode → destination
   buffers: {},          // name → AudioBuffer | null (missing) | Promise (decoding)
@@ -41,7 +41,7 @@ const SOUND_MANIFEST = {
   knife:     ['stab_light', 'stab_heavy', 'slash_combo_1', 'slash_combo_2', 'slash_combo_3', 'knife_combo'],
   voice:     ['grunt_1', 'grunt_2', 'fgrunt_1', 'fgrunt_2', 'fgrunt_3'],
   swings:    ['whoosh_light', 'whoosh_heavy', 'fly_takeoff'],
-  movement:  ['jump', 'dash', 'getup', 'tech'],
+  movement:  ['jump', 'dash', 'getup', 'tech', 'swipe'],
   grapples:  ['throw_grab', 'throw_slam', 'clinch_break'],
   stamina:   ['gassed'],
   crumple:   ['crumple', 'buckle'],

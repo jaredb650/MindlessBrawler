@@ -510,18 +510,25 @@ const SPR_CELL_W = 161, SPR_CELL_H = 240;   // default cell size; a sheet can ov
 // ALL sprite config lives in assets/sprites/sprites.json (edited by tools/sprite-tool.html) and is loaded here.
 const SPRITES = { ready: false, chars: {} };   // chars[id] = { global, sheets:{ key:{…cfg…, canvas, ready} } }
 
-function _spriteKey(img, tint, bright) {   // green → transparent + despill + [r,g,b] tint × brightness; returns a canvas (raw img if tainted)
+function _spriteKey(img, tint, bright, contrast, sat) {   // green → transparent + despill + tint×brightness, then contrast + saturation; returns a canvas (raw img if tainted)
   try {
     const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
     const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0);
     const id = cx.getImageData(0, 0, cv.width, cv.height), d = id.data;
-    const br = bright || 1, adj = tint || br !== 1, tr = tint ? tint[0] : 1, tg = tint ? tint[1] : 1, tb = tint ? tint[2] : 1;
+    const br = bright || 1, tr = tint ? tint[0] : 1, tg = tint ? tint[1] : 1, tb = tint ? tint[2] : 1;
+    const c100 = contrast || 0, C = c100 * 2.55, cf = (259 * (C + 255)) / (255 * (259 - C)), sv = (sat == null ? 1 : sat);
+    const adj = tint || br !== 1 || c100 !== 0 || sv !== 1, cl = v => v < 0 ? 0 : v > 255 ? 255 : v;
     for (let i = 0; i < d.length; i += 4) {
       let r = d[i], g = d[i + 1], b = d[i + 2];
       if (g > 80 && g > r * 1.2 && g > b * 1.2) { d[i + 3] = 0; continue; }   // green background → cut it out
       const mx = r > b ? r : b;
       if (g > mx) { g = mx; d[i + 1] = g; }                                    // DESPILL the green rim off the subject
-      if (adj) { d[i] = Math.min(255, r * tr * br); d[i + 1] = Math.min(255, g * tg * br); d[i + 2] = Math.min(255, b * tb * br); }
+      if (adj) {
+        let R = Math.min(255, r * tr * br), G = Math.min(255, g * tg * br), B = Math.min(255, b * tb * br);
+        if (c100 !== 0) { R = cf * (R - 128) + 128; G = cf * (G - 128) + 128; B = cf * (B - 128) + 128; }   // contrast
+        if (sv !== 1) { const gy = 0.299 * R + 0.587 * G + 0.114 * B; R = gy + (R - gy) * sv; G = gy + (G - gy) * sv; B = gy + (B - gy) * sv; }   // saturation
+        d[i] = cl(R); d[i + 1] = cl(G); d[i + 2] = cl(B);
+      }
     }
     cx.putImageData(id, 0, 0); return cv;
   } catch (e) { return img; }   // tainted canvas (file://) → raw image (green shows; use a local server)
@@ -534,7 +541,7 @@ function loadSprites() {
       for (const k in (c.sheets || {})) {
         const sh = Object.assign({}, c.sheets[k]); entry.sheets[k] = sh;
         const img = new Image();
-        img.onload = (G => () => { sh.canvas = _spriteKey(img, sh.tint || G.tint, sh.bright != null ? sh.bright : G.bright); sh.ready = true; })(entry.global);
+        img.onload = (G => () => { sh.canvas = _spriteKey(img, sh.tint || G.tint, sh.bright != null ? sh.bright : G.bright, sh.contrast != null ? sh.contrast : G.contrast, sh.sat != null ? sh.sat : G.sat); sh.ready = true; })(entry.global);
         img.onerror = () => { sh.ready = false; };
         img.src = sh.src;
       }
@@ -545,11 +552,21 @@ function loadSprites() {
 }
 if (typeof Image !== 'undefined' && typeof fetch !== 'undefined' && typeof document !== 'undefined') loadSprites();
 
-function spriteIncluded(sh, nf) {   // frame indices the animation actually plays; null = all (fast path) when nothing excluded
-  if (!sh.exclude || !sh.exclude.length) return null;
-  const out = [];
-  for (let i = 0; i < nf; i++) if (sh.exclude.indexOf(i) < 0) out.push(i);
-  return out;
+function spriteIncluded(sh, nf) {   // PLAY ORDER: excluded frames skipped, plus an optional loop segment repeated.
+  // Returns the ordered list of frame indices to play (with repeats), or null (fast path) when nothing
+  // is excluded AND there's no active loop. loop = { from, to, times }: frames [from..to] play `times` total.
+  const loop = sh.loop && sh.loop.times > 1 ? sh.loop : null;
+  if ((!sh.exclude || !sh.exclude.length) && !loop) return null;
+  const base = [];
+  for (let i = 0; i < nf; i++) if (!sh.exclude || sh.exclude.indexOf(i) < 0) base.push(i);
+  if (!loop) return base;
+  const from = loop.from | 0, to = loop.to | 0;
+  if (to < from) return base;
+  const seg = base.filter(i => i >= from && i <= to);
+  if (!seg.length) return base;
+  let out = base.filter(i => i < from);
+  for (let t = 0; t < loop.times; t++) out = out.concat(seg);
+  return out.concat(base.filter(i => i > to));
 }
 function spriteAnimKey(entry, f) {
   // The JUMP phases are handled separately (spriteJump, on their own clock). Everything else keys off
@@ -632,9 +649,11 @@ function drawSpritePose(ctx, f, game) {
     const dx = f.x - f.prevX, dy = f.y - f.prevY;
     if (Math.abs(dx) <= CFG.INTERP_SNAP && Math.abs(dy) <= CFG.INTERP_SNAP) { rx = f.prevX + dx * ra; ry = f.prevY + dy * ra; }
   }
-  const airH = Math.max(0, CFG.FLOOR_Y - ry);   // ground shadow (same as the vector body)
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath(); ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - airH * 0.08), 8, 0, 0, Math.PI * 2); ctx.fill();
+  if (!game._trailGhost) {   // afterimage ghosts skip the shadow (else a stack of shadows trails along)
+    const airH = Math.max(0, CFG.FLOOR_Y - ry);   // ground shadow (same as the vector body)
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - airH * 0.08), 8, 0, 0, Math.PI * 2); ctx.fill();
+  }
 
   ctx.save();
   ctx.translate(rx, ry);
@@ -662,6 +681,33 @@ function drawFighter(ctx, f, game) {
   if (f.charType === 'xamora') return drawFighterBrawler(ctx, f, game, XAMORA_LOOK);
   return drawFighterBrawler(ctx, f, game);
 }
+// AFTERIMAGE TRAIL — when a body is moving fast (a lunge / slide / air-dash / hard launch), draw a few
+// fading ghost copies of the CURRENT pose along its recent path, so the motion reads as an intentional
+// dash instead of a teleport glitch. Drawn UNDER the body. Cheap: only redraws while actually fast.
+// trail ONLY the explicit speed-dash moves (flagged `dashTrail: true` — tele-slash, slide tackle,
+// dash attacks…), and only while they're actually moving her. Regular attacks / locomotion never trail.
+function drawFighterTrail(ctx, f, game) {
+  const hist = f.trailHist;
+  const total = Math.hypot(f.x - f.prevX, f.y - f.prevY);
+  const active = !!hist && hist.length >= 4 && !!(f.move && f.move.dashTrail) && total >= (CFG.TRAIL_MIN_SPEED || 5);
+  if (active && !f._trailing) playSfx('swipe');           // rising edge → one swipe per dash burst
+  f._trailing = active;
+  if (!active) return;
+  const ox = f.x, oy = f.y, opx = f.prevX, opy = f.prevY;
+  game._trailGhost = true;
+  const n = hist.length, ghosts = CFG.TRAIL_GHOSTS || 5;
+  for (let i = 1; i <= ghosts; i++) {
+    const g = hist[n - 1 - i * 2];                         // every other logged frame back → spaced ghosts
+    if (!g) continue;
+    f.x = g.x; f.y = g.y; f.prevX = g.x; f.prevY = g.y;    // freeze render-interp at the ghost position
+    ctx.save();
+    ctx.globalAlpha = 0.55 * (1 - (i - 1) / (ghosts + 1)); // heavier lead ghost, fades back
+    drawFighter(ctx, f, game);
+    ctx.restore();
+  }
+  game._trailGhost = false;
+  f.x = ox; f.y = oy; f.prevX = opx; f.prevY = opy;
+}
 function drawFighterVesper(ctx, f, game) { return drawFighterBrawler(ctx, f, game, VESPER_LOOK); }   // legacy refs
 function drawFighterXamora(ctx, f, game) { return drawFighterBrawler(ctx, f, game, XAMORA_LOOK); }
 
@@ -688,12 +734,14 @@ function drawFighterBrawler(ctx, f, game, look) {
     if (Math.abs(dx) <= CFG.INTERP_SNAP && Math.abs(dy) <= CFG.INTERP_SNAP) { rx = f.prevX + dx * ra; ry = f.prevY + dy * ra; }
   }
 
-  // ground shadow
+  // ground shadow (afterimage ghosts skip it)
   const air = Math.max(0, CFG.FLOOR_Y - ry);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath();
-  ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - air * 0.08), 8, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (!game._trailGhost) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(rx, CFG.FLOOR_Y + 6, Math.max(18, 44 - air * 0.08), 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.save();
   // hit vibration: jitter the freshly-hit body during the hitstop freeze so the
@@ -2041,6 +2089,7 @@ function render(ctx, game, alpha) {
   // attacker draws on top
   const [a, b] = game.fighters;
   const order = a.move && !b.move ? [b, a] : [a, b];
+  for (const f of order) drawFighterTrail(ctx, f, game);   // afterimage ghosts UNDER both bodies
   for (const f of order) drawFighter(ctx, f, game);
   drawHeads(ctx);   // severed heads fly/roll over the bodies
   drawShells(ctx);  // ejected shotgun shells
