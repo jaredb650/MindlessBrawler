@@ -380,46 +380,61 @@ function drawLock(ctx, cx, cy, s, col) {
   ctx.restore();
 }
 
-// one player's half of the side-by-side select: headshot strip + name/blurb + state.
+// shared roster strip — every fighter shown ONCE at a big, art-forward size, with
+// BOTH players' cursors on it (P1 blue, P2 red; the active player's cursor pulses).
+function drawRosterStrip(ctx, game) {
+  const m = game.menu, t = m.t || 0, slots = selectSlots(), n = slots.length;
+  const cw = 150, ch = 150, gap = 26, total = n * cw + (n - 1) * gap;
+  const sx = CFG.STAGE_W / 2 - total / 2, ty = 88;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.14);
+  for (let i = 0; i < n; i++) {
+    const so = slots[i], x = sx + i * (cw + gap);
+    ctx.save(); if (so.locked) ctx.globalAlpha *= 0.55; drawPortrait(ctx, so.portrait, so.name, x, ty, cw, ch); ctx.restore();
+    if (so.locked) drawLock(ctx, x + cw / 2, ty + ch / 2, 40, '#e6ebf5');
+    ctx.textAlign = 'center'; ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.fillStyle = so.locked ? '#8a90a3' : 'rgba(230,236,246,0.92)';
+    ctx.fillText(so.name, x + cw / 2, ty + ch + 22);
+  }
+  // both cursors; nest P2 slightly inside P1 so they stay readable when on the same card
+  for (let p = 0; p < 2; p++) {
+    const pick = m.picks[p], x = sx + pick * (cw + gap);
+    const active = (m.stage === p) && !(m.locked && m.locked[p]);
+    const rgb = p === 0 ? '79,195,247' : '239,83,80', col = p === 0 ? '#4fc3f7' : '#ef5350';
+    const o = p === 0 ? 0 : 5;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = active ? `rgba(${rgb},${0.45 + 0.55 * pulse})` : col;
+    ctx.strokeRect(x - 5 + o, ty - 5 + o, cw + 10 - o * 2, ch + 10 - o * 2);
+    ctx.fillStyle = col; ctx.font = 'bold 17px system-ui, sans-serif'; ctx.textAlign = 'center';
+    if (p === 0) ctx.fillText('P1', x + 14, ty - 12);
+    else ctx.fillText('P2', x + cw - 14, ty + ch + 42);
+  }
+}
+
+// one player's info column under the shared strip: name + blurb + state.
 // state ∈ 'active' (choosing now) | 'locked' (confirmed) | 'waiting' (turn not reached → dimmed).
 function drawSelectPanel(ctx, game, slot, state) {
-  const m = game.menu, t = m.t || 0, slots = selectSlots(), n = slots.length;
+  const m = game.menu, t = m.t || 0, slots = selectSlots();
   const rgb = slot === 0 ? '79,195,247' : '239,83,80', col = slot === 0 ? '#4fc3f7' : '#ef5350';
   const panelCx = slot === 0 ? CFG.STAGE_W * 0.25 : CFG.STAGE_W * 0.75;
-  const pick = m.picks[slot], cur = slots[pick];
+  const cur = slots[m.picks[slot]];
   const pulse = 0.5 + 0.5 * Math.sin(t * 0.14);
 
   ctx.save();
-  if (state === 'waiting') ctx.globalAlpha = 0.4;   // dim the panel that isn't its turn yet
+  if (state === 'waiting') ctx.globalAlpha = 0.5;   // dim the panel that isn't its turn yet
   ctx.textAlign = 'center';
-  ctx.fillStyle = col; ctx.font = 'bold 24px system-ui, sans-serif';
-  ctx.fillText(slot === 0 ? 'PLAYER 1' : 'PLAYER 2', panelCx, 96);
+  ctx.fillStyle = col; ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.fillText(slot === 0 ? 'PLAYER 1' : 'PLAYER 2', panelCx, 286);
 
-  // headshot strip — every fighter (playable + locked teasers), cursor on the current pick
-  const tw = 72, th = 86, gap = 14, total = n * tw + (n - 1) * gap, sx = panelCx - total / 2, ty = 120;
-  for (let i = 0; i < n; i++) {
-    const so = slots[i], x = sx + i * (tw + gap);
-    ctx.save(); if (so.locked) ctx.globalAlpha *= 0.6; drawPortrait(ctx, so.portrait, so.name, x, ty, tw, th); ctx.restore();
-    if (so.locked) drawLock(ctx, x + tw / 2, ty + th / 2, 26, '#e6ebf5');
-    if (i === pick) {
-      ctx.strokeStyle = state === 'active' ? `rgba(${rgb},${pulse})` : col;
-      ctx.lineWidth = state === 'locked' ? 4 : 3; ctx.strokeRect(x - 3, ty - 3, tw + 6, th + 6);
-    }
-  }
+  ctx.fillStyle = cur.locked ? '#8a90a3' : '#fff'; ctx.font = 'bold 32px system-ui, sans-serif';
+  ctx.fillText(cur.name, panelCx, 320);
+  ctx.fillStyle = cur.locked ? '#ffae6b' : 'rgba(230,236,246,0.85)'; ctx.font = 'italic 15px system-ui, sans-serif';
+  wrapText(ctx, cur.locked ? cur.note : (CHAR_STYLE[cur.id] || ''), panelCx, 346, CFG.STAGE_W * 0.42, 20);
 
-  // name + blurb (locked → '???' + "not yet unlocked")
-  ctx.textAlign = 'center';
-  ctx.fillStyle = cur.locked ? '#8a90a3' : '#fff'; ctx.font = 'bold 34px system-ui, sans-serif';
-  ctx.fillText(cur.name, panelCx, 272);
-  ctx.fillStyle = cur.locked ? '#ffae6b' : 'rgba(230,236,246,0.85)'; ctx.font = 'italic 16px system-ui, sans-serif';
-  wrapText(ctx, cur.locked ? cur.note : (CHAR_STYLE[cur.id] || ''), panelCx, 300, CFG.STAGE_W * 0.42, 21);
-
-  // status line
   ctx.font = 'bold 20px system-ui, sans-serif';
-  if (cur.locked) { ctx.fillStyle = '#ef5350'; ctx.fillText('LOCKED', panelCx, 360); }
-  else if (state === 'locked') { ctx.fillStyle = '#9ccc65'; ctx.fillText('✓  LOCKED IN', panelCx, 360); }
-  else if (state === 'active') { ctx.fillStyle = `rgba(${rgb},${pulse})`; ctx.fillText('◀  choose  ▶', panelCx, 360); }
-  else { ctx.fillStyle = 'rgba(220,225,235,0.5)'; ctx.fillText('— waiting —', panelCx, 360); }
+  if (cur.locked) { ctx.fillStyle = '#ef5350'; ctx.fillText('LOCKED', panelCx, 396); }
+  else if (state === 'locked') { ctx.fillStyle = '#9ccc65'; ctx.fillText('✓  LOCKED IN', panelCx, 396); }
+  else if (state === 'active') { ctx.fillStyle = `rgba(${rgb},${pulse})`; ctx.fillText('◀  choose  ▶', panelCx, 396); }
+  else { ctx.fillStyle = 'rgba(220,225,235,0.5)'; ctx.fillText('— waiting —', panelCx, 396); }
   ctx.restore();
 }
 
@@ -438,23 +453,26 @@ function drawSelect(ctx, game) {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(220,225,235,0.5)'; ctx.font = 'bold 26px system-ui, sans-serif';
   ctx.fillText('SELECT  FIGHTER', cx, 58);
-  // center divider
-  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cx, 80); ctx.lineTo(cx, CFG.STAGE_H - 80); ctx.stroke();
 
   const m = game.menu, slots = selectSlots();
   const stateFor = (slot) => (m.locked && m.locked[slot]) ? 'locked' : (slot === m.stage ? 'active' : 'waiting');
+
+  // the big shared roster strip up top, then the two info columns below it
+  drawRosterStrip(ctx, game);
+  // divider only below the strip, separating the P1 / P2 info columns
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, 272); ctx.lineTo(cx, CFG.STAGE_H - 80); ctx.stroke();
   drawSelectPanel(ctx, game, 0, stateFor(0));
   drawSelectPanel(ctx, game, 1, stateFor(1));
-  // preview per player: the live idle fighter if playable, else a dim locked-teaser portrait
+  // preview per player: the live idle fighter if playable, else a lock + teaser line
   for (let i = 0; i < 2; i++) {
     const so = slots[m.picks[i]], st = stateFor(i), pcx = i === 0 ? CFG.STAGE_W * 0.28 : CFG.STAGE_W * 0.72;
     if (so.locked) {
-      const w = 220, h = 264, x = pcx - w / 2, y = CFG.FLOOR_Y - h;
-      ctx.save(); ctx.globalAlpha = st === 'waiting' ? 0.18 : 0.4; drawPortrait(ctx, so.portrait, so.name, x, y, w, h); ctx.restore();
-      drawLock(ctx, pcx, CFG.FLOOR_Y - h / 2, 58, '#e6ebf5');
+      ctx.save(); ctx.globalAlpha = st === 'waiting' ? 0.3 : 0.85;
+      drawLock(ctx, pcx, CFG.FLOOR_Y - 130, 64, '#9aa3b5');
       ctx.fillStyle = '#cdd3e1'; ctx.font = 'bold 16px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Character not yet unlocked', pcx, CFG.FLOOR_Y + 26);
+      ctx.fillText('Character not yet unlocked', pcx, CFG.FLOOR_Y - 60);
+      ctx.restore();
     } else if (game.fighters[i]) {
       ctx.save(); if (st === 'waiting') ctx.globalAlpha = 0.35; drawFighter(ctx, game.fighters[i], game); ctx.restore();
     }
