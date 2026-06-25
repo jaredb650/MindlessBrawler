@@ -17,10 +17,11 @@ const CHAR_STYLE = {
   xamora:  'Fallen-angel heavyweight. Slow but devastating long-range staff sweeps and battle magic. The tank — huge health, controls the whole screen.',
 };
 // Select-grid accent + fallback portrait colour per fighter.
-const CHAR_ACCENT = { brawler: '#4fc3f7', vesper: '#ef7a5a', xamora: '#ffd24a', blackwill: '#8e9aad' };
+const CHAR_ACCENT = { brawler: '#4fc3f7', vesper: '#ef7a5a', xamora: '#ffd24a', locked1: '#8a90a3', blackwill: '#8e9aad' };
 
 // Locked / coming-soon fighters: shown on the select grid as teasers but NOT selectable yet.
 const LOCKED_FIGHTERS = [
+  { id: 'locked1', name: '???', portrait: 'locked1', locked: true, note: 'Character not yet unlocked' },
   { id: 'blackwill', name: 'BLACKWILL', portrait: 'blackwill', locked: true, note: 'Locked — coming soon' },
 ];
 // The full select grid = playable roster + locked teasers (built lazily once CHAR_ROSTER exists).
@@ -33,7 +34,7 @@ function selectSlots() {
   return SELECT_SLOTS;
 }
 
-// Headshots: drop PNGs at assets/portraits/<id>.png  (brawler.png, vesper.png, xamora.png, blackwill.png).
+// Headshots: drop PNGs at assets/portraits/<id>.png  (brawler.png, vesper.png, xamora.png, locked1.png, blackwill.png).
 // Missing files fall back to a coloured plate with the fighter's initial.
 const PORTRAITS = {};
 function loadPortraits() {
