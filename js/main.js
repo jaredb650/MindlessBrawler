@@ -20,6 +20,7 @@ const game = {
   superFreeze: 0,
   superWho: null,
   shake: 0,
+  shakeDir: 0,         // directional camera-kick bias (× shake); set by the wall spike, cleared when shake ends
   slowmo: 0,
   witchTime: 0,        // Witch Time countdown (the slow-mo window)
   witchWho: null,      // the fighter who stays FULL speed during Witch Time
@@ -1038,6 +1039,7 @@ function logicStep() {
   if (game.koFreeze > 0) { game.koFreeze--; return; }
   if (game.banner && game.banner.timer > 0 && game.matchState !== 'ko') game.banner.timer--;
   game.shake = Math.max(0, game.shake - 0.6);
+  if (game.shake === 0) game.shakeDir = 0;   // directional kick lives only as long as the shake
   if (game.flash > 0) game.flash--;
   updateFx();
 

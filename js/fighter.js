@@ -554,7 +554,10 @@ class Fighter {
       this.hp = Math.max(0, this.hp - CFG.SIDESPIKE_WALL_DMG);   // the wall-spike HURTS
       if (this.hp <= 0) this.pendingElectric = 0;               // dead → no posthumous electrocution
       game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
-      game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+      game.shakeDir = into * CFG.SIDESPIKE_WALL_KICK;                  // camera lurches OFF the wall, into the stage
+      game.hitstop = Math.max(game.hitstop, CFG.SIDESPIKE_WALL_FREEZE);   // extra-long impact freeze — the weight beat
+      game.flash = CFG.SIDESPIKE_WALL_FLASH; game.flashMax = CFG.SIDESPIKE_WALL_FLASH;   // white impact flash
+      spawnShockwave(wx + into * 10, by, into);                        // vertical shockwave ring bursting off the wall
       spawnRumble(wx + into * 12, this.y - CFG.BODY_H * 0.5, into);   // debris blasted off the wall
       spawnBlast(wx + into * 14, by);                                  // ORANGE fireball — the wall-spike explosion
       spawnBlood(wx + into * 14, by, into, 38, 2);                       // BLOOD EXPLOSION out from the wall
@@ -585,7 +588,10 @@ class Fighter {
     this.hp = Math.max(0, this.hp - CFG.SIDESPIKE_WALL_DMG);
     if (this.hp <= 0) this.pendingElectric = 0;
     game.shake = Math.max(game.shake, CFG.SIDESPIKE_WALL_SHAKE);
-    game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER);
+    game.shakeDir = dir * CFG.SIDESPIKE_WALL_KICK;
+    game.hitstop = Math.max(game.hitstop, CFG.SIDESPIKE_WALL_FREEZE);   // extra-long impact freeze
+    game.flash = CFG.SIDESPIKE_WALL_FLASH; game.flashMax = CFG.SIDESPIKE_WALL_FLASH;   // white impact flash
+    spawnShockwave(this.x, by, dir); spawnShockwave(this.x, by, -dir);   // no wall → ring bursts both ways
     spawnBlast(this.x, by);                                          // ORANGE explosion
     spawnSpark(this.x, by, 'hit', 2);
     spawnBlood(this.x, by, dir, 38, 2);                              // chunky blood burst

@@ -13,8 +13,9 @@ const CFG = {
 
   // 16-bit RETRO filter (js/retro.js) — toggle live with V. Tune by feel:
   RETRO: {
-    scale: 4,            // pixel chunkiness: render at 1280/4×720/4 = 320×180, then nearest-neighbor upscale.
-                         //   use a CLEAN divisor (2,4,5,8) for uniform pixels — 4 is the 16-bit sweet spot; 5 = chunkier.
+    scale: 2,            // pixel chunkiness: render at 1280/2×720/2 = 640×360, then nearest-neighbor upscale.
+                         //   use a CLEAN divisor (2,4,5,8) for uniform pixels — 2 = fine/hi-res retro, 4 = chunky 16-bit, 5 = chunkier.
+                         //   NOTE: FX_PX (js/render.js) follows this value, so FX chunks + sparks stay aligned to the retro grid.
     levels: 32,          // colors PER CHANNEL (the "16-bit" banding): lower = more banded/retro. 32≈subtle, 16=punchy, 8=poster.
     quantize: true,      // palette-reduce the buffer (set false for pure pixelation, full color)
     scanlines: false,    // thin CRT scanline overlay
@@ -266,6 +267,9 @@ const CFG = {
   SIDESPIKE_GRAV_MULT: 0.12,       // gravity SUPPRESSED (not zero) during the flight → flies straight, sags slightly
   SIDESPIKE_WALL_DMG: 130,         // a side-spiked body that SLAMS the wall takes SIGNIFICANT extra damage (can KO)
   SIDESPIKE_WALL_SHAKE: 16,        // the wall-spike screen rumble (vs the normal WALLSPLAT_SHAKE 6)
+  SIDESPIKE_WALL_FREEZE: 24,       // extra-long IMPACT FREEZE on the wall spike (vs HITSTOP_ENDER 16) — the weight beat
+  SIDESPIKE_WALL_FLASH: 7,         // white screen-flash frames on the wall spike
+  SIDESPIKE_WALL_KICK: 1.6,        // directional camera-kick strength (× shake) AWAY from the wall, into the stage
   WALLSPIKE_SLIDE_SPEED: 3,        // px/frame the wall-spiked body slowly slides DOWN the wall
   WALLSPIKE_SLIDE_FRAMES: 34,      // how long it slides (smearing a blood trail) before peeling off
   OVERHAND_FREEZE: 26,             // dramatic hit-freeze when the charged overhand lands

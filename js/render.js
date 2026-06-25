@@ -9,21 +9,37 @@ const Slashes = [];      // dramatic slash crescents — bright streaks thrown d
 const FloatTexts = [];
 const Stains = [];       // persistent blood decals on floor/walls (cleared on rematch)
 const Heads = [];        // severed heads — physics objects that fly, bounce, roll (decapitation KO)
+const Shockwaves = [];   // expanding impact rings (wall spike) — short-lived, drawn additively
 
 // ── PIXEL-ART FX: chunky, grid-snapped blocks (Mortal Kombat / Metal Slug / Blasphemous look) ──
 // Every particle / stain draws as a hard-edged square snapped to FX_PX, with stepped (not smooth)
 // alpha — so blood + impacts read as deliberate pixel art, and stay consistent when the retro
 // filter (js/retro.js) is on. FX_PX matches RETRO.scale so a chunk = 1 retro-pixel under the filter.
-const FX_PX = 3;   // FX pixel size (smaller = finer chunks). Tune to taste.
+const FX_PX = (typeof CFG !== 'undefined' && CFG.RETRO && CFG.RETRO.scale) || 4;   // = RETRO.scale → a chunk is exactly 1 retro-pixel under the filter (no shimmer)
 function fxStepA(t) { return t > 0.66 ? 1 : t > 0.33 ? 0.7 : 0.4; }   // quantized fade
-function fxBlock(ctx, x, y, size, color, alpha, outline) {
-  const s = Math.max(FX_PX, Math.round(size / FX_PX) * FX_PX);
-  const px = Math.round(x / FX_PX) * FX_PX - (s >> 1);
-  const py = Math.round(y / FX_PX) * FX_PX - (s >> 1);
+// `gp` = the pixel grid for THIS chunk (defaults to FX_PX). Sparks pass a finer grid so they
+// read crisp, while blood/debris stay chunky.
+function fxBlock(ctx, x, y, size, color, alpha, outline, gp) {
+  const q = gp || FX_PX;
+  const s = Math.max(q, Math.round(size / q) * q);
+  const px = Math.round(x / q) * q - (s >> 1);
+  const py = Math.round(y / q) * q - (s >> 1);
   ctx.globalAlpha = alpha == null ? 1 : alpha;
-  if (outline) { ctx.fillStyle = outline; ctx.fillRect(px - FX_PX, py - FX_PX, s + FX_PX * 2, s + FX_PX * 2); }
+  if (outline) { ctx.fillStyle = outline; ctx.fillRect(px - q, py - q, s + q * 2, s + q * 2); }
   ctx.fillStyle = color;
   ctx.fillRect(px, py, s, s);
+}
+// A velocity-aligned chunky STREAK: a few fx blocks smeared from the particle's trailing
+// position to its head, tapered thin→fat. Reads as a fast spark / blood squirt while staying
+// hard-edged pixel. `p.streak` = trail length in frames of velocity; `p.px` = optional finer grid.
+function fxStreak(ctx, p, alpha, outline) {
+  const steps = 4, len = p.streak;
+  for (let i = 0; i < steps; i++) {
+    const f = i / (steps - 1);                          // 0 = tail … 1 = head
+    const sx = p.x - p.vx * len * (1 - f);
+    const sy = p.y - p.vy * len * (1 - f);
+    fxBlock(ctx, sx, sy, p.size * (0.45 + 0.55 * f), p.color, alpha, i === steps - 1 ? outline : null, p.px);
+  }
 }
 
 // A severed head launched off the body — bounces, rolls, bleeds, settles on the floor.
@@ -91,25 +107,46 @@ function drawShells(ctx) {
 // Callers that omit it default to med, so existing spark calls look ~unchanged.
 function spawnSpark(x, y, kind, power) {
   const palettes = {
-    hit:   ['#ffffff', '#ffb74d', '#ff7043'],
-    block: ['#80deea', '#4dd0e1'],
-    parry: ['#fff59d', '#ffe082', '#ffffff'],
+    hit:   ['#ffffff', '#ffe066', '#ffd23f', '#ffaa1d'],   // white-hot core → yellow → amber (heat ramp)
+    block: ['#ffffff', '#82eaff', '#4dd0e1'],              // crisp blue guard-clang
+    parry: ['#fff59d', '#ffe082', '#ffffff'],              // gold — unchanged (cinematics rely on it)
     blood: ['#c0392b', '#e74c3c', '#7b241c'],
   };
   const colors = palettes[kind] || palettes.hit;
   const p = (power == null) ? 1 : power;
+  const energy = (kind === 'hit' || kind === 'block');   // additive, streaked, short-lived — the impact pops
   const n = kind === 'parry' ? 14 : kind === 'hit' ? (6 + p * 5) : 6;   // light 6 / med 11 / heavy 16
-  const spMax = kind === 'block' ? 3 : kind === 'hit' ? (4 + p * 3) : 6;
+  const spMax = kind === 'block' ? 4 : kind === 'hit' ? (4 + p * 3) : 6;
   const szMax = kind === 'hit' ? (2 + p * 1.5) : 3;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
     const sp = 2 + Math.random() * spMax;
     Particles.push({
       x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
-      life: 14 + Math.random() * 10, maxLife: 24,
+      life: energy ? 9 + Math.random() * 7 : 14 + Math.random() * 10, maxLife: energy ? 16 : 24,
       color: colors[(Math.random() * colors.length) | 0],
       size: 2 + Math.random() * szMax, grav: 0.15,
       blood: kind === 'blood',
+      streak: energy ? 1.4 : 0,    // velocity-aligned chunky trail
+      additive: energy,            // drawn in the 'lighter' pass → overlapping sparks bloom
+      px: energy ? 2 : undefined,  // finer pixel grid for sparks (crisper than the chunky FX_PX)
+    });
+  }
+  if (energy) spawnImpactStar(x, y, p);   // the classic radial "pop" at the contact point
+}
+
+// A one-shot radial STAR burst at a contact point — bright white arms streaking outward for a
+// few frames (the genre's signature impact pop). Drawn additively with the energy sparks.
+function spawnImpactStar(x, y, power) {
+  const arms = 4 + (power || 0) * 2;       // 4 (light) … 8 (heavy)
+  const reach = 5 + (power || 0) * 2;
+  for (let i = 0; i < arms; i++) {
+    const a = (i / arms) * Math.PI * 2 + Math.random() * 0.3;
+    Particles.push({
+      x, y, vx: Math.cos(a) * reach, vy: Math.sin(a) * reach,
+      life: 5 + Math.random() * 3, maxLife: 8,
+      color: '#ffffff', size: 2.5, grav: 0,
+      streak: 2.2, additive: true, px: 2,   // finer grid → crisp star
     });
   }
 }
@@ -156,6 +193,19 @@ function drawSlashes(ctx) {
 function spawnBlood(x, y, dir, n, power) {
   const reds = ['#c0392b', '#a93226', '#922b21', '#7b241c', '#5e1a13'];   // tight crimson ramp (no bright AA red)
   const p = power == null ? 1 : power;
+  // squirt STREAKS — fast directional crimson lines mixed in with the chunks (opaque, no soft mist)
+  for (let i = 0, sn = 3 + (n >> 2); i < sn; i++) {
+    const sp = 7 + Math.random() * 9;
+    Particles.push({
+      x, y: y + (Math.random() - 0.5) * 20,
+      vx: dir * sp + (Math.random() - 0.5) * 3, vy: -Math.random() * 5 - 1,
+      life: 30 + Math.random() * 20, maxLife: 50,
+      color: reds[(Math.random() * 3) | 0],
+      size: 2 + Math.random() * 2 + p, grav: 0.45,
+      blood: true,        // stains the floor/wall where it lands
+      streak: 2.4,        // velocity-aligned chunky squirt — long enough to read as a line, not a dot
+    });
+  }
   for (let i = 0; i < n; i++) {
     const sp = 3 + Math.random() * 10;
     Particles.push({
@@ -179,14 +229,14 @@ function spawnBlood(x, y, dir, n, power) {
       size: (1.5 + Math.random() * 2) + p * 1.4, grav: 0.5, blood: true,
     });
   }
-  if (p >= 2) for (let i = 0; i < 4; i++) {            // heavy hits throw a few chunky globs (now a bit smaller)
+  if (p >= 2) for (let i = 0; i < 4; i++) {            // heavy hits throw a few chunky globs (half-size now)
     const sp = 2 + Math.random() * 6;
     Particles.push({
       x, y: y + (Math.random() - 0.5) * 24,
       vx: dir * sp + (Math.random() - 0.5) * 3, vy: -Math.random() * 6 - 1,
       life: 44 + Math.random() * 24, maxLife: 70,
       color: reds[3 + ((Math.random() * 2) | 0)],
-      size: 6 + Math.random() * 4, grav: 0.5, blood: true,
+      size: 3 + Math.random() * 2, grav: 0.5, blood: true,
     });
   }
 }
@@ -272,9 +322,38 @@ function spawnRumble(x, y, dir) {
       x: x + (Math.random() - 0.5) * 26, y: y - 90 + Math.random() * 170,
       vx: dir * sp * (0.4 + Math.random()) + (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 10,
       life: 16 + Math.random() * 18, maxLife: 34,
-      color: cols[(Math.random() * cols.length) | 0], size: 2 + Math.random() * 5.5, grav: 0.42,
+      color: cols[(Math.random() * cols.length) | 0], size: 5 + Math.random() * 9, grav: 0.42,   // bigger chunks → reads as heavy rubble
+      outline: '#1f1f26',                                                                          // dark edge → chunky rock definition
     });
   }
+}
+
+// An expanding SHOCKWAVE ring — a vertical half-ellipse of chunky energy blocks bursting from an
+// impact point INTO the stage (`dir` = +1/-1 into-stage). Taller than wide → vertical emphasis.
+// Drawn additively. A double pulse (a second, delayed ring) reads as a real shock, not a bubble.
+const SHOCKWAVE_MAXR = 150;
+function spawnShockwave(x, y, dir, color) {
+  Shockwaves.push({ x, y, dir, life: 16, maxLife: 16, delay: 0, color: color || '#ffd54f' });
+  Shockwaves.push({ x, y, dir, life: 13, maxLife: 13, delay: 4, color: '#ffffff' });
+  if (Shockwaves.length > 16) Shockwaves.splice(0, Shockwaves.length - 16);
+}
+function drawShockwaves(ctx) {
+  ctx.globalCompositeOperation = 'lighter';
+  for (const s of Shockwaves) {
+    if (s.delay > 0) continue;                  // not started yet (updateFx ticks the delay down)
+    const t = 1 - s.life / s.maxLife;            // 0 → 1 over its life
+    const e = 1 - (1 - t) * (1 - t);             // ease-out: bursts fast, then slows
+    const rx = 14 + e * SHOCKWAVE_MAXR * 0.6;    // horizontal reach into the stage
+    const ry = 18 + e * SHOCKWAVE_MAXR;          // taller → the vertical shock
+    const a = (1 - t) * 0.9;                      // fades as it grows
+    const steps = 22;
+    for (let i = 0; i <= steps; i++) {
+      const ang = -Math.PI / 2 + Math.PI * (i / steps);   // top → bottom, +x side
+      fxBlock(ctx, s.x + s.dir * Math.cos(ang) * rx, s.y + Math.sin(ang) * ry, 3 + (1 - t) * 3, s.color, a);
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
 }
 
 // Horizontal SIDE-SPIKE burst — energy streaking in the launch direction (its own distinct look).
@@ -405,6 +484,7 @@ function updateFx() {
   }
   if (Particles.length > 1400) Particles.splice(0, Particles.length - 1400);   // safety cap (bloodier hits → more particles); drop oldest
   for (let i = Slashes.length - 1; i >= 0; i--) { if (--Slashes[i].life <= 0) Slashes.splice(i, 1); }
+  for (let i = Shockwaves.length - 1; i >= 0; i--) { const s = Shockwaves[i]; if (s.delay > 0) { s.delay--; } else if (--s.life <= 0) Shockwaves.splice(i, 1); }
   for (let i = FloatTexts.length - 1; i >= 0; i--) {
     const t = FloatTexts[i];
     t.y -= 0.8; t.life--;
@@ -2057,7 +2137,8 @@ function render(ctx, game, alpha) {
   game.renderAlpha = (alpha == null) ? 1 : alpha;   // drawFighter reads this (avoids threading it through every call)
   ctx.save();
   if (game.shake > 0) {
-    ctx.translate((Math.random() - 0.5) * game.shake * 2, (Math.random() - 0.5) * game.shake * 2);
+    const kick = (game.shakeDir || 0) * game.shake;   // directional camera lurch (wall spike kicks away from the wall)
+    ctx.translate((Math.random() - 0.5) * game.shake * 2 + kick, (Math.random() - 0.5) * game.shake * 2);
   }
   // KO FREEZE-FRAME: the world drops to black, a white impact burst fans out, and the
   // two fighters render as stark white silhouettes — held a beat, then the launch resumes.
@@ -2097,13 +2178,28 @@ function render(ctx, game, alpha) {
   // OVERDRIVE BEAM pours out OVER the fighters for maximum drama (the freeze overlay owns the charge visual)
   for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);
 
+  // pass 1 — OPAQUE: blood chunks/squirts, dust, debris (normal source-over compositing)
   for (const p of Particles) {
+    if (p.additive) continue;
     const t = Math.max(0, p.life / p.maxLife);
-    if (p.blood) fxBlock(ctx, p.x, p.y, p.size, p.color, t > 0.22 ? 1 : 0.7, p.size >= 6 ? '#2e0a08' : null);  // crisp crimson chunk; dark outline on globs (gore stays opaque, no soft fade)
-    else fxBlock(ctx, p.x, p.y, p.size, p.color, fxStepA(t));   // sparks / dust / energy → stepped fade
+    if (p.blood) {
+      const a = t > 0.22 ? 1 : 0.7, outline = p.size >= 4 ? '#2e0a08' : null;   // gore stays opaque; dark outline on globs
+      if (p.streak) fxStreak(ctx, p, a, outline); else fxBlock(ctx, p.x, p.y, p.size, p.color, a, outline);
+    } else {
+      fxBlock(ctx, p.x, p.y, p.size, p.color, fxStepA(t), p.outline);   // dust / debris → stepped fade (rubble carries a dark outline)
+    }
   }
+  // pass 2 — ADDITIVE: energy sparks + impact stars bloom (globalCompositeOperation 'lighter')
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of Particles) {
+    if (!p.additive) continue;
+    const t = Math.max(0, p.life / p.maxLife);
+    if (p.streak) fxStreak(ctx, p, fxStepA(t)); else fxBlock(ctx, p.x, p.y, p.size, p.color, fxStepA(t));
+  }
+  ctx.globalCompositeOperation = 'source-over';   // reset — else every later draw this frame composites additively
   ctx.globalAlpha = 1;
   drawSlashes(ctx);   // slash crescents ride on top of the sparks/blood
+  drawShockwaves(ctx);   // expanding impact rings (wall spike) bloom over everything
 
   for (const t of FloatTexts) {
     ctx.globalAlpha = Math.min(1, t.life / 20);

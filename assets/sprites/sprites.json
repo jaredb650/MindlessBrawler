@@ -2123,16 +2123,16 @@
       },
       "sheets": {
         "idle": {
-          "src": "assets/sprites/brawler/gunman_poses.png",
+          "src": "assets/sprites/brawler/gunman_poses_truepixel_512x512_raw.png",
           "cols": 10,
           "rows": 1,
           "start": 0,
           "frames": 10,
-          "fps": 18,
+          "fps": 10,
           "mode": "loop",
           "ch": 512,
           "cw": 512,
-          "scale": 0.48,
+          "scale": 0.465,
           "offY": 36,
           "offX": -6,
           "cells": {
@@ -2144,6 +2144,225 @@
               "dx": -2,
               "dy": 2
             }
+          },
+          "exclude": [
+            1,
+            3,
+            5,
+            7
+          ]
+        },
+        "jab": {
+          "src": "assets/sprites/brawler/meka_jab_truepixel_512x512_raw.png",
+          "cols": 3,
+          "rows": 1,
+          "start": 0,
+          "frames": 3,
+          "fps": 21,
+          "mode": "loop",
+          "ch": 512,
+          "cw": 512,
+          "scale": 0.485,
+          "offX": -4,
+          "offY": 32,
+          "cells": {
+            "2": {
+              "dx": -1
+            }
+          }
+        },
+        "cross": {
+          "src": "assets/sprites/brawler/meka_cross.png",
+          "cols": 5,
+          "rows": 1,
+          "start": 0,
+          "frames": 5,
+          "fps": 16,
+          "mode": "loop",
+          "ch": 512,
+          "cw": 512,
+          "scale": 0.5,
+          "offX": -6,
+          "offY": 32,
+          "cells": {
+            "1": {
+              "dx": 11,
+              "dy": 3
+            },
+            "2": {
+              "dx": 9,
+              "dy": 3
+            },
+            "3": {
+              "dx": 13,
+              "dy": 2
+            }
+          },
+          "exclude": [
+            0
+          ]
+        },
+        "hook": {
+          "src": "assets/sprites/brawler/meka_hook_512_truepixel_324x324_raw.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 6,
+          "fps": 19,
+          "mode": "once",
+          "ch": 324,
+          "cw": 324,
+          "scale": 0.61,
+          "offY": 16,
+          "cells": {
+            "1": {
+              "dx": 7,
+              "dy": 3
+            },
+            "2": {
+              "dx": 0,
+              "dy": 5
+            },
+            "3": {
+              "dy": 5,
+              "dx": -1
+            },
+            "4": {
+              "dx": -8,
+              "dy": 3
+            },
+            "5": {
+              "dx": -8,
+              "dy": 3
+            },
+            "6": {
+              "dx": -9,
+              "dy": 3
+            }
+          },
+          "offX": 8,
+          "exclude": [
+            2
+          ],
+          "loop": {
+            "from": 0,
+            "to": 0,
+            "times": 2
+          }
+        },
+        "uppercut": {
+          "src": "assets/sprites/brawler/meka_uppercut_512_truepixel_324x324_raw.png",
+          "cols": 4,
+          "rows": 2,
+          "start": 0,
+          "frames": 5,
+          "fps": 18,
+          "mode": "once",
+          "ch": 314,
+          "cw": 314,
+          "scale": 0.62,
+          "offY": 18,
+          "offX": 6,
+          "cells": {
+            "0": {
+              "dx": 1,
+              "dy": -13
+            },
+            "1": {
+              "dx": -19,
+              "dy": -14
+            },
+            "2": {
+              "dx": -27,
+              "dy": -13
+            },
+            "3": {
+              "dx": -31,
+              "dy": -12
+            },
+            "4": {
+              "dx": -12,
+              "dy": -13
+            },
+            "5": {
+              "dx": -10,
+              "dy": -1
+            }
+          },
+          "exclude": [
+            4
+          ],
+          "loop": {
+            "from": 1,
+            "to": 1,
+            "times": 3
+          }
+        },
+        "backkick": {
+          "src": "assets/sprites/brawler/meka_spinkick_512.png",
+          "cols": 13,
+          "rows": 1,
+          "start": 0,
+          "frames": 13,
+          "fps": 21,
+          "mode": "once",
+          "ch": 512,
+          "cw": 512,
+          "scale": 0.38,
+          "cells": {
+            "1": {
+              "dx": -7,
+              "dy": 0
+            },
+            "2": {
+              "dx": 50,
+              "dy": -4
+            },
+            "3": {
+              "dx": 56,
+              "dy": -3
+            },
+            "4": {
+              "dx": 19,
+              "dy": -2
+            },
+            "5": {
+              "dx": 80,
+              "dy": -3
+            },
+            "6": {
+              "dx": 85,
+              "dy": -4
+            },
+            "7": {
+              "dx": 31,
+              "dy": 0
+            },
+            "8": {
+              "dx": 45,
+              "dy": -2
+            },
+            "9": {
+              "dy": 3,
+              "dx": 3
+            },
+            "10": {
+              "dx": -6,
+              "dy": 4
+            },
+            "11": {
+              "dx": 1,
+              "dy": 2
+            }
+          },
+          "exclude": [
+            3
+          ],
+          "offY": 13,
+          "loop": {
+            "from": 6,
+            "to": 6,
+            "times": 2
           }
         }
       }
