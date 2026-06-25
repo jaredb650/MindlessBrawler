@@ -26,7 +26,7 @@ const SFX = {
   pitchVary: 0.06,      // ±6% random playbackRate on every sfx → no two hits sound identical
   throttleMs: 32,       // don't re-stack the SAME sound faster than this
   throttle: { gunshot: 0 },   // per-sound throttle override (ms): gunshot fires EVERY machine-gun blow (no throttle)
-  gain: { hit_heavy: 0.8, beam_fire: 0.8, swipe: 0.6 },   // per-sound volume trim (tune by ear): hit_heavy -20%; beam_fire layers on explosion → -20%; swipe (dash trail) -40%
+  gain: { hit_heavy: 0.8, beam_fire: 0.8, swipe: 0.6, char_select: 0.45 },   // per-sound volume trim (tune by ear): hit_heavy -20%; beam_fire -20%; swipe -40%; char_select (epic spell impact) -55% — it's loud
   ctx: null,            // AudioContext (lazy)
   masterGain: null,     // master GainNode → destination
   buffers: {},          // name → AudioBuffer | null (missing) | Promise (decoding)
@@ -50,7 +50,7 @@ const SOUND_MANIFEST = {
   execution: ['exec_grab', 'exec_punch', 'exec_riser', 'exec_blast'],
   flatliner: ['flatliner_freeze', 'flatliner_hit', 'flatliner_drop', 'flatliner_ko'],
   match:     ['fight_start', 'ko', 'ko_freeze'],
-  ui:        ['ui_move', 'ui_confirm', 'ui_back'],
+  ui:        ['ui_move', 'ui_confirm', 'ui_back', 'char_select'],
   music:     ['music_menu', 'music_fight'],
 };
 

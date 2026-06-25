@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Characters: per-character definitions — the single source of truth for a
 // fighter's IDENTITY (moveset, stats, input mapping, render profile, supers).
-// The game began as a mirror match (both fighters = the MMA 'brawler'); this
+// The game began as a mirror match (both fighters = the base 'brawler'); this
 // registry is the seam a 2nd character (Vesper, gun-kata) layers in through.
 //
 // A Fighter reads its identity from here at construction: this.char / charType /
@@ -12,8 +12,8 @@
 const CHARACTERS = {
   brawler: {
     id: 'brawler',
-    name: 'BRAWLER',
-    moves: MOVES,        // the shared MMA moveset (js/moves.js)
+    name: 'MEKA',
+    moves: MOVES,        // the shared base moveset (js/moves.js)
     // physical "feel" — the bruiser's values ARE the original CFG constants (so nothing changes).
     // A 2nd character overrides these (e.g. less HP, faster, less-floaty jumps).
     stats: {

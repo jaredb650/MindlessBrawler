@@ -2121,7 +2121,32 @@
         "cellW": 240,
         "cellH": 240
       },
-      "sheets": {}
+      "sheets": {
+        "idle": {
+          "src": "assets/sprites/brawler/gunman_poses.png",
+          "cols": 10,
+          "rows": 1,
+          "start": 0,
+          "frames": 10,
+          "fps": 18,
+          "mode": "loop",
+          "ch": 512,
+          "cw": 512,
+          "scale": 0.48,
+          "offY": 36,
+          "offX": -6,
+          "cells": {
+            "2": {
+              "dx": -1,
+              "dy": 0
+            },
+            "3": {
+              "dx": -2,
+              "dy": 2
+            }
+          }
+        }
+      }
     },
     "xamora": {
       "global": {

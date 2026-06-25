@@ -49,6 +49,20 @@ function drawUI(ctx, game) {
   ctx.textAlign = 'left';
   ctx.fillText(f2.name, W - 40 - barW, 22);
 
+  // P1 / P2 over-head tags — readable even in a same-character mirror match
+  const bodyH = CFG.BODY_H || 170;
+  for (let i = 0; i < 2; i++) {
+    const f = game.fighters[i]; if (f.hp <= 0) continue;
+    const col = i === 0 ? '#4fc3f7' : '#ef5350';
+    const hx = Math.round(f.x), hy = Math.round(f.y - bodyH - 16);
+    ctx.textAlign = 'center'; ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.strokeText(i === 0 ? 'P1' : 'P2', hx, hy);
+    ctx.fillStyle = col; ctx.fillText(i === 0 ? 'P1' : 'P2', hx, hy);
+    ctx.beginPath(); ctx.moveTo(hx - 5, hy + 5); ctx.lineTo(hx + 5, hy + 5); ctx.lineTo(hx, hy + 11); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill();
+  }
+
   // meter (bottom corners) — glows READY at full
   const mW = 320, mY = CFG.STAGE_H - 46;
   drawBar(ctx, 40, mY, mW, 18, f1.meter / CFG.MAX_METER, f1.meter >= CFG.MAX_METER ? '#ffe082' : '#4fc3f7', '#2a2a33', false);

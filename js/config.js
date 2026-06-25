@@ -4,7 +4,7 @@
 // Units: pixels, frames (60 logic frames = 1 second).
 // ─────────────────────────────────────────────────────────────
 const CFG = {
-  // Arena — the phone booth. Fixed camera, hard walls, cornering is real.
+  // Arena — tight and walled. Fixed camera, hard walls, cornering is real.
   STAGE_W: 1280,
   STAGE_H: 720,
   FLOOR_Y: 640,

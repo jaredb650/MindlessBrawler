@@ -1526,7 +1526,7 @@ class Fighter {
     // get yanked to the floor before the pin renders (it pops down on timeout).
     if (!this.isAirborne() && this.state !== 'thrown' && this.state !== 'suplexed' && this.state !== 'wallsplat' && !(this.move && this.move.gazelleHop) && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
 
-    // Walls — the phone booth has hard edges. Launched bodies splat and rebound.
+    // Walls — the arena has hard edges. Launched bodies splat and rebound.
     const minX = CFG.WALL_L + 30, maxX = CFG.WALL_R - 30;
     if (this.x < minX) {
       this.x = minX;
