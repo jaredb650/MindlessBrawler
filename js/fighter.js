@@ -948,7 +948,9 @@ class Fighter {
         }
         // MAGIC PUNCH COMBO: once the chain has confirmed (>=2), the attacker LATCHES to the
         // opponent — glides to strike range every frame so the inescapable string never drops.
-        if (this.punchChain >= 2) {
+        // EXCLUSIVE to characters with char.comboMagnet (Andromeda's rushdown "teleport"); other
+        // characters still chain via cancels + per-move lungeVx, just without the big dash-across.
+        if (this.punchChain >= 2 && this.char.comboMagnet) {
           const toward = Math.sign(opp.x - this.x) || this.facing;   // re-aim each frame so a cross-up can't strand the magnet behind them
           this.facing = toward;
           const want = opp.x - toward * CFG.MAGNET_DIST;

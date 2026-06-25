@@ -231,6 +231,7 @@ CHARACTERS.vesper = {
   dmgScalePerHit: 0.07,                              // gentler combo decay than the 0.10 default (her strings stay meaty)
   minDmgScale: 0.55,                                 // ...and a much higher floor (0.55 vs 0.35) so her LONG juggles keep hurting
   meterMult: 3.0,                                    // her specials are weaker / whiff more → her meter fills 3x faster
+  comboMagnet: true,                                // EXCLUSIVE: her confirmed punch chain latches/dashes her to the victim (the rushdown "teleport"). Other chars chain without the glide.
   airDash: true,                                    // rushdown mobility: a mid-air blink (fighter.js air state)
   doubleJump: true,                                 // a second jump in the air
   wallJump: true,                                   // kick off a wall for more air (refreshes double jump + air-dash)

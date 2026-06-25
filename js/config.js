@@ -354,7 +354,7 @@ const CFG = {
 
   // Clinch — neutral P+K locks the bodies together: dirty boxing, body knees,
   // a judo throw off BACK, and a mash-escape for the victim. Auto-releases.
-  CLINCH_GRAB_RANGE: 375,        // 3x reach (was 125) — extended P+K grab range (clinch grab / Xamora Talon)
+  CLINCH_GRAB_RANGE: 220,        // P+K grab range (clinch grab / Xamora Talon) — pulled back from the 375 over-reach (orig 125)
   // grabs slide INTO the reach with leftover momentum → a walk/dash grab reaches further
   GRAB_SLIDE_WALK: 4.5,          // forward px/frame a grab carries when started from a walk
   GRAB_SLIDE_RUN: 8.5,           // ...and from a dash (run) — a real lunging snatch

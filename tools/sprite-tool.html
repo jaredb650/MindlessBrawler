@@ -41,6 +41,21 @@
   #strip canvas.adj { outline:2px solid #e0a23a; outline-offset:-2px; }
   #strip canvas.excl { opacity:0.3; filter:grayscale(1); box-shadow:0 0 0 2px var(--bad) inset; }
   #strip canvas.loopf { box-shadow:0 0 0 2px #e0a32a inset; }   /* frames inside the loop segment */
+  #strip canvas.addable { cursor:copy; } #strip canvas.addable:hover { box-shadow:0 0 0 2px var(--good) inset; }
+  /* ── timeline strip (explicit play order: drag / duplicate / mirror) ── */
+  #tlwrap { width:100%; max-width:680px; display:none; }
+  #timeline { display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:4px; }
+  #timeline .tl { position:relative; border:1px solid #2a2d3a; border-radius:3px; background:#0b0c11; cursor:grab; }
+  #timeline .tl canvas { display:block; border-radius:3px; }
+  #timeline .tl.sel { box-shadow:0 0 0 2px var(--acc) inset; }
+  #timeline .tl.play { outline:2px solid var(--good); outline-offset:-2px; }
+  #timeline .tl.over { box-shadow:-3px 0 0 0 var(--good); }
+  #timeline .tl.dragging { opacity:.4; }
+  #timeline .tllbl { position:absolute; left:2px; bottom:1px; font-size:9px; color:#cdd3e1; background:rgba(0,0,0,.55); border-radius:3px; padding:0 3px; pointer-events:none; }
+  #timeline .tlbar { position:absolute; top:1px; right:1px; display:flex; gap:2px; opacity:0; transition:opacity .1s; }
+  #timeline .tl:hover .tlbar { opacity:1; }
+  #timeline .tlbar span { font-size:10px; line-height:1; padding:2px 3px; background:rgba(0,0,0,.7); border-radius:3px; cursor:pointer; color:#cdd3e1; }
+  #timeline .tlbar span.tdel:hover { color:var(--bad); } #timeline .tlbar span.tdup:hover { color:var(--good); } #timeline .tlbar span.tflip:hover { color:var(--acc); }
   #ctrls { width:300px; border-left:1px solid var(--line); background:var(--panel); padding:12px; overflow-y:auto; }
   #ctrls h3 { margin:0 0 4px; font-size:12px; color:var(--acc); }
   .row { display:flex; align-items:center; gap:8px; margin:7px 0; }
@@ -136,6 +151,10 @@
         <button id="anchorbtn" title="anchor align: click a point (e.g. rear foot) to set a reference, then click the SAME point on other frames to snap them into line (sets each frame's per-frame nudge)">⚓ Anchor: off</button>
       </div>
       <div id="strip"></div>
+      <div id="tlwrap">
+        <div class="hint" style="text-align:center">▶ timeline — drag to reorder · click to select · ⧉ duplicate · ⇋ mirror · ✕ delete · click a grid cell above to append</div>
+        <div id="timeline"></div>
+      </div>
     </div>
     <div id="ctrls"><div class="empty">Pick an animation on the left.</div></div>
   </div>
@@ -164,6 +183,7 @@
     <span id="tplbl" class="hint"></span>
     <div class="grow"></div>
     <button id="tpApply" class="go" title="process all frames with the current settings (Enter)">✓ Apply</button>
+    <button id="tpUse" class="go" title="apply these processed frames straight to THIS animation — uploads + repoints the sheet (no download/reupload)">★ Apply to anim</button>
     <button id="tpdlraw">⬇ Raw</button>
     <button id="tpdlscaled">⬇ Scaled</button>
     <button id="tpexit">← Back</button>
@@ -408,7 +428,9 @@ function renderEditor(){
     <div class="row"><label>cols</label><input type="number" data-k="cols" value="${sh.cols||1}"><label>start</label><input type="number" data-k="start" value="${sh.start||0}"></div>
     <div class="row"><label>frames</label><input type="number" data-k="frames" value="${sh.frames||1}"></div>
     <button class="full" id="reslice">⊞ auto-slice (grid + skip empty cells)</button>
-    <div class="hint">click a cell below = start · shift-click = end · <b>alt-click = exclude</b> (red = skipped in playback)</div>
+    <div class="hint" id="gridhint">click a cell below = start · shift-click = end · <b>alt-click = exclude</b> (red = skipped in playback)</div>
+    <button class="full" id="tlbtn"></button>
+    <div class="hint" id="tlhint"></div>
     <hr>
     <h3>Alignment</h3>
     ${ctrlRange('scale','scale',0.3,2.5,0.005,v=>(+v).toFixed(3))}
@@ -426,7 +448,7 @@ function renderEditor(){
     </select></div>
     ${ctrlRange('speed','fps',1,60,1,v=>v+' fps')}
     <div class="hint">${sh.mode==='syncMove'?"in-game this locks to the move's frame length; the slider sets PREVIEW speed":'frames per second (controls in-game + preview speed)'}</div>
-    <div class="row"><label>loop frames</label>
+    <div class="row" id="looprow"><label>loop frames</label>
       <input type="number" id="loopFrom" min="0" value="${sh.loop?sh.loop.from:0}" style="width:50px" title="first frame of the looped range">
       <span class="hint">to</span>
       <input type="number" id="loopTo" min="0" value="${sh.loop?sh.loop.to:Math.max(0,(sh.frames||1)-1)}" style="width:50px" title="last frame of the looped range">
@@ -491,6 +513,18 @@ function bindControls(){
   document.getElementById('autobtn').onclick=autoAlign;
   const sn=c.querySelector('[data-k2=snap]'); if(sn) sn.onchange=()=>{ const s=sheet(); if(sn.checked) s.snap=true; else delete s.snap; };
   const rs=document.getElementById('reslice'); if(rs) rs.onclick=()=>{ const s=sheet(); if(s.src&&keyed[s.src]){ autoSliceSheet(s,s.src); renderEditor(); } else status('load a sheet first'); };
+  const om=!!(sh.order&&sh.order.length);
+  const tlb=document.getElementById('tlbtn');
+  if(tlb){
+    tlb.textContent = om ? ('✕ clear timeline ('+sh.order.length+' steps → back to grid window)') : '▦ Convert to timeline — drag · duplicate · mirror frame order';
+    tlb.style.color = om ? 'var(--bad)' : 'var(--acc)';
+    tlb.onclick = om ? clearTimeline : convertToTimeline;
+    document.getElementById('tlhint').innerHTML = om
+      ? 'click a grid cell above to <b>append</b> it · drag the timeline thumbnails to reorder · ⧉ dup · ⇋ mirror · ✕ del'
+      : 'turn the grid window into an explicit, reorderable frame list (reorder, duplicate & mirror individual frames).';
+  }
+  if(om){ const lr=document.getElementById('looprow'); if(lr){ lr.style.display='none'; const lh=lr.nextElementSibling; if(lh&&lh.className==='hint') lh.style.display='none'; }
+    const gh=document.getElementById('gridhint'); if(gh) gh.innerHTML='timeline mode — the grid above is a palette; <b>click a cell to append it</b> to the order.'; }
   document.getElementById('delsheet').onclick=()=>{ if(confirm('Remove '+slotKey+'?')){ delete sheets()[slotKey]; slotKey=null; renderList(); renderEditor(); } };
   setupDrop();
 }
@@ -513,13 +547,19 @@ let _rkT; function rekey(){ const sh=sheet(); if(!sh||!sh.src) return;
 function rekeySoon(){ clearTimeout(_rkT); _rkT=setTimeout(rekey, 60); }   // debounce re-keying a big sheet while dragging
 function totalCells(){ const d=dims[sheet().src]; const cw=cellW(),ch=cellH(),cols=sheet().cols||1; if(!d) return (sheet().frames||1); return Math.max(1, Math.floor(d.w/cw)*Math.floor(d.h/ch)); }
 function buildStrip(){
-  const strip=document.getElementById('strip'); strip.innerHTML=''; const sh=sheet(); if(!sh||!sh.src||!keyed[sh.src]) return;
+  const strip=document.getElementById('strip'); strip.innerHTML=''; const sh=sheet(); if(!sh||!sh.src||!keyed[sh.src]){ buildTimeline(); return; }
   const cw=cellW(),ch=cellH(),cols=sh.cols||1, n=totalCells(), start=sh.start||0, end=start+(sh.frames||1)-1;
+  const orderMode=!!(sh.order&&sh.order.length);
   const tw=64, th=Math.round(64*ch/cw);
   for(let i=0;i<n;i++){
     const cv=document.createElement('canvas'); cv.width=tw; cv.height=th;
     const g=cv.getContext('2d'); const sx=(i%cols)*cw, sy=((i/cols)|0)*ch;
     g.drawImage(keyed[sh.src], sx,sy,cw,ch, 0,0,tw,th);
+    if(orderMode){                                                  // timeline = grid is a palette: click a cell → append it
+      cv.className='addable'; cv.title='cell '+i+'  ·  click = append to timeline';
+      cv.onclick=()=>appendToOrder(i);
+      strip.appendChild(cv); continue;
+    }
     const inRange=i>=start&&i<=end, fi=i-start, excluded=inRange && sh.exclude && sh.exclude.indexOf(fi)>=0;
     if(inRange) cv.className='in'; if(i===start||i===end) cv.className+=' edge';
     if(inRange && sh.cells && sh.cells[fi]) cv.className+=' adj';   // tagged with a per-frame nudge
@@ -535,35 +575,48 @@ function buildStrip(){
     };
     strip.appendChild(cv);
   }
+  buildTimeline();
 }
-function updateScrub(){ const sh=sheet(); const sc=document.getElementById('scrub'); sc.max=Math.max(0,(sh.frames||1)-1); }
+function updateScrub(){ const sh=sheet(); const sc=document.getElementById('scrub'); sc.max=Math.max(0,frameCount(sh)-1); }
 
 // preview animation
 let t0=performance.now(), curFrame=0;
 function effFps(){ return (sheet().fps)||30; }   // preview speed = the fps slider, for every mode
+// frame addressing: in LEGACY mode `frame` = frame index (cell = start+frame); in TIMELINE mode (sh.order)
+// `frame` = step index → resolves the cell + per-step nudge/mirror from the order entry. Mirrors render.js.
+function frameCount(sh){ return (sh&&sh.order&&sh.order.length) ? sh.order.length : Math.max(1,(sh&&sh.frames)||1); }
+function resolveStep(sh, frame){
+  if(sh.order && sh.order.length){ const e=sh.order[Math.max(0,Math.min(sh.order.length-1,frame|0))]||{}; return { cell:e.cell||0, dx:e.dx||0, dy:e.dy||0, ds:e.ds||0, flip:!!e.flip }; }
+  const c=sh.cells&&sh.cells[frame]; return { cell:(sh.start||0)+frame, dx:(c&&c.dx)||0, dy:(c&&c.dy)||0, ds:(c&&c.ds)||0, flip:!!(c&&c.flip) };
+}
 function paintSprite(g, key, cx, fy, frame){   // draw one sheet's frame with the GAME's exact math (feet at fy)
   const sh=sheets()[key]; if(!sh||!sh.src||!keyed[sh.src]) return false;
-  const cw=(sh.cw||gl().cellW||240), ch=(sh.ch||gl().cellH||240), cols=sh.cols||1, cell=(sh.start||0)+frame;
+  const cw=(sh.cw||gl().cellW||240), ch=(sh.ch||gl().cellH||240), cols=sh.cols||1;
+  const st=resolveStep(sh, frame), cell=st.cell;
   const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
   let scale=sh.scale!=null?sh.scale:(gl().scale!=null?gl().scale:1), offX=sh.offX!=null?sh.offX:(gl().offX||0), offY=sh.offY!=null?sh.offY:(gl().offY||0);
-  const cadj=sh.cells&&sh.cells[frame]; if(cadj){ offX+=cadj.dx||0; offY+=cadj.dy||0; scale+=cadj.ds||0; }   // per-frame nudge (matches game render)
+  offX+=st.dx; offY+=st.dy; scale+=st.ds;   // per-frame nudge (matches game render)
   g.save(); g.translate(cx,fy);
   const facesLeft = sh.faceLeft!=null ? sh.faceLeft : gl().artFacesLeft;   // per-sheet override, else global
   const flip = facesLeft ? facing===1 : facing===-1; if(flip) g.scale(-1,1);
   let dw=cw*scale, dh=ch*scale;
   g.imageSmoothingEnabled=false;   // match the game: hard pixels, no bilinear blur
-  let dx0=-dw/2+offX, dy0=sh.flipY?-offY:(-dh+offY);
+  const fflip = st.flip ? -1 : 1;   // per-frame horizontal mirror, anchored on the centerline (negate offX)
+  let dx0=-dw/2+fflip*offX, dy0=sh.flipY?-offY:(-dh+offY);
+  if(fflip<0) g.scale(-1,1);
   if(sh.flipY) g.scale(1,-1);   // vertical mirror, feet kept at baseline
   if(sh.snap){ dx0=Math.round(dx0); dy0=Math.round(dy0); dw=Math.round(dw); dh=Math.round(dh); }   // pixel-snap: kill sub-pixel shimmer
   g.drawImage(keyed[sh.src], sx,sy,cw,ch, dx0,dy0, dw,dh);
   g.restore(); return true;
 }
 function includedFrames(sh){   // frame indices that actually play (exclusions skipped); never empty
+  if(sh.order && sh.order.length) return sh.order.map((_,i)=>i);   // timeline = explicit, nothing excluded
   const nf=Math.max(1,sh.frames||1), ex=sh.exclude||[], out=[];
   for(let i=0;i<nf;i++) if(ex.indexOf(i)<0) out.push(i);
   return out.length?out:[0];
 }
 function playOrder(sh){   // play sequence: included frames + an optional loop segment repeated (mirrors render.js)
+  if(sh.order && sh.order.length) return sh.order.map((_,i)=>i);   // timeline is explicit; repeats = duplicated steps
   const base=includedFrames(sh), loop=sh.loop&&sh.loop.times>1?sh.loop:null;
   if(!loop) return base;
   const from=loop.from|0, to=loop.to|0; if(to<from) return base;
@@ -653,7 +706,7 @@ function drawGhost(g, cx, fy, frame, color, alpha){    // flat coloured silhouet
   g.save(); g.globalAlpha=alpha; g.drawImage(_gc,0,0); g.restore();
 }
 function drawOnion(g, cx, fy){
-  const nf=Math.max(1,sheet().frames||1);
+  const nf=frameCount(sheet());
   for(let d=Math.max(1,onionN|0); d>=1; d--){          // farther first (fainter), nearer on top
     if(curFrame-d>=0)     drawGhost(g, cx, fy, curFrame-d, '#ff5a6e', 0.34/d);   // previous = red
     if(curFrame+d<=nf-1)  drawGhost(g, cx, fy, curFrame+d, '#5aa6ff', 0.34/d);   // next = blue
@@ -663,7 +716,7 @@ const _dA=document.createElement('canvas'), _dB=document.createElement('canvas')
 function drawDiff(g, cx, fy){                           // pixel diff: current frame vs reference frame
   const A=fitOff(_dA), B=fitOff(_dB), W=_dA.width, H=_dA.height;
   A.setTransform(1,0,0,1,0,0); A.clearRect(0,0,W,H); B.setTransform(1,0,0,1,0,0); B.clearRect(0,0,W,H);
-  const nf=Math.max(1,sheet().frames||1), rf=Math.max(0,Math.min(nf-1,refFrame));
+  const nf=frameCount(sheet()), rf=Math.max(0,Math.min(nf-1,refFrame));
   paintSprite(A, slotKey, cx, fy, curFrame); paintSprite(B, slotKey, cx, fy, rf);
   const pa=A.getImageData(0,0,W,H), pb=B.getImageData(0,0,W,H), out=A.createImageData(W,H);
   const da=pa.data, db=pb.data, o=out.data;
@@ -684,7 +737,7 @@ function loop(){
   g.strokeStyle='#3a3f50'; g.lineWidth=2; g.beginPath(); g.moveTo(0,fy); g.lineTo(pv.width,fy); g.stroke();
   g.fillStyle='#1a1c24'; g.fillRect(0,fy,pv.width,pv.height-fy);
   const sh=slotKey&&sheet();
-  const nf=Math.max(1,(sh&&sh.frames)||1);
+  const nf=frameCount(sh);
   if(sh){
     if(playing){ const ord=playOrder(sh), m=ord.length, ft=Math.floor((performance.now()-t0)/1000*effFps());
       let idx; if(sh.mode==='boomerang'&&m>1){ const per=2*(m-1), p=((ft%per)+per)%per; idx=p<m?p:per-p; } else idx=ft%m;   // ping-pong else loop (loop segment expands ord)
@@ -718,7 +771,7 @@ function loop(){
 
   // reference figure (left, or centre when empty): a colour-compare sheet, else the procedural placeholder
   if(cmp){
-    const rsh=sheets()[cmp], rfr=((Math.max(1,rsh.frames||1))/2)|0;
+    const rsh=sheets()[cmp], rfr=(frameCount(rsh)/2)|0;
     if(!keyed[rsh.src]) loadSheet(rsh.src, colorTint(rsh), colorBright(rsh), colorContrast(rsh), colorSat(rsh), ()=>{});
     paintSprite(g, cmp, refX, fy, rfr); refLabel(g,'ref · '+cmp, refX, fy);
   } else if(showProc){
@@ -749,8 +802,9 @@ function measureFrame(canvas, cw, ch, cell, cols){
 function autoAlign(){
   const sh=sheet(); if(!sh.src||!keyed[sh.src]) return alert('Load a sheet first.');
   const cw=cellW(),ch=cellH(),cols=sh.cols||1, start=sh.start||0, n=sh.frames||1;
+  const cells=(sh.order&&sh.order.length)?sh.order.map(e=>e.cell||0):Array.from({length:n},(_,i)=>start+i);
   let foot=-1, c0=null;
-  for(let i=0;i<n;i++){ const m=measureFrame(keyed[sh.src],cw,ch,start+i,cols); if(!m)continue; foot=Math.max(foot,m.maxy); if(c0==null) c0=(m.minx+m.maxx)/2; }
+  for(const cell of cells){ const m=measureFrame(keyed[sh.src],cw,ch,cell,cols); if(!m)continue; foot=Math.max(foot,m.maxy); if(c0==null) c0=(m.minx+m.maxx)/2; }
   if(foot<0) return alert('No opaque pixels found.');
   const scale=val('scale');
   sh.offY = Math.round((ch-foot)*scale);            // feet exactly on the floor line (y=0)
@@ -760,43 +814,112 @@ function autoAlign(){
 
 // ───────────────────────── per-frame nudge (deltas on top of sheet alignment) ─────────────────────────
 function drawCross(g,x,y,col){ g.save(); g.strokeStyle=col; g.lineWidth=1.5; g.beginPath(); g.moveTo(x-9,y); g.lineTo(x+9,y); g.moveTo(x,y-9); g.lineTo(x,y+9); g.stroke(); g.beginPath(); g.arc(x,y,4.5,0,7); g.stroke(); g.restore(); }
-function cellAdj(i){ const c=sheet().cells; return (c&&c[i])||{}; }
-function setCell(i,k,v){
-  const sh=sheet(), cells=sh.cells||(sh.cells={});
-  const o=cells[i]||(cells[i]={}); o[k]=v;
-  if(!o.dx&&!o.dy&&!o.ds) delete cells[i];                 // all-zero → inherit the sheet (keeps json tidy)
+function cellAdj(i){ const sh=sheet(); if(sh.order&&sh.order.length) return sh.order[i]||{}; const c=sh.cells; return (c&&c[i])||{}; }
+function setCell(i,k,v){   // write a per-frame nudge/flip — to the order entry in timeline mode, else cells[i]
+  const sh=sheet();
+  if(sh.order && sh.order.length){
+    const e=sh.order[i]; if(!e) return;
+    if(k==='flip'){ if(v) e.flip=true; else delete e.flip; }
+    else if(!v) delete e[k]; else e[k]=v;                  // drop zero deltas (keeps json tidy; cell stays)
+    buildStrip(); return;
+  }
+  const cells=sh.cells||(sh.cells={});
+  const o=cells[i]||(cells[i]={});
+  if(k==='flip'){ if(v) o.flip=true; else delete o.flip; } else o[k]=v;
+  if(!o.dx&&!o.dy&&!o.ds&&!o.flip) delete cells[i];        // all-neutral → inherit the sheet (keeps json tidy)
   if(!Object.keys(cells).length) delete sh.cells;
   buildStrip();
 }
+// ── timeline (explicit play order) ops ──
+let dragSrc=-1;
+function convertToTimeline(){   // bake the current legacy play sequence (window + exclude + loop + cells) into an explicit order
+  const sh=sheet(); if(sh.order&&sh.order.length) return;
+  const seq=playOrder(sh);
+  sh.order = seq.map(fr=>{ const c=sh.cells&&sh.cells[fr], e={cell:(sh.start||0)+fr};
+    if(c){ if(c.dx)e.dx=c.dx; if(c.dy)e.dy=c.dy; if(c.ds)e.ds=c.ds; if(c.flip)e.flip=true; } return e; });
+  delete sh.exclude; delete sh.loop; delete sh.cells;     // now baked into order
+  editFrame=0; renderEditor(); status('timeline on · '+sh.order.length+' steps — drag to reorder');
+}
+function clearTimeline(){ const sh=sheet(); if(!sh.order) return;
+  if(!confirm('Remove the timeline and return to the plain grid window?\n(per-step mirrors / reordering / duplicates will be lost)')) return;
+  const first=sh.order[0]&&sh.order[0].cell||0; delete sh.order;
+  sh.start=first; sh.frames=Math.max(1,sh.frames||1); editFrame=0; renderEditor(); }
+function refreshTlBtn(){ const sh=slotKey&&sheet(), b=document.getElementById('tlbtn'); if(b&&sh&&sh.order&&sh.order.length) b.textContent='✕ clear timeline ('+sh.order.length+' steps → back to grid window)'; }
+function appendToOrder(cell){ const sh=sheet(); const o=sh.order||(sh.order=[]); o.push({cell}); editFrame=o.length-1; curFrame=editFrame; buildStrip(); renderCellCtrls(); refreshTlBtn(); }
+function dupStep(i){ const sh=sheet(); if(!sh.order||!sh.order[i]) return; sh.order.splice(i+1,0,JSON.parse(JSON.stringify(sh.order[i]))); editFrame=i+1; curFrame=i+1; buildStrip(); renderCellCtrls(); refreshTlBtn(); }
+function delStep(i){ const sh=sheet(); if(!sh.order) return; sh.order.splice(i,1);
+  if(!sh.order.length){ delete sh.order; editFrame=0; renderEditor(); return; }
+  editFrame=Math.max(0,Math.min(sh.order.length-1,i)); curFrame=editFrame; buildStrip(); renderCellCtrls(); refreshTlBtn(); }
+function moveStep(from,to){ const sh=sheet(); if(!sh.order||from===to||from<0) return;   // drop = insert before target
+  const arr=sh.order, [e]=arr.splice(from,1); let t = from<to ? to-1 : to; t=Math.max(0,Math.min(arr.length,t));
+  arr.splice(t,0,e); editFrame=t; curFrame=t; buildStrip(); renderCellCtrls(); }
+function buildTimeline(){
+  const wrap=document.getElementById('tlwrap'), tl=document.getElementById('timeline'); if(!tl) return;
+  const sh=slotKey&&sheet(), orderMode=!!(sh&&sh.order&&sh.order.length);
+  wrap.style.display = orderMode ? 'block':'none';
+  tl.innerHTML=''; if(!orderMode||!sh.src||!keyed[sh.src]) return;
+  const cw=cellW(),ch=cellH(),cols=sh.cols||1, tw=56, th=Math.round(56*ch/cw);
+  sh.order.forEach((e,i)=>{
+    const cell=e.cell||0, sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
+    const box=document.createElement('div'); box.className='tl'+(i===editFrame?' sel':'')+(i===curFrame?' play':''); box.draggable=true;
+    const cv=document.createElement('canvas'); cv.width=tw; cv.height=th; const g=cv.getContext('2d');
+    if(e.flip){ g.save(); g.translate(tw,0); g.scale(-1,1); g.drawImage(keyed[sh.src],sx,sy,cw,ch,0,0,tw,th); g.restore(); }
+    else g.drawImage(keyed[sh.src],sx,sy,cw,ch,0,0,tw,th);
+    box.appendChild(cv);
+    const lbl=document.createElement('div'); lbl.className='tllbl'; lbl.textContent=i+(e.flip?' ⇋':'')+' ·c'+cell; box.appendChild(lbl);
+    const bar=document.createElement('div'); bar.className='tlbar';
+    bar.innerHTML='<span class="tflip" title="mirror this step">⇋</span><span class="tdup" title="duplicate">⧉</span><span class="tdel" title="delete">✕</span>';
+    box.appendChild(bar);
+    cv.onclick=()=>{ playing=false; document.getElementById('play').textContent='▶ Play'; editFrame=i; curFrame=i; document.getElementById('scrub').value=i; renderCellCtrls(); buildTimeline(); };
+    bar.querySelector('.tflip').onclick=ev=>{ ev.stopPropagation(); const cur=!!sh.order[i].flip; if(cur) delete sh.order[i].flip; else sh.order[i].flip=true; buildTimeline(); if(i===editFrame) renderCellCtrls(); };
+    bar.querySelector('.tdup').onclick=ev=>{ ev.stopPropagation(); dupStep(i); };
+    bar.querySelector('.tdel').onclick=ev=>{ ev.stopPropagation(); delStep(i); };
+    box.ondragstart=ev=>{ dragSrc=i; box.classList.add('dragging'); ev.dataTransfer.effectAllowed='move'; ev.dataTransfer.setData('text/plain',String(i)); };
+    box.ondragend=()=>{ box.classList.remove('dragging'); };
+    box.ondragover=ev=>{ ev.preventDefault(); ev.dataTransfer.dropEffect='move'; box.classList.add('over'); };
+    box.ondragleave=()=>box.classList.remove('over');
+    box.ondrop=ev=>{ ev.preventDefault(); box.classList.remove('over'); if(dragSrc>=0) moveStep(dragSrc,i); dragSrc=-1; };
+    tl.appendChild(box);
+  });
+}
 function renderCellCtrls(){
   const box=document.getElementById('cellbox'); if(!box||!slotKey) return;
-  const sh=sheet(), nf=Math.max(1,sh.frames||1);
+  const sh=sheet(), orderMode=!!(sh.order&&sh.order.length), nf=frameCount(sh);
   editFrame=Math.max(0,Math.min(nf-1,editFrame|0));
-  const a=cellAdj(editFrame), tagged=Object.keys(sh.cells||{}).length;
+  const a=cellAdj(editFrame);
+  const tagged = orderMode ? sh.order.filter(e=>e.dx||e.dy||e.ds||e.flip).length : Object.keys(sh.cells||{}).length;
   const excl=(sh.exclude||[]).indexOf(editFrame)>=0;
+  const noun = orderMode?'step':'frame';
+  const hdr = orderMode ? `step ${editFrame} / ${nf-1} · cell ${sh.order[editFrame]?sh.order[editFrame].cell:'?'}` : `frame ${editFrame} / ${nf-1}${excl?' · <span style="color:var(--bad)">SKIPPED</span>':''}`;
+  const manage = orderMode
+    ? `<div class="row"><button class="mini" id="cf_dup" style="flex:1">⧉ duplicate this step</button><button class="mini" id="cf_del" style="flex:1;color:var(--bad)">✕ delete step</button></div>`
+    : `<div class="row"><button class="mini" id="cf_excl" style="flex:1${excl?';color:var(--bad)':''}">${excl?'☑ included? no — click to include':'⊘ exclude / skip this frame'}</button></div>`;
   box.innerHTML=`
     <div class="row"><button class="mini" id="cf_prev">◀</button>
-      <span class="val" style="width:auto;flex:1;text-align:center;color:var(--txt)">frame ${editFrame} / ${nf-1}${excl?' · <span style="color:var(--bad)">SKIPPED</span>':''}</span>
+      <span class="val" style="width:auto;flex:1;text-align:center;color:var(--txt)">${hdr}</span>
       <button class="mini" id="cf_next">▶</button></div>
-    <div class="row"><button class="mini" id="cf_excl" style="flex:1${excl?';color:var(--bad)':''}">${excl?'☑ included? no — click to include':'⊘ exclude / skip this frame'}</button></div>
-    <div class="row"><button class="mini" id="cf_touch" style="flex:1">✎ touch-up — erase pixels in this frame</button></div>
-    <div class="row"><button class="mini" id="cf_setref" style="flex:1${refFrame===editFrame?';color:#c08bff':''}">★ ${refFrame===editFrame?'IS reference frame':'set as reference frame'}</button><span class="val" style="width:auto;color:var(--dim)">ref ${refFrame}</span></div>
+    ${manage}
+    <div class="row"><button class="mini" id="cf_flip" style="flex:1${a.flip?';color:var(--acc);border-color:var(--acc)':''}">⇋ mirror this ${noun} · ${a.flip?'ON':'off'}</button></div>
+    <div class="row"><button class="mini" id="cf_touch" style="flex:1">✎ touch-up — erase pixels in this ${noun}</button></div>
+    <div class="row"><button class="mini" id="cf_setref" style="flex:1${refFrame===editFrame?';color:#c08bff':''}">★ ${refFrame===editFrame?'IS reference '+noun:'set as reference '+noun}</button><span class="val" style="width:auto;color:var(--dim)">ref ${refFrame}</span></div>
     <div class="row"><label>Δx</label><input type="range" id="cf_dx" min="-160" max="160" step="1" value="${a.dx||0}"><span class="val" id="cf_dxv">${a.dx||0}</span></div>
     <div class="row"><label>Δy</label><input type="range" id="cf_dy" min="-160" max="160" step="1" value="${a.dy||0}"><span class="val" id="cf_dyv">${a.dy||0}</span></div>
     <div class="row"><label>Δscale</label><input type="range" id="cf_ds" min="-0.6" max="0.6" step="0.005" value="${a.ds||0}"><span class="val" id="cf_dsv">${(a.ds||0).toFixed(3)}</span></div>
-    <div class="row"><button class="mini" id="cf_clr">clear frame</button><button class="mini" id="cf_clrall">clear all${tagged?' ('+tagged+')':''}</button></div>
-    <div class="hint">scrub or ◀ ▶ to a frame, then nudge it. Deltas stack on the alignment above; gold-outlined cells below are tagged.</div>`;
+    <div class="row"><button class="mini" id="cf_clr">clear ${noun}</button><button class="mini" id="cf_clrall">clear all${tagged?' ('+tagged+')':''}</button></div>
+    <div class="hint">scrub or ◀ ▶ to a ${noun}, then nudge / mirror it. Deltas stack on the alignment above.${orderMode?' Mirror reuses art for spins.':''}</div>`;
   const pause=()=>{ playing=false; document.getElementById('play').textContent='▶ Play'; };
   const sync=()=>{ curFrame=editFrame; document.getElementById('scrub').value=editFrame; };
-  box.querySelector('#cf_prev').onclick=()=>{ pause(); editFrame--; sync(); renderCellCtrls(); };
-  box.querySelector('#cf_next').onclick=()=>{ pause(); editFrame++; sync(); renderCellCtrls(); };
-  box.querySelector('#cf_excl').onclick=()=>{ toggleExclude(editFrame); };   // exclude works on the frame currently shown
+  box.querySelector('#cf_prev').onclick=()=>{ pause(); editFrame--; sync(); renderCellCtrls(); buildTimeline(); };
+  box.querySelector('#cf_next').onclick=()=>{ pause(); editFrame++; sync(); renderCellCtrls(); buildTimeline(); };
+  if(orderMode){ box.querySelector('#cf_dup').onclick=()=>dupStep(editFrame); box.querySelector('#cf_del').onclick=()=>delStep(editFrame); }
+  else box.querySelector('#cf_excl').onclick=()=>{ toggleExclude(editFrame); };
+  box.querySelector('#cf_flip').onclick=()=>{ pause(); sync(); setCell(editFrame,'flip',!cellAdj(editFrame).flip); renderCellCtrls(); buildTimeline(); };
   box.querySelector('#cf_touch').onclick=()=>{ pause(); sync(); openTouchup(); };
   box.querySelector('#cf_setref').onclick=()=>{ refFrame=editFrame; buildStrip(); renderCellCtrls(); };   // reference for flip-test + diff
-  const bind=(id,k,fmt)=>{ const el=box.querySelector('#'+id); el.oninput=()=>{ pause(); sync(); const v=parseFloat(el.value)||0; setCell(editFrame,k,v); const l=document.getElementById(id+'v'); if(l) l.textContent=fmt?fmt(v):v; }; };
+  const bind=(id,k,fmt)=>{ const el=box.querySelector('#'+id); el.oninput=()=>{ pause(); sync(); const v=parseFloat(el.value)||0; setCell(editFrame,k,v); const l=document.getElementById(id+'v'); if(l) l.textContent=fmt?fmt(v):v; buildTimeline(); }; };
   bind('cf_dx','dx'); bind('cf_dy','dy'); bind('cf_ds','ds',v=>v.toFixed(3));
-  box.querySelector('#cf_clr').onclick=()=>{ const c=sheet().cells; if(c){ delete c[editFrame]; if(!Object.keys(c).length) delete sheet().cells; } buildStrip(); renderCellCtrls(); };
-  box.querySelector('#cf_clrall').onclick=()=>{ delete sheet().cells; buildStrip(); renderCellCtrls(); };
+  box.querySelector('#cf_clr').onclick=()=>{ if(orderMode){ const e=sh.order[editFrame]; if(e){ delete e.dx; delete e.dy; delete e.ds; delete e.flip; } } else { const c=sheet().cells; if(c){ delete c[editFrame]; if(!Object.keys(c).length) delete sheet().cells; } } buildStrip(); renderCellCtrls(); };
+  box.querySelector('#cf_clrall').onclick=()=>{ if(orderMode){ sh.order.forEach(e=>{ delete e.dx; delete e.dy; delete e.ds; delete e.flip; }); } else delete sheet().cells; buildStrip(); renderCellCtrls(); };
 }
 
 // ───────────────────────── drop / upload ─────────────────────────
@@ -860,8 +983,8 @@ function cellSnap(canvas,sx,sy,w,h){ return canvas.getContext('2d',{willReadFreq
 function openTouchup(){
   const sh=sheet(); if(!sh||!sh.src||!keyed[sh.src]) return alert('Load a sheet first.');
   if(!orig[sh.src]) return alert('Original not loaded yet — reselect this animation, then try again.');
-  editFrame=Math.max(0,Math.min((sh.frames||1)-1, editFrame|0));
-  const cw=cellW(), ch=cellH(), cols=sh.cols||1, cell=(sh.start||0)+editFrame;
+  editFrame=Math.max(0,Math.min(frameCount(sh)-1, editFrame|0));
+  const cw=cellW(), ch=cellH(), cols=sh.cols||1, cell=resolveStep(sh,editFrame).cell;
   const sx=(cell%cols)*cw, sy=((cell/cols)|0)*ch;
   const z=Math.max(1, Math.min(4, Math.floor(560/Math.max(cw,ch))));
   const cv=document.getElementById('tucv'); cv.width=cw*z; cv.height=ch*z; cv.style.width=(cw*z)+'px'; cv.style.height=(ch*z)+'px';
@@ -938,7 +1061,7 @@ document.getElementById('save').onclick=doSave;
 document.getElementById('dl').onclick=downloadJSON;
 fetch('/api/ping').then(r=>r.ok&&r.json()).then(j=>{ hasServer=!!(j&&j.ok); markServer(); if(!hasServer) status('⚠ run `node server.js` to add art + Save to disk'); }).catch(()=>{ hasServer=false; markServer(); status('⚠ run `node server.js` to add art + Save to disk'); });
 document.getElementById('play').onclick=function(){ playing=!playing; this.textContent=playing?'⏸ Pause':'▶ Play'; if(playing) t0=performance.now(); };
-document.getElementById('scrub').oninput=function(){ playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=parseInt(this.value)||0; editFrame=curFrame; renderCellCtrls(); };
+document.getElementById('scrub').oninput=function(){ playing=false; document.getElementById('play').textContent='▶ Play'; curFrame=parseInt(this.value)||0; editFrame=curFrame; renderCellCtrls(); buildTimeline(); };
 document.getElementById('facebtn').onclick=()=>facing=-facing;
 document.getElementById('anchorbtn').onclick=function(){ anchorMode=!anchorMode; anchorRef=null;
   if(anchorMode){ playing=false; document.getElementById('play').textContent='▶ Play'; status('⚓ click the anchor point (e.g. rear foot) on this frame to set the reference'); }
@@ -963,7 +1086,7 @@ document.getElementById('headbtn').onclick=function(){ showHead=!showHead; this.
 function syncAids(){ const set=(id,on,lab)=>{ const b=document.getElementById(id); if(b){ b.textContent=lab+(on?'on':'off'); b.classList.toggle('on',on); } };
   set('onionbtn',onion,'Onion: '); set('flipbtn',flipTest,'FlipTest: '); set('diffbtn',diffMode,'Diff: '); }
 function toggleFlip(){ flipTest=!flipTest;
-  if(flipTest){ const sh=slotKey&&sheet(), nf=Math.max(1,(sh&&sh.frames)||1); flipA=Math.min(nf-1,refFrame); flipB=(editFrame!==flipA)?Math.min(nf-1,editFrame):Math.min(nf-1,flipA+1); _flipT=performance.now(); }
+  if(flipTest){ const sh=slotKey&&sheet(), nf=frameCount(sh); flipA=Math.min(nf-1,refFrame); flipB=(editFrame!==flipA)?Math.min(nf-1,editFrame):Math.min(nf-1,flipA+1); _flipT=performance.now(); }
   syncAids(); }
 document.getElementById('onionbtn').onclick=()=>{ onion=!onion; syncAids(); };
 document.getElementById('onionN').onchange=function(){ onionN=Math.max(1,Math.min(4,parseInt(this.value)||1)); this.value=onionN; };
@@ -1137,10 +1260,38 @@ function tpOpen(){
 function tpClose(){ document.getElementById('tp').classList.remove('open'); }
 function tpDownload(canvas,name){ canvas.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); status('⬇ '+name); }); }
 function tpBaseName(){ const sh=sheet(); const base=(sh.src||'sheet').split('/').pop().replace(/\.png$/i,''); return base+'_truepixel'; }
+// Apply the processed truepixel frames DIRECTLY to the current animation: assemble the raw sheet,
+// upload it, and repoint THIS slot at it — no manual download + reupload round-trip.
+function tpApplyToAnim(){
+  const sh=slotKey&&sheet(); if(!sh||!sh.src||!keyed[sh.src]) return status('load a sheet first');
+  if(!hasServer) return status('⚠ Apply needs `node server.js` running — or use ⬇ Raw, then drop it back in');
+  const tChar=charId, tSlot=slotKey, tSheet=sh;          // capture targets (upload is async)
+  const r=tpAssemble(1);                                  // raw 1× sheet (re-applies if stale)
+  const n=includedFrames(tSheet).length;                 // included frames are now laid out sequentially
+  const name=(tpBaseName()+`_${TP._tw}x${TP._th}_raw.png`).replace(/[^a-zA-Z0-9_.-]/g,'_');
+  const src='assets/sprites/'+tChar+'/'+name, dataUrl=r.canvas.toDataURL('image/png');
+  const G=DATA.characters[tChar].global;
+  status('uploading truepixel frames…');
+  fetch('/api/upload',{method:'POST',body:JSON.stringify({char:tChar,name,dataUrl})})
+    .then(res=>res.json()).then(j=>{
+      if(!j||!j.ok) return status('apply failed: '+((j&&j.error)||'upload error'));
+      // seed the in-memory art so the editor uses it instantly (loadSheet caches by src → no refetch race)
+      dims[src]={w:r.canvas.width,h:r.canvas.height};
+      orig[src]=rawCanvas(r.canvas);
+      keyed[src]=keySheet(r.canvas, tSheet.tint||G.tint, tSheet.bright!=null?tSheet.bright:G.bright, tSheet.contrast!=null?tSheet.contrast:G.contrast, tSheet.sat!=null?tSheet.sat:G.sat);
+      // repoint the slot — the reassembled sheet is a fresh compact grid, so old per-cell deltas/excludes no longer map
+      tSheet.src=src; tSheet.cw=TP._tw; tSheet.ch=TP._th; tSheet.cols=r.cols; tSheet.rows=r.rows; tSheet.frames=n; tSheet.start=0;
+      delete tSheet.exclude; delete tSheet.cells;
+      if(tChar===charId && tSlot===slotKey){ tpClose(); renderList(); renderEditor(); } else renderList();
+      status('✓ truepixel applied to '+tSlot+' — hit Save to persist sprites.json');
+    })
+    .catch(()=>status('⚠ apply failed — is node server.js running?'));
+}
 
 document.getElementById('tpbtn').onclick=tpOpen;
 document.getElementById('tpexit').onclick=tpClose;
 document.getElementById('tpApply').onclick=tpApply;
+document.getElementById('tpUse').onclick=tpApplyToAnim;
 document.getElementById('tpPrev').onclick=()=>{ TP.frame--; tpRenderCell(); };
 document.getElementById('tpNext').onclick=()=>{ TP.frame++; tpRenderCell(); };
 document.getElementById('tpAB').onclick=()=>{ TP.ab=!TP.ab; tpRenderCell(); };

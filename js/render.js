@@ -648,6 +648,20 @@ function spriteIncluded(sh, nf) {   // PLAY ORDER: excluded frames skipped, plus
   for (let t = 0; t < loop.times; t++) out = out.concat(seg);
   return out.concat(base.filter(i => i > to));
 }
+function spriteSteps(sh, nf) {
+  // Normalized play list: each step = { cell, dx, dy, ds, flip }. An explicit `order` timeline (drag /
+  // duplicate / per-frame mirror, authored in the sprite tool) is the source of truth when present;
+  // otherwise fall back to the legacy contiguous window (start..start+frames-1) with exclusions skipped
+  // and the optional loop segment repeated. `flip` = horizontal mirror of that one frame (reuse art for spins).
+  if (sh.order && sh.order.length) return sh.order.map(e => (typeof e === 'number' ? { cell: e } : e));
+  const inc = spriteIncluded(sh, nf), start = sh.start || 0, cells = sh.cells;
+  const len = inc ? inc.length : nf, out = [];
+  for (let i = 0; i < len; i++) {
+    const fr = inc ? inc[i] : i, c = cells && cells[fr];
+    out.push(c ? { cell: start + fr, dx: c.dx, dy: c.dy, ds: c.ds, flip: c.flip } : { cell: start + fr });
+  }
+  return out;
+}
 function spriteAnimKey(entry, f) {
   // The JUMP phases are handled separately (spriteJump, on their own clock). Everything else keys off
   // animKey() — which is the move's anim during attacks, else the state name (idle/walk/run/crouch/backdash/
@@ -696,20 +710,23 @@ function drawSpritePose(ctx, f, game) {
   if (!sh || !sh.ready || !sh.canvas) return false;   // not loaded yet → vector fallback
   const g = entry.global, nf = sh.frames || 1;
   const cw = sh.cw || g.cellW || SPR_CELL_W, ch = sh.ch || g.cellH || SPR_CELL_H;
-  // Cinematic states (heel drop / side kick / …) clear the move and run a short sequencer, so the normal
-  // fps clock barely advances. If this fighter is the one a cine is driving and the cine knows its length,
-  // scale the WHOLE sheet across the cine so the sprite plays start→finish instead of holding one frame.
-  if (frame == null && game.cine && (game.cine.att === f || game.cine.vic === f) && game.cine.data && game.cine.data.total) {
-    const inc = spriteIncluded(sh, nf);                 // honour excluded frames in cines too (skip the dialed-out cells)
-    const nfe = inc ? (inc.length || 1) : nf;
-    const idx = Math.min(nfe - 1, Math.max(0, (game.cine.f / game.cine.data.total * nfe) | 0));
-    frame = inc ? (inc.length ? inc[idx] : 0) : idx;
-  }
-  if (frame == null) {
-    const inc = spriteIncluded(sh, nf);                 // excluded frames are skipped from the cycle
-    const nfe = inc ? (inc.length || 1) : nf;
+  let stepObj;
+  if (frame != null) {
+    // Jump phases (spriteJump) resolve an explicit frame INDEX on their own clock — keep the legacy
+    // cell + per-frame-nudge lookup for them (jump sheets don't use the `order` timeline).
+    const c = sh.cells && sh.cells[frame];
+    stepObj = c ? { cell: (sh.start || 0) + frame, dx: c.dx, dy: c.dy, ds: c.ds, flip: c.flip } : { cell: (sh.start || 0) + frame };
+  } else {
+    // Everything else: build the ordered step list (explicit `order`, else the legacy start/frames window
+    // with exclusions + loop), then pick ONE step by the playback clock.
+    const steps = spriteSteps(sh, nf), nfe = steps.length || 1;
     let idx;
-    if (sh.mode === 'syncMove' && f.move) {   // attack sheets: scale the cycle to the move's total length
+    // Cinematic states (heel drop / side kick / …) clear the move and run a short sequencer, so the normal
+    // fps clock barely advances. If this fighter is the one a cine is driving and the cine knows its length,
+    // scale the WHOLE sheet across the cine so the sprite plays start→finish instead of holding one frame.
+    if (game.cine && (game.cine.att === f || game.cine.vic === f) && game.cine.data && game.cine.data.total) {
+      idx = Math.min(nfe - 1, Math.max(0, (game.cine.f / game.cine.data.total * nfe) | 0));
+    } else if (sh.mode === 'syncMove' && f.move) {   // attack sheets: scale the cycle to the move's total length
       const dur = (f.move.startup || 0) + (f.move.active || 0) + (f.move.recovery || 0);
       idx = dur > 0 ? Math.min(nfe - 1, (f.f / dur * nfe) | 0) : 0;
     } else {
@@ -718,9 +735,9 @@ function drawSpritePose(ctx, f, game) {
       else if (sh.mode === 'boomerang' && nfe > 1) { const per = 2 * (nfe - 1), p = ((ft % per) + per) % per; idx = p < nfe ? p : per - p; }   // ping-pong: 0→n-1→0…
       else idx = ((ft % nfe) + nfe) % nfe;   // default = loop
     }
-    frame = inc ? (inc.length ? inc[idx] : 0) : idx;
+    stepObj = steps[idx] || { cell: sh.start || 0 };
   }
-  const cell = (sh.start || 0) + frame, cols = sh.cols || 1;
+  const cell = stepObj.cell, cols = sh.cols || 1;
   const sx = (cell % cols) * cw, sy = ((cell / cols) | 0) * ch;
 
   let rx = f.x, ry = f.y;   // mirror the vector path's render interp
@@ -743,11 +760,12 @@ function drawSpritePose(ctx, f, game) {
   let scale = sh.scale != null ? sh.scale : (g.scale != null ? g.scale : 1);
   let offX = sh.offX != null ? sh.offX : (g.offX || 0);
   let offY = sh.offY != null ? sh.offY : (g.offY || 0);
-  const cadj = sh.cells && sh.cells[frame];   // per-frame nudge: deltas on top of the sheet alignment (fixes drift in independently-genned frames)
-  if (cadj) { offX += cadj.dx || 0; offY += cadj.dy || 0; scale += cadj.ds || 0; }
+  offX += stepObj.dx || 0; offY += stepObj.dy || 0; scale += stepObj.ds || 0;   // per-frame nudge: deltas on top of the sheet alignment (fixes drift in independently-genned frames)
   let dw = cw * scale, dh = ch * scale;
   ctx.imageSmoothingEnabled = false;   // sprites are pre-rendered → draw with HARD pixels (no bilinear blur). Restored by ctx.restore() below.
-  let dx0 = -dw / 2 + offX, dy0 = sh.flipY ? -offY : (-dh + offY);   // feet at y=0 (flipY = vertical mirror)
+  const fflip = stepObj.flip ? -1 : 1;   // per-frame horizontal mirror, anchored on the centerline (negate offX so it mirrors in place, not sideways)
+  let dx0 = -dw / 2 + fflip * offX, dy0 = sh.flipY ? -offY : (-dh + offY);   // feet at y=0 (flipY = vertical mirror)
+  if (fflip < 0) ctx.scale(-1, 1);   // composes on top of the facing flip → a frame stays mirrored-relative-to-pose either way
   if (sh.flipY) ctx.scale(1, -1);
   if (sh.snap) { dx0 = Math.round(dx0); dy0 = Math.round(dy0); dw = Math.round(dw); dh = Math.round(dh); }   // optional per-sheet pixel-snap (default off → identical render)
   ctx.drawImage(sh.canvas, sx, sy, cw, ch, dx0, dy0, dw, dh);
