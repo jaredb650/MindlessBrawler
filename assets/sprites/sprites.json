@@ -2251,52 +2251,72 @@
           }
         },
         "uppercut": {
-          "src": "assets/sprites/brawler/meka_uppercut_512_truepixel_324x324_raw.png",
-          "cols": 4,
+          "src": "assets/sprites/brawler/meka_uppercut2_truepixel_312x312_raw.png",
+          "cols": 12,
           "rows": 2,
           "start": 0,
-          "frames": 5,
-          "fps": 18,
+          "frames": 15,
+          "fps": 30,
           "mode": "once",
-          "ch": 314,
-          "cw": 314,
-          "scale": 0.62,
-          "offY": 18,
-          "offX": 6,
-          "cells": {
-            "0": {
-              "dx": -27,
-              "dy": -13
+          "ch": 312,
+          "cw": 312,
+          "scale": 0.785,
+          "offY": 6,
+          "offX": -2,
+          "order": [
+            {
+              "cell": 2
             },
-            "1": {
-              "dx": -19,
-              "dy": -14
-            },
-            "2": {
-              "dx": -27,
-              "dy": -13
-            },
-            "3": {
-              "dx": -54,
-              "dy": -12
-            },
-            "4": {
-              "dx": -12,
-              "dy": -13
-            },
-            "5": {
-              "dx": -10,
+            {
+              "cell": 6,
+              "dx": 9,
               "dy": -1
+            },
+            {
+              "cell": 9,
+              "dx": 9,
+              "dy": 2
+            },
+            {
+              "cell": 9,
+              "dx": 9,
+              "dy": 2
+            },
+            {
+              "cell": 9,
+              "dx": 9,
+              "dy": 2
+            },
+            {
+              "cell": 5,
+              "dy": 4
+            },
+            {
+              "cell": 5,
+              "dy": 4
+            },
+            {
+              "cell": 10,
+              "dy": 4,
+              "dx": 4
+            },
+            {
+              "cell": 10,
+              "dy": 4,
+              "dx": 4
+            },
+            {
+              "cell": 2
+            },
+            {
+              "cell": 2
+            },
+            {
+              "cell": 11,
+              "dy": 4,
+              "dx": -2
             }
-          },
-          "exclude": [
-            4
-          ],
-          "loop": {
-            "from": 1,
-            "to": 1,
-            "times": 3
-          }
+          ]
         },
         "backkick": {
           "src": "assets/sprites/brawler/meka_spinkick_512.png",
@@ -2570,6 +2590,179 @@
           "scale": 0.695,
           "offY": 35,
           "offX": 0
+        },
+        "crouch": {
+          "src": "assets/sprites/brawler/Grok_Imagine_Video_1_5-e3cc7992_960x960_sheet_truepixel_312x312_raw.png",
+          "cols": 6,
+          "rows": 5,
+          "start": 0,
+          "frames": 22,
+          "fps": 52,
+          "mode": "once",
+          "cw": 312,
+          "ch": 312,
+          "scale": 0.72,
+          "bright": 0.9,
+          "contrast": 10,
+          "sat": 1.13,
+          "offX": -10,
+          "offY": 35,
+          "exclude": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            10,
+            13,
+            16,
+            19,
+            22,
+            23,
+            25,
+            27
+          ],
+          "cells": {
+            "6": {
+              "dx": -1,
+              "dy": 0
+            },
+            "9": {
+              "dx": 5,
+              "dy": 4
+            },
+            "10": {
+              "dx": 4,
+              "dy": 3
+            },
+            "11": {
+              "dx": 9,
+              "dy": 5
+            },
+            "12": {
+              "dx": 13,
+              "dy": 8
+            },
+            "13": {
+              "dx": 11,
+              "dy": 6
+            },
+            "14": {
+              "dx": 14,
+              "dy": 7
+            },
+            "15": {
+              "dx": 16,
+              "dy": 7
+            },
+            "16": {
+              "dx": 16,
+              "dy": 8
+            },
+            "17": {
+              "dx": 15,
+              "dy": 8
+            },
+            "18": {
+              "dx": 18,
+              "dy": 7
+            },
+            "19": {
+              "dx": 17,
+              "dy": 8
+            },
+            "20": {
+              "dx": 17,
+              "dy": 9
+            },
+            "21": {
+              "dx": 17,
+              "dy": 9
+            },
+            "22": {
+              "dx": 18,
+              "dy": 8
+            },
+            "23": {
+              "dx": 18,
+              "dy": 8
+            },
+            "24": {
+              "dx": 19,
+              "dy": 8
+            },
+            "25": {
+              "dx": 20,
+              "dy": 8
+            },
+            "26": {
+              "dx": 20,
+              "dy": 8
+            },
+            "27": {
+              "dx": 19,
+              "dy": 7
+            },
+            "28": {
+              "dx": 18,
+              "dy": 8
+            }
+          }
+        },
+        "prejump": {
+          "src": "assets/sprites/brawler/Grok_Imagine_Video_1_5-a04d1476_960x960_sheet_truepixel_310x310_raw.png",
+          "cols": 6,
+          "rows": 3,
+          "start": 0,
+          "frames": 16,
+          "fps": 60,
+          "mode": "jumpStart",
+          "cw": 310,
+          "ch": 310,
+          "scale": 0.68,
+          "offX": 3,
+          "offY": 32
+        },
+        "air": {
+          "src": "assets/sprites/brawler/Grok_Imagine_Video_1_5-a04d1476_960x960_sheet_truepixel_314x314_raw_truepixel_310x310_raw.png",
+          "cols": 6,
+          "rows": 4,
+          "start": 14,
+          "frames": 8,
+          "fps": 8,
+          "mode": "jumpAir",
+          "cw": 310,
+          "ch": 310,
+          "scale": 0.73,
+          "offX": -6,
+          "offY": 82,
+          "exclude": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14
+          ]
+        },
+        "land": {
+          "src": "assets/sprites/brawler/Grok_Imagine_Video_1_5-a04d1476_960x960_sheet_truepixel_312x312_raw.png",
+          "cols": 6,
+          "rows": 6,
+          "start": 0,
+          "frames": 32,
+          "fps": 60,
+          "mode": "jumpLand",
+          "cw": 312,
+          "ch": 312,
+          "scale": 0.725,
+          "offX": 4,
+          "offY": 33
         }
       }
     },
