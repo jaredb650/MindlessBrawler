@@ -52,6 +52,9 @@ const CHARACTERS = {
     comboChain: ['jab', 'cross', 'uppercut', 'cross'],
     comboFinish: { atChain: 4, kind: 'magiccombo' },
     grunts: ['grunt_1', 'grunt_2'],   // MALE pained grunts — played when HE is the one taking the hit
+    // ── MEKA buff pass (2026-07) — raise the baseline to the other kits, per the balance direction ──
+    meterMult: 1.5,                   // he was the only char at 1.0 while Andromeda compounds to ~4.65x — closes part of the super-economy gap
+    overclock: true,                  // CYBORG REDLINE: below OVERCLOCK_HP_FRAC his stamina regen ramps (OVERCLOCK_REGEN_MULT) + body crackles — comeback fuel
   },
 };
 
@@ -61,48 +64,49 @@ const CHARACTERS = {
 // the brawler's moveset + input maps so she is immediately playable.
 // Vesper's gun-kata kit. She inherits the FULL brawler table (aerials/throws/clinch/getup still
 // work) and OVERRIDES her ground normals into a DISTINCT, combo-rich moveset:
-//   LEAD HAND = KNIFE (all P normals): every knife hit draws a slash line + stacks BLEED (DoT).
+//   LEAD HAND = KNIFE (all P normals): every knife hit draws a slash line. Knife damage is LOW on
+//   purpose — a stab's job is the HITSTUN that confirms into her chains, not raw numbers.
 //   OFF HAND  = PISTOL (◀P + gun-kata K): point-blank shots that weave INTO strings (knockback,
-//               chip, no bleed) — "slash, slash, BANG".
+//               chip) — "slash, slash, BANG".
 // Every move has a distinct hitbox / damage / PURPOSE (poke, lunge, launcher, buckle, juggle,
 // ender) and the cancel trees flow knife → gun → kick. Anims reuse brawler poses for now; the
 // knife/pistol props + slash lines + muzzle flash carry the identity (render.js).
 const VESPER_MOVES = {
   ...MOVES,
-  // ── KNIFE (lead hand, P) — slash lines + BLEED ──
+  // ── KNIFE (lead hand, P) — slash lines ──
   // neutral-P 1-2-3 REKKA, link 1: a quick STAB. A CONNECTED stab arms link 2 (the arc, → slash2).
   slash: { anim: 'jab', startup: 2, active: 5, recovery: 6, damage: 11, hitstun: 13, blockstun: 7, stamina: 2,
-    guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'knife', bleed: 1, label: 'STAB',
+    guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'knife', label: 'STAB',
     hitbox: { x: 24, y: -150, w: 96, h: 26 },
     cancels: ['slash', 'slash2', 'thrust', 'hamstring', 'gunkick', 'heelshot', 'rifleburst'] },   // slash2 = rekka link 2; thrust = AERIAL RAVE spine
   // REKKA link 2 (after a connected stab): a forward SEMICIRCLE ARC slash. → slash3 (rekka), or thrust (SHISH KEBAB).
   slash2: { anim: 'slasharc', startup: 4, active: 6, recovery: 10, damage: 15, hitstun: 15, blockstun: 9, stamina: 3,
-    guard: 'mid', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_MED, weapon: 'knife', bleed: 1, chainOnly: true, label: 'ARC SLASH',
+    guard: 'mid', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_MED, weapon: 'knife', chainOnly: true, label: 'ARC SLASH',
     hitbox: { x: 16, y: -172, w: 104, h: 74 },
     cancels: ['slash3', 'thrust', 'risingslash', 'hamstring', 'heelshot'] },
   // REKKA link 3: an UPWARD back-hand cut — big knockback launcher (the rekka ender, knocks them far).
   slash3: { anim: 'slashup', startup: 5, active: 5, recovery: 20, damage: 30, hitstun: 0, blockstun: 13, stamina: 6,
-    guard: 'mid', kind: 'punch', kbx: 13, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', bleed: 1, chainOnly: true, heavy: true,
+    guard: 'mid', kind: 'punch', kbx: 13, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', chainOnly: true, heavy: true,
     launcher: true, launchVy: -13, hitbox: { x: 12, y: -186, w: 70, h: 94 }, label: 'RISING CUT',
     cancels: [] },
   // advancing lunge DOUBLE-stab: longest knife reach, closes space, hit-confirm into launcher or a shot.
   thrust: { anim: 'cross', startup: 4, active: 6, recovery: 9, damage: 16, hitstun: 16, blockstun: 10, stamina: 4,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'THRUST', lungeVx: 6, dashTrail: true,   // trails when the combo magnet dashes her across the ground (slash→thrust)
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_MED, weapon: 'knife', strikeHand: 'rear', label: 'THRUST', lungeVx: 6, dashTrail: true,   // trails when the combo magnet dashes her across the ground (slash→thrust)
     hitbox: { x: 26, y: -150, w: 100, h: 32 }, multihit: { times: 2, interval: 3 },
     cancels: ['risingslash', 'pistol', 'heelshot', 'hamstring', 'upshot'] },
   // upward gut → LAUNCHER (juggle starter). Can flow into a point-blank air shot.
   risingslash: { anim: 'uppercut', startup: 6, active: 5, recovery: 18, damage: 46, hitstun: 0, blockstun: 14, stamina: 10,
-    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', strikeHand: 'rear', bleed: 1, label: 'RISING SLASH',
+    guard: 'mid', kind: 'punch', kbx: 2.0, hitstop: CFG.HITSTOP_ENDER, weapon: 'knife', strikeHand: 'rear', label: 'RISING SLASH',
     hitbox: { x: 12, y: -190, w: 58, h: 86 }, launcher: true, launchVy: -13, heavy: true, popsGround: true,
     cancels: ['pistol', 'risingslash'] },   // rising → rising chains into SKYHOOK
   // low slash to the leg → BUCKLE (crumple/kneel): a frozen, fully-hittable guaranteed follow-up.
-  // deep cut → 2 bleed. Must be blocked LOW.
+  // Must be blocked LOW.
   hamstring: { anim: 'crouchjab', startup: 4, active: 3, recovery: 8, damage: 22, hitstun: 14, blockstun: 9, stamina: 4,
-    guard: 'low', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_ENDER, crouching: true, weapon: 'knife', bleed: 2, label: 'HAMSTRING',
+    guard: 'low', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_ENDER, crouching: true, weapon: 'knife', label: 'HAMSTRING',
     hitbox: { x: 16, y: -78, w: 72, h: 30 }, crumple: 'kneel', heavy: true,
     cancels: ['slash', 'thrust', 'pistol', 'risingslash', 'shotgun'] },   // → pistol = EXECUTION, → shotgun = SKEET
   // ── PISTOL (off hand, ◀P) — point-blank shot ──
-  // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip, NO bleed. Flows on
+  // gun-kata: short-range muzzle blast woven INTO strings. Knockback + chip. Flows on
   // into more knife/kick so a string reads "slash, slash, BANG, kick".
   pistol: { anim: 'pistolaim', startup: 5, active: 4, recovery: 14, damage: 0, hitstun: 0, blockstun: 0, stamina: 5,
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'pistol', gun: true, label: 'PISTOL',
@@ -140,10 +144,6 @@ const VESPER_MOVES = {
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, weapon: 'shotgun', label: 'SHOTGUN',
     hitbox: { x: 16, y: -168, w: 188, h: 78 }, blast: true, sideSpike: true, sideSpikeAir: true, heavy: true, noFlowCancel: true,
     planted: true, rackFrame: 25, bulletArts: false, fireSfx: 'shotgun_blast', gib: true },   // a shotgun KO GIBS the head
-  // low sweep → hard knockdown ender (oki). [still defined for combo refs; ↓K now = rifleburst]
-  lowsweep: { anim: 'sweep', startup: 6, active: 4, recovery: 19, damage: 36, hitstun: 0, blockstun: 12, stamina: 9,
-    guard: 'low', kind: 'kick', kbx: 1.5, hitstop: CFG.HITSTOP_ENDER, crouching: true, label: 'SWEEP',
-    hitbox: { x: 18, y: -40, w: 92, h: 32 }, knockdown: true, heavy: true, popsGround: true },
   // ↓K ASSAULT RIFLE: she PLANTS, pulls a rifle and fires a 3-round BURST downrange — damaging
   // rounds that JUGGLE (launch) on hit. No movement; the burst (not a melee) does the work.
   rifleburst: { anim: 'rifleaim', startup: 9, active: 4, recovery: 22, damage: 0, hitstun: 0, blockstun: 14, stamina: 11,
@@ -153,11 +153,11 @@ const VESPER_MOVES = {
   // ── AIR (knife + gun) ──
   // neutral air P: a basic air knife.
   airslash: { anim: 'airpunch', startup: 4, active: 999, recovery: 0, damage: 16, hitstun: 16, blockstun: 9, stamina: 3,
-    guard: 'high', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_LIGHT, air: true, weapon: 'knife', bleed: 1,
+    guard: 'high', kind: 'punch', kbx: 1.5, hitstop: CFG.HITSTOP_LIGHT, air: true, weapon: 'knife',
     hitbox: { x: 16, y: -80, w: 62, h: 46 }, popsGround: true, label: 'AIR SLASH' },
   // air ▶P: TELE-SLASH — a fast forward BLINK-slash (iaido). On hit → a stun-burst slash combo.
   teleslash: { anim: 'airpunch', startup: 3, active: 999, recovery: 0, damage: 18, hitstun: 0, blockstun: 12, stamina: 8,
-    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
+    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife',
     hitbox: { x: 6, y: -130, w: 98, h: 98 }, dive: { vx: 30, vy: -1 }, dashTrail: true,
     slashCombo: { hits: 2, launchVy: -13, style: 'iaido', label: 'IAIDO' }, label: 'TELE-SLASH' },
   // air ▶K: AIR UZI — sprays an uzi burst out in front of her.
@@ -166,12 +166,12 @@ const VESPER_MOVES = {
     hitbox: { x: 0, y: 0, w: 0, h: 0 }, burst: { count: 5, speed: 22, up: 0, interval: 2, move: 'uzi', sfx: 'uzi_burst' }, label: 'AIR UZI' },   // streamed STRAIGHT FORWARD → a horizontal line/trail, not a fan
   // air ↓K: AIR SPIKE — a downward knife slash (NO dive, she keeps her arc); SPIKES foes from above.
   airspike: { anim: 'divekick', startup: 5, active: 999, recovery: 0, damage: 32, hitstun: 0, blockstun: 12, stamina: 6,
-    guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, air: true, weapon: 'knife', bleed: 1,
+    guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_ENDER, air: true, weapon: 'knife',
     hitbox: { x: 8, y: -50, w: 78, h: 98 }, spike: CFG.AXEKICK_SPIKE_VY, label: 'AIR SPIKE' },
   // air ↑P: AERIAL UPSLASH — a knife arc sweeping a SEMICIRCLE over her head; juggles foes UP.
   // phased hitbox sweeps back-of-head → straight overhead → down-front to read as the arc.
   aerupslash: { anim: 'aerupslash', startup: 4, active: 999, recovery: 0, damage: 24, hitstun: 0, blockstun: 10, stamina: 5,
-    guard: 'high', kind: 'punch', kbx: 2, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
+    guard: 'high', kind: 'punch', kbx: 2, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife',
     launcher: true, launchVy: -16, popsGround: true, airHitCap: 8,
     hitbox: [
       { t0: 3, t1: 7, x: -36, y: -150, w: 52, h: 56 },     // back-of-head
@@ -186,7 +186,7 @@ const VESPER_MOVES = {
     hitbox: { x: 4, y: -176, w: 62, h: 116 }, scissorGrab: { label: 'SCISSOR TAKEDOWN' }, label: 'SCISSOR KICK' },
   // air ↓P: DIVE GRAB — a diving knife; on hit it COMMAND-GRABS into a TRIPLE SLASH (3rd launches).
   elbowdrop: { anim: 'elbowdrop', startup: 3, active: 999, recovery: 0, damage: 18, hitstun: 0, blockstun: 13, stamina: 6,
-    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife', bleed: 1,
+    guard: 'high', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_MED, air: true, weapon: 'knife',
     hitbox: { x: 12, y: -44, w: 64, h: 60 }, dive: { vx: CFG.ELBOWDROP_VX, vy: CFG.ELBOWDROP_VY },
     slashCombo: { hits: 3, launchVy: -14, style: 'triple', label: 'TRIPLE SLASH' }, label: 'DIVE GRAB' },
   // run+↓: SLIDE — on contact, a RISING DOUBLE SLASH whose 2nd hit launches HIGH (juggle setup).

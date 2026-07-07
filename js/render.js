@@ -337,15 +337,35 @@ function spawnShockwave(x, y, dir, color) {
   Shockwaves.push({ x, y, dir, life: 13, maxLife: 13, delay: 4, color: '#ffffff' });
   if (Shockwaves.length > 16) Shockwaves.splice(0, Shockwaves.length - 16);
 }
+
+// GROUND shockwave — the FLOOR-explosion variant (meteor elbow / crescent slam). The wall
+// ring stands upright (parallel to the wall); this one lies FLAT: a perspective-squashed
+// full ring hugging the floor, expanding radially — the shock propagates ALONG the ground.
+function spawnGroundShockwave(x, y, color) {
+  Shockwaves.push({ x, y, ground: true, life: 16, maxLife: 16, delay: 0, color: color || '#ffd54f' });
+  Shockwaves.push({ x, y, ground: true, life: 13, maxLife: 13, delay: 4, color: '#ffffff' });
+  if (Shockwaves.length > 16) Shockwaves.splice(0, Shockwaves.length - 16);
+}
 function drawShockwaves(ctx) {
   ctx.globalCompositeOperation = 'lighter';
   for (const s of Shockwaves) {
     if (s.delay > 0) continue;                  // not started yet (updateFx ticks the delay down)
     const t = 1 - s.life / s.maxLife;            // 0 → 1 over its life
     const e = 1 - (1 - t) * (1 - t);             // ease-out: bursts fast, then slows
-    const rx = 14 + e * SHOCKWAVE_MAXR * 0.6;    // horizontal reach into the stage
-    const ry = 18 + e * SHOCKWAVE_MAXR;          // taller → the vertical shock
     const a = (1 - t) * 0.9;                      // fades as it grows
+    if (s.ground) {
+      // FLOOR ring: flat squashed FULL ellipse expanding outward along the ground plane
+      const r = 16 + e * SHOCKWAVE_MAXR * 1.15;   // wide radial reach along the floor
+      const ry = 5 + e * 20;                      // shallow — it lies on the ground, not standing up
+      const steps = 26;
+      for (let i = 0; i < steps; i++) {
+        const ang = Math.PI * 2 * (i / steps);
+        fxBlock(ctx, s.x + Math.cos(ang) * r, s.y + Math.sin(ang) * ry, 3 + (1 - t) * 3, s.color, a);
+      }
+      continue;
+    }
+    const rx = 14 + e * SHOCKWAVE_MAXR * 0.6;    // horizontal reach into the stage
+    const ry = 18 + e * SHOCKWAVE_MAXR;          // taller → the vertical shock (the WALL ring)
     const steps = 22;
     for (let i = 0; i <= steps; i++) {
       const ang = -Math.PI / 2 + Math.PI * (i / steps);   // top → bottom, +x side
@@ -2192,6 +2212,17 @@ function render(ctx, game, alpha) {
   for (const f of order) drawFighter(ctx, f, game);
   drawHeads(ctx);   // severed heads fly/roll over the bodies
   drawShells(ctx);  // ejected shotgun shells
+
+  // IMPACT FADE — the meteor-elbow nuke's cinematic beat: lights down, both bodies stay
+  // lit (execution-style), NOT the KO blackout. Drawn HERE — before the particle/spark/
+  // slash/shockwave/float-text passes — so the explosion FX punch through the dim at
+  // FULL brightness (the whole point of the beat is watching that eruption).
+  if (game.impactFade > 0 && !game.execution && game.koFreeze <= 0) {
+    const fa = Math.min(1, game.impactFade / 10) * 0.6;   // holds dark, eases back up as it expires
+    ctx.fillStyle = `rgba(0,0,0,${fa.toFixed(3)})`;
+    ctx.fillRect(0, 0, CFG.STAGE_W, CFG.STAGE_H);
+    for (const f of game.fighters) drawFighter(ctx, f, game);   // the two bodies stay lit over the dark
+  }
 
   // OVERDRIVE BEAM pours out OVER the fighters for maximum drama (the freeze overlay owns the charge visual)
   for (const f of game.fighters) if (game.superFreeze <= 0 && f.state === 'superstart' && f.superKind === 'beam') drawBeam(ctx, f);

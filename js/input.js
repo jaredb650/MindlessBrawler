@@ -39,12 +39,15 @@ class Pad {
     this.tapDir = 0;     // ±1 on the frame a double-tap completes (dash trigger)
     this._lastTapDir = 0;
     this._tapTimer = 0;
+    this.history = [];   // last N press edges {b, t} — drawn by the debug overlay (training aid)
+    this._t = 0;         // monotonic update counter timestamping history entries
   }
 
   // `synth` (optional) replaces the keyboard as the down-state source — dummy AI uses this.
   // `frozen` = hitstop/super-freeze: edges still register, but buffers don't tick down.
   update(synth, frozen) {
     this.tapDir = 0;
+    this._t++;
     if (!frozen && this._tapTimer > 0) this._tapTimer--;
     for (const btn in this.map) {
       const down = synth ? !!synth[btn] : !!RawKeys[this.map[btn]];
@@ -53,6 +56,8 @@ class Pad {
         this._buf[btn] = INPUT_BUFFER;
         // direction keys come first in the map, so held.* is current-frame here
         this.snap[btn] = { up: this.held.up, down: this.held.down, left: this.held.left, right: this.held.right };
+        this.history.push({ b: btn, t: this._t });   // training-mode input strip (debug overlay)
+        if (this.history.length > 12) this.history.shift();
       } else if (!frozen && this._buf[btn] > 0) this._buf[btn]--;
       this.held[btn] = down;
       this._prev[btn] = down;

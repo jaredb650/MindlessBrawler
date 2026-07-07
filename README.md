@@ -64,7 +64,7 @@ rapid-repeat throttling, looping music with track switching, and **M to mute**.
 | → + P            | Cross       | string mid |
 | → + P (after cross) | Hook     | **ender**: drops them like a sack of potatoes |
 | ↑ + P            | Uppercut    | **ender**: launch → ground bounce → knockdown |
-| ← + P            | Spinning backfist | range + lunges forward |
+| ← + P            | Spinning backfist | range + lunges forward; **ROBOT-ARM ARMOR** — eats one hit through the windup |
 | ↓ + P            | Crouch jab  | fast low-profile string |
 | K                | Front kick  | longest poke |
 | → + K            | Leg kick    | THE pressure glue: big stun, no pushback, must block low |
@@ -81,6 +81,7 @@ rapid-repeat throttling, looping music with track switching, and **M to mute**.
 | P in air         | Air punch   | quick aerial straight |
 | K in air         | Air kick    | the jump-in (must be blocked standing) |
 | ↓ + K in air     | **Divekick** | steep dive — changes your jump arc, drives them down |
+| ↓ + P in air     | **Meteor elbow** | slow, DEAD-VERTICAL drop; the landing ERUPTS the floor. On a **downed** body = the OTG finisher (sky-high eruption launch, untechable). Standing = brushed aside. Airborne = spiked to the floor |
 | Super (full meter) | Mech Cannon | cinematic freeze → 20mm shell, ~45% HP, blockable/jumpable |
 
 Flying conversions are range-gated (knee ~500px, uppercut ~260px) — they're
@@ -101,6 +102,9 @@ strikes, not movement. Whiffed flights eat a long, punishable landing.
   so one-button mash breaks itself; varied strings keep rolling). The real outs
   are parry, retreat-block, pushback, and the attacker's gas tank — hit 0 and
   you're **gassed**: no attacks, no block, wide open.
+- **MEKA overclock** — below 30% HP the cyborg redlines: stamina regen ramps up
+  and his body crackles. His robot-arm swings (backfist, overhand) have armor,
+  and the machine-gun → overhand just-frame **FLATLINER** window is landable now.
 
 ## Architecture (what survives the sprite pass)
 

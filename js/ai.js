@@ -48,6 +48,24 @@ class CPU {
       }
       return synth;
     }
+    // MOUNTED (ground & pound): mash to shove the mount off — same rotate-a-fresh-press
+    // pattern as the clinch (the GP cine reads pad.pressed edges every frame).
+    if (self.state === 'gpmounted') {
+      if ((game.frame % 3) === 0) synth[['punch', 'kick', 'jump'][(Math.random() * 3) | 0]] = true;   // self.f is frozen by the cine — pace off the global clock
+      return synth;
+    }
+    // GROUND TECH: falling launched body near the floor → sometimes buffer the kip-up
+    // (it's a read, not a guarantee — mirrors the human's tight tech window)
+    if (self.state === 'launched' && !self.noTech && self.vy > 0
+        && (CFG.FLOOR_Y - self.y) < 70 && Math.random() < 0.15) { synth.jump = true; return synth; }
+    // PUSHBLOCK: under real pressure with gas to spare, occasionally shove them off
+    // (the guard branch below is already holding away, so held-back is satisfied)
+    if (self.state === 'blockstun' && self.stamina > 50 && Math.random() < 0.04) {
+      synth.punch = true; synth.kick = true;
+      const pdx = opp.x - self.x;
+      synth[pdx >= 0 ? 'left' : 'right'] = true;   // keep holding away — pushblock requires it
+      return synth;
+    }
     // occasionally roll on wakeup to reposition out of the corner
     if (self.state === 'downed' && self.f === 3 && Math.random() < 0.3) { synth[away] = true; return synth; }
 
@@ -122,6 +140,13 @@ class CPU {
     // ── self-preservation ──
     if (self.stamina < 18) { synth[away] = true; return synth; }   // back off, breathe
 
+    // ── spend the bank: full meter doesn't help anyone sitting in the tank ──
+    if (self.meter >= CFG.SUPER_COST && this.cool <= 0 && dist < 520 && Math.random() < 0.02) {
+      this.press(['super']);   // neutral super (cannon / climax / wrath — every char's safe default)
+      this.cool = 90;
+      return synth;
+    }
+
     // ── anti-air ──
     if (opp.isAirborne() && dist < 150 && this.cool <= 0) {
       this.press(['punch'], 'up');
@@ -136,6 +161,11 @@ class CPU {
         // dash in: double-tap toward
         this.queue.push({ tap: [], dir: 'forward' }, { wait: 3 }, { tap: [], dir: 'forward' }, { wait: 8 });
         this.cool = 25;
+      }
+      // occasional JUMP-IN from mid range: hop toward, then the air kick on the way down
+      if (dist > 160 && dist < 320 && this.cool <= 0 && Math.random() < 0.012) {
+        this.queue.push({ tap: ['jump'], dir: 'forward' }, { wait: 6 }, { tap: [], dir: 'forward' }, { wait: 10 }, { tap: ['kick'], dir: 'forward' });
+        this.cool = 60;
       }
       return synth;
     }

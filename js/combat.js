@@ -11,7 +11,7 @@ const MOVE_LABELS = {
   jab: 'JAB', cross: 'CROSS', hook: 'HOOK!', uppercut: 'UPPERCUT!',
   backfist: 'BACKFIST', crouchjab: 'BODY JAB', frontkick: 'FRONT KICK',
   legkick: 'LEG KICK', sweep: 'SWEEP!', soccer: 'SOCCER KICK!',
-  jumpkick: 'JUMP KICK', knee: 'KNEE', backkick: 'SPINNING BACK KICK!',
+  jumpkick: 'JUMP KICK', backkick: 'SPINNING BACK KICK!',
   axekick: 'AXE KICK!', tornado: 'TORNADO KICK!',
   airpunch: 'AIR PUNCH', divekick: 'DIVE KICK!', elbowdrop: 'ELBOW DROP!',
   clinchpunch: 'DIRTY BOXING', clinchknee: 'BODY KNEE!', suplex: 'GERMAN SUPLEX!',
@@ -84,7 +84,9 @@ function spawnTremor(owner) {
   });
   playSfx('ground_pop');
 }
-function spawnShockwave(owner) {
+// NOTE: named ...Round to dodge render.js's spawnShockwave(x,y,dir) FX ring — render loads
+// LAST, so a same-named function here would be silently overwritten and the projectile lost.
+function spawnShockwaveRound(owner) {
   const d = owner.facing;
   Projectiles.push({
     x: owner.x + d * 46, y: CFG.FLOOR_Y - 30, vx: d * CFG.TREMOR_SPEED, vy: 0, grav: 0,
@@ -172,13 +174,14 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
-  // SUPER-ARMOR (Xamora the heavy): she EATS a hit instead of being interrupted — on a flagged
-  // commital windup (move.armor:N hits) OR while walking the foe down (stamina-priced). Mirrors the
-  // electrified early-out: apply REDUCED damage, juice, return with NO reaction funnel so her move
-  // keeps running. COUNTERPLAY is structural: THROWS skip this entirely (a grab overwrites her
+  // SUPER-ARMOR: the victim EATS a hit instead of being interrupted — on a flagged commital
+  // windup (move.armor:N hits — GENERIC: Xamora's slam/smite, Meka's robot-arm backfist/overhand)
+  // OR while walking the foe down (stamina-priced, Xamora-exclusive). Mirrors the electrified
+  // early-out: apply REDUCED damage, juice, return with NO reaction funnel so the move keeps
+  // running. COUNTERPLAY is structural: THROWS skip this entirely (a grab overwrites the
   // 'attack' state before it ever reaches here), MULTI-HIT breaks it (the N cap → ARMOR BREAK kneel),
   // and an `armorBreak:true` move blows straight through (clears the tally, falls to the real funnel).
-  const armorOnMove = vic.char.id === 'xamora' && vic.state === 'attack' && vic.move && vic.move.armor
+  const armorOnMove = vic.state === 'attack' && vic.move && vic.move.armor
     && vic.f <= vic.move.startup + (vic.move.active || 0);
   const armorOnWalk = vic.char.id === 'xamora' && vic.state === 'walk' && vic.stamina > CFG.ARMOR_WALK_STAMINA
     && ((away === 1 && vic.pad.held.left) || (away === -1 && vic.pad.held.right));   // walking INTO the attacker
@@ -334,7 +337,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
   if (vic.inHitState()) vic.comboHits++;
-  else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; vic.blockedPistolRounds = 0; }   // a clean hit breaks the consecutive-block chain
+  else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; vic.comboDmg = 0; vic.blockedPistolRounds = 0; }   // a clean hit breaks the consecutive-block chain
   const hits = vic.comboHits;
   const sameCount = vic.comboMoves[move.anim] || 0;
   vic.comboMoves[move.anim] = sameCount + 1;
@@ -344,6 +347,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   const dmgScale = Math.max(att.char.minDmgScale || CFG.MIN_DMG_SCALE, 1 - (att.char.dmgScalePerHit || CFG.DMG_SCALE_PER_HIT) * (hits - 1));
   const dmg = Math.max(1, Math.round(move.damage * dmgScale * (att.char.dmgMult || 1)));   // per-character damage scaling (Vesper's rushdown hits harder)
   vic.hp -= dmg;
+  vic.comboDmg += dmg;   // running combo-damage tally (ui.js shows it under the hit counter)
   // a pained grunt on a meaty hit — random, skipped on crumple moves (those already grunt). The
   // grunt is the VICTIM'S voice: female grunts when Vesper is hit, male grunts when the brawler is hit.
   if (dmg >= CFG.GRUNT_DMG && !move.crumple && Math.random() < CFG.GRUNT_CHANCE) {
@@ -473,6 +477,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     if (att.f <= move.pbWindow && !vic.isAirborne()) {
       const bonus = Math.max(1, Math.round(move.pbDamage * dmgScale));
       vic.hp -= bonus;
+      vic.comboDmg += bonus;
       att.meter = Math.min(CFG.MAX_METER, att.meter + bonus * CFG.METER_PER_DAMAGE);
       game.hitstop = Math.max(game.hitstop, CFG.HITSTOP_ENDER + 6);
       game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 3);
@@ -526,10 +531,12 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // Fires on AIRBORNE victims too (a combo into the slam still devastates — it slams them out of the air).
   if (live && move.crescentSlam && vic.state !== 'downed') {
     vic.hp = Math.max(0, vic.hp - CFG.CRESCENT_BONUS);          // on top of the base damage already applied → devastating
+    vic.comboDmg += CFG.CRESCENT_BONUS;
     vic.y = CFG.FLOOR_Y;                                        // SLAMMED to the floor
     game.hitstop = Math.max(game.hitstop, CFG.CRESCENT_FREEZE); // the world stops for a beat
     game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 8);
     game.flash = Math.max(game.flash, CFG.KO_FLASH); game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);
+    spawnGroundShockwave(vic.x, CFG.FLOOR_Y - 8);               // flat floor ring — the shock rolls outward along the ground
     spawnSpike(vic.x, away);                                    // the ground erupts (energy lance + splash)
     spawnRumble(vic.x, CFG.FLOOR_Y - 30, 1); spawnRumble(vic.x, CFG.FLOOR_Y - 30, -1);
     spawnBlast(vic.x, CFG.FLOOR_Y - 50); spawnBlood(vic.x, CFG.FLOOR_Y - 24, away, 28, 2); spawnDust(vic.x, CFG.FLOOR_Y, 22);
@@ -590,6 +597,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
+  // (METEOR ELBOW grounded resolution moved to the LANDING eruption in fighter.js —
+  //  the resolveMelee gate above means an otgNuke move only reaches here vs airborne
+  //  bodies, which fall through to the shared spike branch below.)
   if (vic.isAirborne()) {
     // SIDE SPIKE vs an AIRBORNE/TUMBLING body (spinning back kick): blast them dead-flat
     // across the stage instead of juggling. Generic — no electrocution unless move.electric.
@@ -601,6 +611,9 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     // SPIKE (diving elbow): slam an airborne body straight to the floor — untechable,
     // ground-bounce → OTG. Ends the juggle (no airHits++), bounded by MAX_GROUND_HITS.
     if (move.spike != null) {
+      // METEOR ELBOW air-catch: spiking someone midair DRAGS them down with the drop —
+      // the landing eruption nukes them too (deliberate double-dip: the catch is hard).
+      if (live && move.otgNuke) vic.nukeDragged = true;
       vic.receiveSpike(move.spike, away, game);   // shared mechanic — drives vy down, noTech, juice
       return;
     }
@@ -681,6 +694,11 @@ function resolveMelee(att, box, move, vic, game) {
   if (!box || !move) return;
   if (vic.hp <= 0) return;   // no corpse-juggling on the K.O. screen
   if (vic.invuln > 0 || vic.state === 'fallheavy') return;
+  // METEOR ELBOW: the falling hitbox only catches AIRBORNE bodies (the mid-air spike).
+  // ALL grounded interaction — the downed-body nuke AND the standing shove — resolves AT
+  // TOUCHDOWN (the fighter.js landing eruption), so the hit and the explosion are ONE beat
+  // instead of "poke them aside mid-fall, then explode on empty floor".
+  if (move.otgNuke && !vic.isAirborne()) return;
   // multihit (flying uppercut): wait out the rehit interval between hits
   if (move.multihit && (att.hitCount || 0) > 0 && att.f - att.lastHitF < move.multihit.interval) return;
   // (downed victims ARE hittable — solid body = fair game, ghosts are not)

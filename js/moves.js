@@ -26,7 +26,7 @@ const MOVES = {
   // walk them into a heavier short-range follow-up or roll the 3-jab → machine-gun chain.
   jab: {
     anim: 'jab', startup: 2, active: 3, recovery: 5,
-    damage: 30, hitstun: 16, blockstun: 9, stamina: 2,
+    damage: 30, hitstun: 16, blockstun: 6, stamina: 2,   // blockstun 6 (was 9): −1 on block — the ONLY plus-on-block normal violated the "block hands the turn back" rule
     guard: 'mid', kind: 'punch', kbx: 0, hitstop: CFG.HITSTOP_LIGHT,   // kbx 0: NO push — just stun
     hitbox: { x: 22, y: -152, w: 84, h: 34 },   // reaches ~106px — further than the cross (92)
     cancels: ['jab', 'cross', 'crouchjab', 'uppercut', 'axekick', 'legkick', 'sweep', 'machinegun', 'gazelle'],
@@ -69,13 +69,15 @@ const MOVES = {
     cancels: ['cross'],   // uppercut → forward+P → cross (the magic-combo link; combat.js keeps it grounded)
   },
   // back+P: spinning backfist — slower, more range, lunges forward to cover distance.
+  // ROBOT-ARM ARMOR: the cyborg arm doesn't flinch — eats ONE hit through the windup
+  // (reduced damage still lands; throws/multi-hit/armorBreak crack it, see combat.js).
   backfist: {
     anim: 'backfist', startup: 9, active: 4, recovery: 16,
     damage: 70, hitstun: 24, blockstun: 13, stamina: 9,
     guard: 'mid', kind: 'punch', kbx: 5.0, hitstop: CFG.HITSTOP_MED,
     hitbox: { x: 26, y: -160, w: 85, h: 40 },
     cancels: ['spinelbow', 'legkick', 'sweep'],   // forward+P off backfist → spinelbow (primary route)
-    lungeVx: 5, heavy: true, popsGround: true,
+    lungeVx: 5, heavy: true, popsGround: true, armor: 1,
   },
   // back+P chain ender — the Buzzsaw. A 360 back-elbow off a CONNECTED punch.
   //   PRIMARY:  backfist → forward+P · ALTERNATE: cross → back+P (both tryCancel remaps).
@@ -147,17 +149,6 @@ const MOVES = {
     guard: 'high', kind: 'kick', kbx: 6.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 22, y: -172, w: 92, h: 50 },   // HIGH (head height) + long reach, like a head-hunting hook kick
     lungeVx: 6, blast: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
-  },
-  // ↑+K: clinch knee to the body — body shots break the will to fight:
-  // drains opponent STAMINA on hit (half even through block). Chains in from
-  // everything light; tap JUMP during its startup (in range) → FLYING KNEE.
-  knee: {
-    anim: 'knee', startup: 4, active: 3, recovery: 7,
-    damage: 35, hitstun: 18, blockstun: 9, stamina: 3,
-    guard: 'mid', kind: 'kick', kbx: 1.2, hitstop: CFG.HITSTOP_MED,
-    hitbox: { x: 10, y: -125, w: 48, h: 42 },
-    cancels: ['legkick', 'sweep'],
-    staminaDrain: 12, popsGround: true, flyConvert: 'flyknee',
   },
   // ↑+K: AXE KICK — the overhead ender. Slow telegraphed lift, then the heel
   // chops STRAIGHT DOWN through the guard: a true overhead, must be blocked
@@ -277,19 +268,24 @@ const MOVES = {
     dive: { vx: CFG.DIVEKICK_VX, vy: CFG.DIVEKICK_VY },
     knockdown: true, heavy: true, popsGround: true,
   },
-  // down+P in the air: DIVING ELBOW — the juggle spike. Redirects your arc steeply
-  // down-forward on start (dive:{vx,vy}, read in startMove), like divekick but the
-  // ELBOW point. On an AIRBORNE victim it SPIKES — drives their vy hard DOWN, slams
-  // them to the floor (untechable), ground-bounce → OTG. On a grounded body it's a
-  // committed dive-bomb knockdown; whiffed, it's a long, punishable plant.
+  // down+P in the air: METEOR ELBOW — Meka's grounded super-punish. He HANGS for the
+  // windup (momentum killed), then drops DEAD-VERTICAL and the landing ERUPTS the floor
+  // (wall-spike explosion + shockwave rings). The falling hitbox only catches AIRBORNE
+  // bodies (the spike) — ALL grounded impact resolves AT TOUCHDOWN so the hit and the
+  // explosion are one beat (resolveMelee gate + the fighter.js landing eruption):
+  //   DOWNED body under the impact → the FINISHER: eruption launch sky-high
+  //     (crescent-slam style, untechable) + big flat bonus — combo them to the floor, end it here.
+  //   STANDING in eruption reach → brushed aside: small chip, knocked out of the way.
+  //   AIRBORNE → the SPIKE (mid-fall, unchanged): driven straight down, bounce → OTG.
+  // The plant is still a long, punishable landing on a true whiff.
   elbowdrop: {
-    anim: 'elbowdrop', startup: 3, active: 999, recovery: 0,   // active until landing
-    damage: 75, hitstun: 24, blockstun: 13, stamina: 6,
+    anim: 'elbowdrop', startup: 7, active: 999, recovery: 0,   // active until landing (slower load — it's a finisher, not a poke)
+    damage: 30, hitstun: 24, blockstun: 13, stamina: 8,
     guard: 'high', kbx: 2.5, hitstop: CFG.HITSTOP_ENDER, air: true, kind: 'punch',
-    hitbox: { x: 12, y: -44, w: 60, h: 58 },   // relative to airborne feet — steep down-forward elbow point
-    dive: { vx: CFG.ELBOWDROP_VX, vy: CFG.ELBOWDROP_VY },
+    hitbox: { x: -4, y: -50, w: 70, h: 64 },   // centered under the falling body — a straight-down elbow point
+    dive: { vx: 0, vy: CFG.ELBOWDROP_DROP_VY },   // vx 0: he falls STRAIGHT DOWN from wherever he is
     spike: CFG.ELBOWDROP_SPIKE_VY,             // airborne-victim hit → drive their vy DOWN this hard (the spike)
-    knockdown: true, heavy: true, popsGround: true,
+    otgNuke: true, heavy: true,
   },
   // forward+K near a downed opponent: the PREMIUM ground hit — biggest pop,
   // biggest damage. Vs a standing opponent it's just a big slow kick.
@@ -350,7 +346,8 @@ const MOVES = {
     guard: 'mid', kind: 'punch', kbx: 9, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 18, y: -168, w: 80, h: 58 },
     // sideSpike: horizontal blast (generic — other moves can use it). electric: + electrocution (overhand only).
-    blast: true, sideSpike: true, electric: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true,
+    // armor: the robot arm powers THROUGH a mash-out attempt — the payoff punch can't be poked out.
+    blast: true, sideSpike: true, electric: true, heavy: true, popsGround: true, chainOnly: true, noFlowCancel: true, armor: 1,
     canFlatline: true,   // eligible for the just-frame one-punch-KO divert (combat.js reads the prime)
   },
   // frontkick (connected) → forward+P: SUPERMAN PUNCH. A flying diving overhand
@@ -363,7 +360,7 @@ const MOVES = {
     guard: 'high', kind: 'punch', kbx: 4.0, hitstop: CFG.HITSTOP_ENDER,
     hitbox: { x: 10, y: -120, w: 70, h: 64 },   // relative to airborne feet — big overhand box angled down-forward
     air: true, flight: { vx: CFG.SUPERMAN_VX, vy: CFG.SUPERMAN_VY },   // flat, FAST leap (flyknee-modeled), travels a big chunk of screen
-    knockdown: true, groundBounce: true, heavy: true, popsGround: true, chainOnly: true,
+    knockdown: true, groundBounce: true, heavy: true, popsGround: true, chainOnly: true, dashTrail: true,   // afterimages stream off the leap — free swagger, zero art
   },
   // run + DOWN: a low SLIDE TACKLE that takes the legs out and POPS them airborne.
   slidetackle: {

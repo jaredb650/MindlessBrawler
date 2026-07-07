@@ -56,6 +56,7 @@ const CFG = {
   WHIFF_STAMINA_PENALTY: 0.5,   // extra fraction of cost on whiff — HEAVY moves only
   GASSED_FRAMES: 80,            // wide open this long when you hit zero
   GASSED_RECOVER_STAMINA: 40,   // pool refill after gassing out
+  BLOCK_REGEN_MULT: 0.5,        // blockstun regens at HALF rate (was zero) — blocking guards your tank too, turtling isn't self-destructive
 
   // Forward pressure — never stop dead to throw hands.
   MOMENTUM_KEEP: 0.6,           // fraction of walk/run speed carried into a strike
@@ -99,11 +100,6 @@ const CFG = {
   WITCH_DODGE_FRAMES: 22,      // Witch Time: the dodge window (invuln) that can trigger the slow
   WITCH_TIME_FRAMES: 150,      // how long the world crawls (she stays full speed) on a successful dodge
   WITCH_RANGE: 200,            // (unused gate placeholder)
-  // BLEED (Vesper's knife DoT): each knife hit adds stacks + refreshes the timer; ticks while it lasts.
-  MAX_BLEED: 6,                 // stack cap
-  BLEED_DURATION: 150,          // frames a fresh knife hit keeps them bleeding (~2.5s)
-  BLEED_TICK: 18,               // a drip every N frames
-  BLEED_DMG: 2,                 // damage per stack per tick (6 stacks = 12/tick → strong chip, not dominant)
   PRESS_DRIFT_STAMINA: 0.1,     // ...which sips stamina: relentlessness is a spend
   FLOW_CANCEL_RECOVERY: 4,      // on a clean HIT recovery caps at this — block rides FULL recovery (negative on block), whiffs eat it all
 
@@ -129,8 +125,8 @@ const CFG = {
   WALLSPLAT_FRAMES: 26,         // frames pinned to the wall, fully hittable — the corner-carry juggle window
   WALLSPLAT_DROP_VY: -6,        // small pop when the pin times out — slides down into the bounce/fall path
   WALLSPLAT_SHAKE: 6,           // splat impact shake (heavier than the old rebound's 4)
-  PUSHBLOCK_COST: 22,           // stamina to pushblock — a panic button, never free corner-escape
-  PUSHBLOCK_PUSH: 13,           // outward shove on the attacker (vs BLOCK_PUSHBACK 4.5)
+  PUSHBLOCK_COST: 12,           // stamina to pushblock — priced like a tool, not a super (was 22: nobody used it)
+  PUSHBLOCK_PUSH: 22,           // outward shove on the attacker (vs BLOCK_PUSHBACK 4.5) — ~100px: a real reset to footsie range
   FEINT_COST: 14,               // stamina to feint-cancel a startup into neutral — the bait has a price
   FEINT_WINDOW_PAD: 0,          // extra frames past startup the feint stays live (0 = startup only)
 
@@ -148,6 +144,21 @@ const CFG = {
   GAZELLE_LAUNCH_VY: -13,       // launch height of the gazelle hook (between hook's drop and uppercut's -13.5 pop) — starts the air juggle
   GAZELLE_HOP_VX: 6.5,          // forward leap speed of the gazelle-step (seeded into attackDrift, glides/decays through the swing)
   GAZELLE_HOP_APEX: 28,         // px the body rises at the leap peak — LOW enough that the hook's hitbox still meets a standing body (was 64: flew clean over the opponent's head)
+
+  // IMPACT ENERGY — landing violence scales with how hard the body ACTUALLY hit.
+  // energy = |vy| + IMPACT_VX_WEIGHT·|vx| at every launched body-vs-surface contact:
+  // high falls integrate into vy for free (gravity), fast tumbles carry the vx term.
+  // The tier drives every juice channel at once (blood / dust / shake / sfx layer /
+  // stains / micro-hitstop). `hardSlam` (armed by spike-class moves in receiveSpike)
+  // forces the TOP tier on the next contact — spikes always read brutal. Corpses get
+  // an energy bump. Techs never reach the juice (clean escapes stay clean).
+  IMPACT_VX_WEIGHT: 0.6,        // how much horizontal tumble speed counts toward the crunch
+  IMPACT_KO_BONUS: 6,           // a corpse hits a tier harder (dead weight)
+  IMPACT_TIERS: [               // ascending: highest `min` ≤ energy wins
+    { min: 5,  blood: 4,  power: 0, dust: 8,  shake: 3 },                                                        // thud
+    { min: 13, blood: 14, power: 1, dust: 13, shake: 5, sfx: 'hit_heavy2', stains: 2 },                          // slam
+    { min: 18, blood: 26, power: 2, dust: 20, shake: 8, sfx: 'hard_slam', stains: 4, upBurst: 12, hitstop: 5, flash: true },   // brutal — blood knocked OUT of them (hard_slam = flesh+bone crunch, NOT the wall-spike sting)
+  ],
 
   // Knockdown / ground game — downed bodies are HITTABLE (full damage).
   // Kicks/heavies pop them off the floor for ground juggles; after
@@ -216,18 +227,24 @@ const CFG = {
   LIVERSHOT_CRUMPLE_FRAMES: 46, // liver shot's longer body-shot freeze (via move.crumpleFrames)
   LIVERSHOT_DRAIN: 30,          // stamina ripped by the liver shot
 
-  // SUPER-ARMOR (Xamora the heavy only — gated by char id). She EATS a hit through a
-  // flagged commital windup (move.armor:N = hits absorbed) or while walking the foe down
-  // (stamina-priced), takes reduced damage, and keeps coming. Counterplay is built in:
-  // THROWS bypass it (a grab on frame 5 overwrites her 'attack' state), MULTI-HIT breaks
-  // it (the N cap), and an `armorBreak:true` move blows straight through.
-  ARMOR_CHIP: 0.7,              // fraction of damage she still takes through armor (a trade, never free)
+  // SUPER-ARMOR. MOVE-armor is generic: any move flagged `armor:N` eats N hits through
+  // its commital windup (Xamora's slam/ring-smash/smite; MEKA's robot-arm backfist +
+  // overhand — the cyborg arm doesn't flinch). WALK-armor (eating hits while advancing,
+  // stamina-priced) stays Xamora-exclusive. Reduced damage still lands (a trade, never
+  // free). Counterplay is built in: THROWS bypass it (a grab overwrites the 'attack'
+  // state), MULTI-HIT breaks it (the N cap), and an `armorBreak:true` move blows through.
+  ARMOR_CHIP: 0.7,              // fraction of damage still taken through armor (a trade, never free)
   ARMOR_WALK_STAMINA: 34,       // stamina drained per hit eaten while walking → self-limits to ~2 advancing hits
+
+  // OVERCLOCK (MEKA — char.overclock flag): below the HP threshold the cyborg redlines —
+  // stamina regen ramps up (comeback fuel) and the body crackles. Reuses existing systems only.
+  OVERCLOCK_HP_FRAC: 0.3,       // hp fraction at/below which the overclock kicks in
+  OVERCLOCK_REGEN_MULT: 1.6,    // stamina regen multiplier while overclocked (stacks with the blockstun half-rate)
 
   // THE FLATLINER — just-frame overhand off the machine-gun's FINAL hit → one-punch KO.
   // A clean primed overhand diverts into the shared cine harness (kind:'flatliner') instead
   // of the blast: small impact hitstop, white flash, freeze, body crumples, round ends.
-  FLATLINER_JF_WINDOW: 1,       // just-frame window (frames after the machine-gun's final hit) — TIGHT: a 2-frame just-frame so most overhands are the regular (electric) one, not the flatliner
+  FLATLINER_JF_WINDOW: 3,       // just-frame window (frames after the machine-gun's final hit) — widened (was 1): his signature one-punch KO should actually happen in matches; still a timing read, most overhands stay the regular (electric) one
   FLATLINER_FLASH: 12,          // white-flash frames on the connect (reuses game.flash)
   FLATLINER_SLOWMO: 70,         // slow-mo frames after the release (reuses game.slowmo)
   FLATLINER_FREEZE: 26,         // beat 1: dead-still freeze on the connected fist (runFlatlinerCine OWNS this — startCine sets only a small hitstop)
@@ -253,10 +270,22 @@ const CFG = {
   DIVEKICK_LAND_RECOVERY: 14,     // whiffed dive = long, punishable landing
   AIRPUNCH_LAND_RECOVERY: 5,      // air punch = short, safe landing
 
-  // Elbow drop — down+P in the air: diving elbow that SPIKES an airborne body to the floor.
-  ELBOWDROP_VX: 7,                // forward punch of the dive (× facing) — slightly shorter reach than divekick
-  ELBOWDROP_VY: 13,               // downward dive speed (positive = down)
-  ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into a victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
+  // Elbow drop — MEKA's air down+P: a slow STRAIGHT-DOWN meteor elbow. The grounded
+  // super-punish: combo someone onto the floor, then land ON the downed body → a
+  // crescent-slam-style eruption launch (the OTG finisher). vs standing = a small
+  // brush-aside; vs airborne = the spike (unchanged). Landing always erupts the floor.
+  ELBOWDROP_VX: 7,                // forward dive of VESPER's dive-grab elbow (× facing) — hers keeps the old arc
+  ELBOWDROP_VY: 13,               // downward dive speed of Vesper's version (positive = down)
+  ELBOWDROP_DROP_VY: 16,          // MEKA's meteor drop: dead-vertical fall speed (no forward travel)
+  ELBOWDROP_OTG_BONUS: 110,       // flat bonus on a DOWNED body (on top of base) — the finisher payoff
+  ELBOWDROP_OTG_VY: -30,          // the eruption launch off a downed body — the HARDEST launch in the game (crescent is -25): "THIS is what the move is for"
+  ELBOWDROP_FREEZE: 26,           // the nuke's impact freeze (hitstop) — held under the lights-down IMPACT FADE (execution-style dim, NOT the KO blackout: that read as a K.O.)
+  ELBOWDROP_LAUNCH_DELAY: 4,      // live frames the victim stays CRUSHED flat on the floor after the freeze releases, THEN erupts — smashed INTO the ground, not just flying up
+  ELBOWDROP_NUKE_RANGE: 95,       // a DOWNED body this close to the LANDING point gets the nuke (the eruption IS the hit — resolves at touchdown, not mid-fall)
+  ELBOWDROP_SHOVE_VX: 11,         // a STANDING victim is brushed aside by the eruption (small dmg, knocked away — not the point of the move)
+  ELBOWDROP_AOE_RANGE: 150,       // eruption reach: grounded foes this close to the impact get the shove (direct or near-miss — one rule)
+  ELBOWDROP_AOE_DMG: 18,          // ...for chip damage (the eruption, not the elbow)
+  ELBOWDROP_SPIKE_VY: 16,         // vy DRIVEN into an AIRBORNE victim on hit — well past BOUNCE_MIN_VY (6) → hard bounce + OTG
   AXEKICK_SPIKE_VY: 15,           // the axe kick chops bodies DOWN into the floor too (grounded + tumbling) → bounce
   SPIKE_LIFT: 62,                  // a STANDING spike victim is yanked this high into a mid-air tumble first, THEN rocketed down → a real slam + bounce (not a quiet thud-to-downed)
 
@@ -281,7 +310,7 @@ const CFG = {
   ELECTRIC_DMG: 7,                 // HP per jolt (~12 jolts → ~84 over the shock)
 
   // Clinch throw — punch+kick mid-string: judo toss BEHIND you (side switch)
-  THROW_RANGE: 360,            // 3x reach (was 120) — extended P+K grab range
+  THROW_RANGE: 220,            // matched to CLINCH_GRAB_RANGE (was 360 — a vacuum grab from a third of the arena)
   THROW_DMG: 50,
   THROW_FRAMES: 26,             // canned arc over your head
 
@@ -378,6 +407,7 @@ const CFG = {
   GROUNDPOUND_DRAIN_PER_HIT: 16, // stamina ripped per hammerfist (4 hits → up to 64; can gas them out)
   GROUNDPOUND_DMG_PER_HIT: 34,   // HP per hammerfist (4 hits → ~136; a finished-off body gets KO'd)
   GROUNDPOUND_COOLDOWN: 70,      // attacker lockout after a pound — can't instantly re-mount the same wakeup (> KNOCKDOWN_FRAMES 55)
+  GP_ESCAPE_THRESHOLD: 40,       // victim MASH (fresh presses × CLINCH_MASH_PER_PRESS) to shove the mount off early — a good masher eats ~2 hammerfists instead of 4
   GP_MOUNT: 14,                  // beat 1: seat onto the body (no damage)
   GP_FLURRY: 48,                 // beat 2: the 4-hammerfist window
   GP_BEAT: 12,                   // a hammerfist every this-many flurry frames (4 across GP_FLURRY)

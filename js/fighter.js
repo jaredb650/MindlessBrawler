@@ -105,7 +105,7 @@ class Fighter {
     this.stunFrames = 0;
     this.invuln = 0;
     this.backHeldFrames = 0;
-    this.comboHits = 0; this.comboMoves = {}; this.airHits = 0;
+    this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.comboDmg = 0;
     this.jabChain = 0;         // consecutive CONNECTED jabs → the 3rd auto-bursts into machine-gun blows
     this.jabCounted = false;   // whether the current jab has been tallied into jabChain
     this.crouchjabChain = 0;   // consecutive CONNECTED crouch jabs → a 2nd (connected) down+P upgrades into the liver shot
@@ -114,6 +114,9 @@ class Fighter {
     this.rekkaCounted = false; // whether the current rekka move has been tallied
     this.bounced = false;
     this.noTech = false;       // set on un-techable launches (KO / point-blank knee / execution)
+    this.nukeLaunch = null;    // meteor-elbow delayed eruption: {vx,vy,delay} — pinned crushed on the floor, THEN launched
+    this.nukeDragged = false;  // caught midair by the meteor elbow's spike → DRAGGED down: the landing eruption nukes them too
+    this.hardSlam = false;     // armed by spike-class hits (receiveSpike): the next surface contact rolls the TOP impact tier
     this.groundHits = 0;       // hits eaten while downed this knockdown (cap → invuln getup)
     this.attackDrift = 0;      // momentum carried into/through strikes
     this.grabSlide = 0;        // forward lunge carried into a grab's reach (walk/dash grabs reach further)
@@ -124,8 +127,6 @@ class Fighter {
     this.armorHits = 0;        // hits absorbed by super-armor on the CURRENT armored move (Xamora) — caps at move.armor → ARMOR BREAK
     this.armorDamage = 0;      // damage soaked through armor this move (bookkeeping / future armor-damage cap)
     this.wallSpiked = false;   // a wall-spike wallsplat → slow slide down the wall + blood trail
-    this.bleed = 0;            // bleed stacks (Vesper's knife DoT)
-    this.bleedTimer = 0;       // frames left bleeding (refreshed on each knife hit)
     this.gibArmed = 0;         // hit by a gib move (shotgun) recently → a KO decapitates
     this.hitCount = 0;         // multihit bookkeeping (flying uppercut)
     this.lastHitF = -99;
@@ -178,7 +179,7 @@ class Fighter {
     if (FLASH_ON_ENTER.has(name)) this.hitFlash = CFG.HIT_FLASH;   // white impact frame on every fallheavy/wallsplat/launched/hitstun entry
 
     if (!MOVE_STATES.has(name)) { this.move = null; this.moveName = null; }
-    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.jabChain = 0; this.crouchjabChain = 0; this.rekkaChain = 0; }
+    if (NEUTRAL_RESET.has(name)) { this.comboHits = 0; this.comboMoves = {}; this.airHits = 0; this.comboDmg = 0; this.jabChain = 0; this.crouchjabChain = 0; this.rekkaChain = 0; }
     // (punchChain is deliberately NOT cleared on neutral: a magic-combo link recovers to idle
     //  between hits while the victim is still in hitstun, so the chain's lifetime is the VICTIM's
     //  combo — cleared in update() when the opponent leaves their hit state, not when WE idle.)
@@ -322,7 +323,12 @@ class Fighter {
     this.flatlinerPrimed = false;            // every move starts un-primed; the just-frame remap re-sets it AFTER this returns
     // Dive bomb: a `dive` field redirects the jump arc steeply down-forward on
     // start (e.g. divekick). vy is positive = downward; vx is signed by facing.
-    if (mv.dive) { this.vx = this.facing * mv.dive.vx; this.vy = mv.dive.vy; }
+    // METEOR ELBOW (otgNuke) is two-phase instead: the windup HANGS in place
+    // (momentum killed, ascent clipped) and the drop fires at the END of startup
+    // (airattack case) — otherwise a fast dive burns the whole startup falling
+    // and lands before a single active frame exists.
+    if (mv.otgNuke) { this.vx = 0; this.vy = Math.min(this.vy, 1.5); }
+    else if (mv.dive) { this.vx = this.facing * mv.dive.vx; this.vy = mv.dive.vy; }
     // Gazelle-step: a grounded LEAP. Carry forward via attackDrift (glided in the
     // attack case); the vertical arc is driven by the shared groundLeapY helper. Seeding
     // attackDrift (not vx) keeps the body in the grounded `attack` state, no air physics.
@@ -516,6 +522,7 @@ class Fighter {
     // (Airborne/tumbling victims already have air; only lift them if they're low.)
     if (CFG.FLOOR_Y - this.y < CFG.SPIKE_LIFT) { this.y = CFG.FLOOR_Y - CFG.SPIKE_LIFT; this.prevY = this.y; }
     this.bounced = false;                          // GUARANTEE the bounce (clear any stale flag — setLaunched(false) won't)
+    this.hardSlam = true;                          // spikes ALWAYS pay off: the floor contact rolls the top impact tier
     this.setLaunched(away * 1.5, downVy, false);   // vy positive = DOWN; no fresh-launch DI on a hard spike
     this.noTech = true;
     if (game) {
@@ -605,6 +612,35 @@ class Fighter {
     this.setLaunched(-dir * 3, CFG.WALLSPLAT_DROP_VY, false);        // pop down into the fall (electrocution arms on landing)
   }
 
+  // ── IMPACT JUICE: landing violence scales with how hard the body ACTUALLY hit ──
+  // Called at launched body-vs-surface contacts with energy = |vy| + w·|vx| (caller
+  // computes it BEFORE zeroing velocities). Tier table lives in CFG.IMPACT_TIERS.
+  // hardSlam (spikes) forces the top tier; corpses get an energy bump. Techs exit
+  // before the landing juice runs — a clean escape stays clean. `dirOverride` lets
+  // wall contacts spray INTO the stage instead of into the wall.
+  impactJuice(energy, surface, game, dirOverride) {
+    if (this.hp <= 0) energy += CFG.IMPACT_KO_BONUS;
+    const tiers = CFG.IMPACT_TIERS;
+    let tier = null;
+    for (const t of tiers) if (energy >= t.min) tier = t;
+    if (this.hardSlam) tier = tiers[tiers.length - 1];   // an armed spike always rolls BRUTAL
+    this.hardSlam = false;
+    if (!tier) return;
+    const wall = surface === 'wall';
+    const dir = dirOverride || Math.sign(this.vx) || -this.facing;
+    spawnBlood(wall ? this.x + dir * 10 : this.x, wall ? this.y - CFG.BODY_H * 0.5 : CFG.FLOOR_Y - 16, dir, tier.blood, tier.power);
+    spawnDust(this.x, CFG.FLOOR_Y, tier.dust);
+    game.shake = Math.max(game.shake, tier.shake);
+    if (tier.sfx) playSfx(tier.sfx);
+    if (tier.stains) for (let i = 0; i < tier.stains; i++) {
+      if (wall) spawnStain(this.x + dir * 4, this.y - Math.random() * CFG.BODY_H * 0.6, true);
+      else spawnStain(this.x + (Math.random() - 0.5) * 90, CFG.FLOOR_Y - 2 - Math.random() * 4, false);
+    }
+    if (tier.upBurst) spawnBlood(this.x, this.y - CFG.BODY_H * 0.4, -dir, tier.upBurst, 2);   // blood knocked OUT of them — sprays up off the slam
+    if (tier.hitstop) game.hitstop = Math.max(game.hitstop, tier.hitstop);                     // a micro-freeze so the crunch has a beat
+    if (tier.flash) this.hitFlash = CFG.HIT_FLASH;
+  }
+
   beginThrown(thrower) {
     this.setState('thrown');
     this.sideSpikeFrames = 0; this.pendingElectric = 0;   // a throw mid-side-spike cancels the flight + armed electrocution
@@ -682,7 +718,7 @@ class Fighter {
   }
 
   setLaunched(vx, vy, freshLaunch) {
-    if (freshLaunch) { this.bounced = false; this.noTech = false; this.sideSpikeFrames = 0; this.pendingElectric = 0; this.wallSpiked = false; }   // a FRESH launch clears any stale side-spike arming
+    if (freshLaunch) { this.bounced = false; this.noTech = false; this.sideSpikeFrames = 0; this.pendingElectric = 0; this.wallSpiked = false; this.nukeDragged = false; this.hardSlam = false; }   // a FRESH launch clears any stale side-spike/drag/slam arming
     this.hitFlash = CFG.HIT_FLASH;   // OTG pops / launches / KO blasts all flash on contact too
     // Hard guard: a missing/NaN launch velocity must never reach physics — it would
     // NaN the body's position and make it vanish off-screen. Default to a gentle float.
@@ -740,9 +776,31 @@ class Fighter {
     }
     if (this.groundpoundCD > 0) this.groundpoundCD--;
 
+    // METEOR ELBOW delayed eruption: the nuke leaves the victim CRUSHED flat on the floor
+    // (state stays 'downed') through the impact freeze; this counts down the last few LIVE
+    // frames after the world unfreezes, then fires the sky launch — smashed into the ground
+    // first, THEN erupted. Early-return pins them (no wakeup roll / getup out of it).
+    if (this.nukeLaunch) {
+      const n = this.nukeLaunch;
+      this.vx = 0; this.vy = 0; this.y = CFG.FLOOR_Y;
+      if (--n.delay <= 0) {
+        this.nukeLaunch = null;
+        this.setLaunched(n.vx, n.vy, true);
+        this.noTech = true;
+        spawnDust(this.x, CFG.FLOOR_Y, 14);
+        playSfx('ground_pop');
+      }
+      return;   // pinned until the eruption fires
+    }
+
     const NO_REGEN = new Set(['attack', 'airattack', 'flyattack', 'superstart', 'gassed', 'hitstun', 'blockstun', 'parried', 'launched', 'fallheavy', 'downed', 'throwgrab', 'throwanim', 'thrown', 'execute', 'executed', 'clinchgrab', 'clinch', 'clinched', 'slipcounter', 'countered', 'wallsplat', 'slip', 'crumple', 'suplexthrow', 'suplexed', 'gpmount', 'gpmounted', 'crumpled']);
+    // OVERCLOCK (Meka): below the HP threshold the cyborg redlines — regen ramps + the body crackles.
+    const overclocked = this.char.overclock && this.hp > 0 && this.hp <= this.stats.maxHp * CFG.OVERCLOCK_HP_FRAC;
+    const regenMult = overclocked ? CFG.OVERCLOCK_REGEN_MULT : 1;
+    if (overclocked && this.animClock % 26 === 0) spawnElectric(this.x + (Math.random() - 0.5) * 24, this.y - CFG.BODY_H * (0.4 + Math.random() * 0.4), 2);
     if (this.staminaLock > 0) { this.staminaLock--; this.stamina = 0; }   // winded by the spear tip — no stamina until the lock expires
-    else if (!NO_REGEN.has(this.state)) this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen);
+    else if (this.state === 'blockstun') this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen * CFG.BLOCK_REGEN_MULT * regenMult);   // blocking guards the tank at HALF rate — defense isn't double-taxed
+    else if (!NO_REGEN.has(this.state)) this.stamina = Math.min(this.stats.maxStamina, this.stamina + this.stats.staminaRegen * regenMult);
 
     // Parry timing: how *fresh* is the block? Holding back forever never parries.
     const away = Math.sign(this.x - opp.x) || -this.facing;
@@ -855,13 +913,16 @@ class Fighter {
       }
       case 'airattack': {
         const mv = this.move;   // air guns fire too (uzi spray, air bullet arts)
+        // METEOR ELBOW phase 2: the hang ends — he PLUMMETS dead-vertical as the
+        // hitbox goes live (dive.vy fires here, not at startMove — see startMove).
+        if (mv && mv.otgNuke && this.f === mv.startup) { this.vx = 0; this.vy = mv.dive.vy; }
         if (mv && this.f === mv.startup + 1) {
           if (mv.projectile === 'pistolround') spawnPistolRound(this);
           else if (mv.projectile === 'rifleround') spawnRifleRound(this);
           else if (mv.projectile === 'wisp') spawnWisp(this, 0);
           else if (mv.projectile === 'wispdown') spawnWisp(this, 1);
           else if (mv.projectile === 'tremor') spawnTremor(this);
-          else if (mv.projectile === 'shockwave') spawnShockwave(this);
+          else if (mv.projectile === 'shockwave') spawnShockwaveRound(this);
           else if (mv.projectile === 'vacuum') spawnVacuum(this);
           else if (mv.projectile === 'lantern') spawnLantern(this);
           if (mv.fireSfx) playSfx(mv.fireSfx);
@@ -900,7 +961,7 @@ class Fighter {
           else if (mv.projectile === 'wisp') spawnWisp(this, 0);
           else if (mv.projectile === 'wispdown') spawnWisp(this, 1);
           else if (mv.projectile === 'tremor') spawnTremor(this);
-          else if (mv.projectile === 'shockwave') spawnShockwave(this);
+          else if (mv.projectile === 'shockwave') spawnShockwaveRound(this);
           else if (mv.projectile === 'vacuum') spawnVacuum(this);
           else if (mv.projectile === 'lantern') spawnLantern(this);
           if (mv.fireSfx) playSfx(mv.fireSfx);   // e.g. the shotgun blast (its reload tail covers the rack)
@@ -911,6 +972,7 @@ class Fighter {
           if (this.f < mv.startup && this.f % 2 === 0) spawnElectric(this.x + this.facing * 6, CFG.FLOOR_Y - 250, Math.min(2 + ((this.f / 4) | 0), 6));   // charging glow overhead
           if (this.f === mv.startup + mv.active && !this.madeContact) {   // WHIFF → slam the empty ground
             const sx = this.x + this.facing * 70;
+            spawnGroundShockwave(sx, CFG.FLOOR_Y - 8);   // flat floor ring — the shock rolls outward along the ground
             spawnSpike(sx, this.facing); spawnRumble(sx, CFG.FLOOR_Y - 30, 1); spawnRumble(sx, CFG.FLOOR_Y - 30, -1);
             spawnBlast(sx, CFG.FLOOR_Y - 44); spawnDust(sx, CFG.FLOOR_Y, 18);
             game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4); game.flash = Math.max(game.flash, 7); game.flashMax = Math.max(game.flashMax, 7);
@@ -1096,9 +1158,12 @@ class Fighter {
           this.stamina -= CFG.PUSHBLOCK_COST;
           const away = Math.sign(opp.x - this.x) || this.facing;
           applyPush(this, opp, CFG.PUSHBLOCK_PUSH, away);   // shove THEM outward (att=this,vic=opp,away from me)
+          game.shake = Math.max(game.shake, CFG.SHAKE_MED);          // a visible KICK so the shove reads as an action, not a blip
+          game.hitstop = Math.max(game.hitstop, 5);
           spawnSpark(this.x + this.facing * 30, this.y - CFG.BODY_H * 0.6, 'block');
+          spawnDust(this.x + this.facing * 26, CFG.FLOOR_Y, 8);
           playSfx('block');
-          pushFeed('PUSHBLOCK', this.color);
+          pushFeed('PUSHBLOCK!', this.color);
         }
         if (this.f >= this.stunFrames) this.setState('idle');
         break;
@@ -1482,12 +1547,11 @@ class Fighter {
             }
           } else if (!this.bounced && impact >= CFG.BOUNCE_MIN_VY) {
             // Hit the ground HARD and bounce — never a flat no-impact landing.
+            // Juice scales with the ACTUAL crunch (energy measured before the bounce eats vy).
             this.bounced = true;
+            this.impactJuice(impact + CFG.IMPACT_VX_WEIGHT * Math.abs(this.vx), 'floor', game);
             this.vy = -impact * CFG.GROUND_BOUNCE;
             this.y = CFG.FLOOR_Y - 1;
-            game.shake = Math.max(game.shake, 5);
-            spawnDust(this.x, CFG.FLOOR_Y, 10);
-            if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 22, Math.sign(this.vx) || this.facing, 16);   // a corpse squirts on every bounce
             playSfx('bounce');
           } else if (this.pendingElectric > 0) {
             // the side-spiked body has LANDED → the electrocution seize begins (top-of-update handler owns it)
@@ -1499,13 +1563,72 @@ class Fighter {
             playSfx('body_slam');
             playSfx('electrocute');                                                      // the electricity runs through the seize
           } else {
-            if (this.hp <= 0) spawnBlood(this.x, CFG.FLOOR_Y - 18, this.facing, 12);   // ...and on the final slam
+            // final settle — usually post-bounce, so the energy (and the blood) tapers naturally
+            this.impactJuice(impact + CFG.IMPACT_VX_WEIGHT * Math.abs(this.vx), 'floor', game);
             this.vx = 0;
             this.setState('fallheavy');
             playSfx('body_slam');
           }
         } else {
           this.vx = 0;
+          // METEOR ELBOW landing: THE PAYOFF BEAT — the eruption IS the hit. The falling
+          // hitbox skips grounded bodies (resolveMelee gate), so the downed-body NUKE and
+          // the standing shove both fire HERE, the same frame the floor explodes — never
+          // "poked aside mid-fall, then an explosion on empty ground". Runs BEFORE the
+          // whiff-tax check so a connecting eruption isn't taxed as a whiff.
+          if (this.state === 'airattack' && this.move && this.move.otgNuke) {
+            const edir = this.facing;
+            spawnGroundShockwave(this.x, CFG.FLOOR_Y - 8);       // FLAT ring propagating outward ALONG the floor (not the upright wall ring)
+            spawnSpike(this.x, edir);
+            spawnBlast(this.x, CFG.FLOOR_Y - 44);
+            spawnRumble(this.x, CFG.FLOOR_Y - 30, 1); spawnRumble(this.x, CFG.FLOOR_Y - 30, -1);
+            spawnDust(this.x, CFG.FLOOR_Y, 18);
+            spawnSpark(this.x, CFG.FLOOR_Y - 50, 'hit', 2);
+            game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);   // (no screen flash on the plain eruption — a whiteout on every whiffed drop was disorienting)
+            playSfx('wall_spike'); playSfx('explosion');
+            // resolution: nuke a downed body under the impact — OR a body the spike CAUGHT
+            // MIDAIR and dragged down (nukeDragged) — else shove any grounded foe in eruption
+            // reach. A dragged body double-dips on purpose: catching the air-to-air is hard.
+            const dragged = !!(opp && opp.nukeDragged);
+            if (opp) opp.nukeDragged = false;                        // consumed at this landing either way
+            if (opp && opp.hp > 0 && opp.invuln <= 0 && (dragged || (!this.madeContact && !opp.isAirborne()))) {
+              const dx = Math.abs(opp.x - this.x);
+              const oaway = Math.sign(opp.x - this.x) || edir;
+              if ((opp.state === 'downed' || dragged) && dx <= CFG.ELBOWDROP_NUKE_RANGE) {
+                // ── THE NUKE: the grounded super-punish lands WITH the explosion ──
+                // a dragged (midair-caught) body gets SLAMMED into the crush posture first
+                if (opp.state !== 'downed') { opp.y = CFG.FLOOR_Y; opp.vx = 0; opp.vy = 0; opp.setState('downed'); }
+                const dmg = this.move.damage + CFG.ELBOWDROP_OTG_BONUS;
+                opp.hp = Math.max(0, opp.hp - dmg);
+                opp.groundHits++;                                  // still spends the ground-hit budget
+                this.madeContact = true; this.madeHit = true;
+                this.meter = Math.min(CFG.MAX_METER, this.meter + dmg * CFG.METER_PER_DAMAGE * (this.char.meterMult || 1));
+                // the "something special just happened" beat: a SHORT white pop, then lights
+                // down (execution-style dim, both bodies stay lit — NOT the KO blackout) held
+                // through a long impact freeze. The flash draws OVER the dim and fades out →
+                // reads as flash-THEN-dark, one beat.
+                game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+                game.impactFade = Math.max(game.impactFade, CFG.ELBOWDROP_FREEZE + 12);
+                game.hitstop = Math.max(game.hitstop, CFG.ELBOWDROP_FREEZE);
+                game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
+                spawnBlood(opp.x, CFG.FLOOR_Y - 24, oaway, 26, 2);
+                spawnFloatText(opp.x, CFG.FLOOR_Y - CFG.BODY_H - 30, 'CRUSHED!!', '#ffd54f');
+                playSfx('meteor_crush');   // the nuke's OWN voice — the elbow connecting a grounded body
+                pushFeed('METEOR ELBOW!!', this.color);
+                // DELAYED eruption: they stay smashed flat on the floor through the freeze,
+                // then rocket skyward a beat later (nukeLaunch handler at the top of update)
+                opp.hitFlash = CFG.HIT_FLASH;
+                opp.nukeLaunch = { vx: oaway * 3, vy: CFG.ELBOWDROP_OTG_VY, delay: CFG.ELBOWDROP_LAUNCH_DELAY };
+              } else if (!opp.isAirborne()
+                  && !['downed', 'fallheavy', 'wallsplat', 'thrown', 'clinch', 'clinched', 'electrified', 'crumple'].includes(opp.state)
+                  && dx <= CFG.ELBOWDROP_AOE_RANGE) {
+                opp.hp = Math.max(1, opp.hp - CFG.ELBOWDROP_AOE_DMG);
+                this.madeContact = true;                           // the blast connected — no whiff tax
+                opp.setLaunched(oaway * CFG.ELBOWDROP_SHOVE_VX, -5, true);
+                spawnSpark(opp.x, CFG.FLOOR_Y - 90, 'hit', 1);
+              }
+            }
+          }
           // air whiff pays the same heavy-only tax as grounded (endMove never runs for air moves)
           if ((this.state === 'airattack' || this.state === 'flyattack') && this.move && this.move.heavy && !this.madeContact) {
             this.stamina = Math.max(0, this.stamina - this.move.stamina * CFG.WHIFF_STAMINA_PENALTY);
@@ -1540,14 +1663,14 @@ class Fighter {
       this.x = minX;
       const cy = this.y - CFG.BODY_H * 0.5;
       if (this.state === 'launched' && this.vx <= -CFG.WALLSPLAT_MIN_VX) this._wallSplat(minX, 1, game);
-      else if (this.state === 'launched' && this.vx < -4) { spawnSpark(minX + 8, cy, 'hit', 1); spawnDust(minX, CFG.FLOOR_Y, 6); if (this.hp <= 0) spawnBlood(minX + 6, cy, 1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      else if (this.state === 'launched' && this.vx < -4) { spawnSpark(minX + 8, cy, 'hit', 1); this.impactJuice(Math.abs(this.vx) + CFG.IMPACT_VX_WEIGHT * Math.abs(this.vy), 'wall', game, 1); this.vx = -this.vx * 0.35; }
       else if (this.vx < 0) this.vx = 0;
     }
     if (this.x > maxX) {
       this.x = maxX;
       const cy = this.y - CFG.BODY_H * 0.5;
       if (this.state === 'launched' && this.vx >= CFG.WALLSPLAT_MIN_VX) this._wallSplat(maxX, -1, game);
-      else if (this.state === 'launched' && this.vx > 4) { spawnSpark(maxX - 8, cy, 'hit', 1); spawnDust(maxX, CFG.FLOOR_Y, 6); if (this.hp <= 0) spawnBlood(maxX - 6, cy, -1, 10); this.vx = -this.vx * 0.35; game.shake = Math.max(game.shake, 4); }
+      else if (this.state === 'launched' && this.vx > 4) { spawnSpark(maxX - 8, cy, 'hit', 1); this.impactJuice(Math.abs(this.vx) + CFG.IMPACT_VX_WEIGHT * Math.abs(this.vy), 'wall', game, -1); this.vx = -this.vx * 0.35; }
       else if (this.vx > 0) this.vx = 0;
     }
   }

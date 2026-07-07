@@ -77,15 +77,20 @@ function drawUI(ctx, game) {
     ctx.fillText("SUPER READY [']", W - 40, mY - 8);
   }
 
-  // combo counters — victim's comboHits shown on the attacker's side
-  ctx.font = 'bold 42px system-ui, sans-serif';
+  // combo counters — victim's comboHits shown on the attacker's side (+ running damage)
   if (f2.comboHits >= 2 && f2.inHitState()) {
     ctx.fillStyle = '#ffd54f'; ctx.textAlign = 'left';
+    ctx.font = 'bold 42px system-ui, sans-serif';
     ctx.fillText(`${f2.comboHits} HITS`, 60, 140);
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText(`${f2.comboDmg | 0} dmg`, 62, 166);
   }
   if (f1.comboHits >= 2 && f1.inHitState()) {
     ctx.fillStyle = '#ffd54f'; ctx.textAlign = 'right';
+    ctx.font = 'bold 42px system-ui, sans-serif';
     ctx.fillText(`${f1.comboHits} HITS`, W - 60, 140);
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText(`${f1.comboDmg | 0} dmg`, W - 62, 166);
   }
 
   // strike feed (kill-feed style, newest at top, fading)
@@ -137,13 +142,51 @@ function drawUI(ctx, game) {
   const dummyLabel = ['P2: HUMAN', 'P2: DUMMY (idle)', 'P2: DUMMY (blocks)', 'P2: CPU'][game.dummyMode];
   ctx.fillText(`[1/2/3/4] ${dummyLabel}   [5] fill meters   [0] hitboxes${game.debug ? ' ON' : ''}`, 40, CFG.STAGE_H - 60);
 
-  // debug state readout
+  // debug state readout — per-fighter state + move PHASE, live frame advantage, input history
   if (game.debug) {
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9fd0ff';
     ctx.textAlign = 'center';
     for (const f of game.fighters) {
-      ctx.fillText(`${f.state}:${f.f}${f.moveName ? ' ' + f.moveName : ''} st:${f.stamina | 0}`, f.x, CFG.FLOOR_Y + 30);
+      let phase = '';
+      if (f.move && f.state === 'attack') {
+        const m = f.move;
+        phase = f.f <= m.startup ? ` S${f.f}/${m.startup}` : f.f <= m.startup + m.active ? ' ACTIVE' : ` R${f.f - m.startup - m.active}/${m.recovery}`;
+      }
+      const stun = ['hitstun', 'blockstun', 'crumple', 'parried'].includes(f.state) ? ` stun:${Math.max(0, f.stunFrames - f.f)}` : '';
+      ctx.fillText(`${f.state}:${f.f}${f.moveName ? ' ' + f.moveName + phase : ''} st:${f.stamina | 0}${stun}`, f.x, CFG.FLOOR_Y + 30);
+    }
+    // frame advantage: who is actionable first, and by how much (+N = P1 first).
+    // Approximate — honors the flow-cancel recovery cap on a clean hit.
+    const adv = framesUntilFree(f2) - framesUntilFree(f1);
+    if (adv !== 0) {
+      ctx.font = 'bold 14px monospace';
+      ctx.fillStyle = adv > 0 ? '#9ccc65' : '#ef9a9a';
+      ctx.fillText(`ADV ${adv > 0 ? '+' : ''}${adv} ${adv > 0 ? 'P1' : 'P2'}`, W / 2, CFG.FLOOR_Y + 50);
+    }
+    // input history strips (newest on the inside edge)
+    ctx.font = 'bold 14px monospace';
+    const SYM = { left: '←', right: '→', up: '↑', down: '↓', punch: 'P', kick: 'K', jump: 'J', super: 'S' };
+    const pads = game.fighters.map(f => f.pad);
+    for (let i = 0; i < 2; i++) {
+      const h = pads[i].history;
+      ctx.textAlign = i === 0 ? 'left' : 'right';
+      ctx.fillStyle = 'rgba(159,208,255,0.9)';
+      const row = h.slice(-10).map(e => SYM[e.b] || '?').join(' ');
+      ctx.fillText(row, i === 0 ? 40 : W - 40, CFG.STAGE_H - 80);
     }
   }
+}
+
+// Frames until this fighter can act again (debug ADV readout). 0 = free now.
+function framesUntilFree(f) {
+  if (f.state === 'attack' && f.move) {
+    const m = f.move;
+    let total = m.startup + m.active + m.recovery;
+    if (f.madeHit && !m.noFlowCancel) total = Math.min(total, m.startup + m.active + CFG.FLOW_CANCEL_RECOVERY);
+    return Math.max(0, total - f.f);
+  }
+  if (['hitstun', 'blockstun', 'crumple', 'parried'].includes(f.state)) return Math.max(0, f.stunFrames - f.f);
+  if (f.state === 'land') return Math.max(0, f.landFrames - f.f);
+  return 0;
 }

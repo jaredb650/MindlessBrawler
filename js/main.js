@@ -39,6 +39,7 @@ const game = {
   comboKill: false,       // KO banner reads FINISHED — the back-super sword finisher
   feed: [],               // strike feed (newest first), drawn by ui.js
   koFreeze: 0,            // KO cinematic: frames the world holds on black + white silhouettes before the launch
+  impactFade: 0,          // cinematic lights-down beat (meteor-elbow nuke): arena dims, bodies stay lit — big-moment pop WITHOUT the KO blackout
   muted: false,           // mirror of SFX.muted (toggled with M)
   scene: 'title',         // front-end scene: title | mode | movelist | fight | paused (driven by menu.js)
   menu: { sel: 0, scroll: 0, t: 0, returnTo: 'mode' },
@@ -51,6 +52,7 @@ let cpu = new CPU();
 function startExecution(att, vic, game) {
   game.execution = { att, vic, f: 0, startHp: vic.hp };
   game.executionKill = true;
+  game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);   // white POP, then the lights drop — the dim doesn't just snap on
   att.facing = Math.sign(vic.x - att.x) || att.facing;
   vic.facing = -att.facing;
   att.setState('execute');
@@ -215,6 +217,28 @@ function startGroundPound(att, vic, game) {
 // then dismount and re-seat the victim DOWNED on the floor for oki (true okizeme).
 function runGroundPoundCine(game, ex) {
   const { att, vic } = ex;
+  // MASH OUT: fresh presses (any button / a direction tap) build escape — cross the
+  // threshold and the victim SHOVES the mount off early, denying the remaining
+  // hammerfists. Same feel as the clinch mash; pads sample every frame, so this
+  // works mid-cine for humans AND the CPU. They still re-seat downed (oki continues).
+  if (ex.f > CFG.GP_MOUNT && vic.hp > 0) {
+    const p = vic.pad;
+    let pressed = 0;
+    for (const b of ['punch', 'kick', 'jump', 'super']) if (p.pressed[b]) { p.consume(b); pressed++; }
+    if (p.tapDir !== 0) pressed++;
+    if (pressed > 0) ex.mash = (ex.mash || 0) + CFG.CLINCH_MASH_PER_PRESS * pressed;
+    if (ex.mash >= CFG.GP_ESCAPE_THRESHOLD) {
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      att.pushVel = -att.facing * 7;                       // bucked off the mount
+      vic.setState(vic.stamina <= 0 ? 'gassed' : 'downed'); // still floored — you denied hits, not the oki
+      spawnDust(vic.x, CFG.FLOOR_Y, 10);
+      game.shake = Math.max(game.shake, CFG.SHAKE_MED);
+      playSfx('clinch_break');
+      pushFeed('SHOVED OFF!', vic.color);
+      game.cine = null;
+      return;
+    }
+  }
   if (ex.f <= CFG.GP_MOUNT) {
     // seat onto the body, slow menace (no damage)
     vic.x += (att.x + att.facing * 40 - vic.x) * 0.2;
@@ -978,6 +1002,7 @@ function resetMatch() {
   game.flatlinerKill = false;
   game.comboKill = false;
   game.koFreeze = 0;
+  game.impactFade = 0;
   game.feed = [];
   cpu = new CPU();
   game.matchState = 'fight';
@@ -1041,6 +1066,7 @@ function logicStep() {
   game.shake = Math.max(0, game.shake - 0.6);
   if (game.shake === 0) game.shakeDir = 0;   // directional kick lives only as long as the shake
   if (game.flash > 0) game.flash--;
+  if (game.impactFade > 0) game.impactFade--;   // ticks through hitstop (like flash) so the lights-down beat spans the freeze then eases off
   updateFx();
 
   // cinematic super flash: world holds its breath
