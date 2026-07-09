@@ -290,7 +290,7 @@
           "rows": 3,
           "start": 0,
           "frames": 10,
-          "fps": 19,
+          "fps": 26,
           "mode": "loop",
           "cw": 240,
           "ch": 240,
@@ -3640,6 +3640,51 @@
           },
           "offX": 28,
           "offY": -9
+        }
+      }
+    },
+    "giiiooo": {
+      "global": {
+        "scale": 1,
+        "offX": 0,
+        "offY": 0,
+        "artFacesLeft": false,
+        "tint": null,
+        "bright": 1,
+        "contrast": 0,
+        "sat": 1,
+        "cellW": 240,
+        "cellH": 240
+      },
+      "sheets": {}
+    },
+    "blackwill": {
+      "global": {
+        "scale": 1,
+        "offX": 0,
+        "offY": 0,
+        "artFacesLeft": false,
+        "tint": null,
+        "bright": 1,
+        "contrast": 0,
+        "sat": 1,
+        "cellW": 240,
+        "cellH": 240
+      },
+      "sheets": {
+        "idle": {
+          "src": "assets/sprites/blackwill/Grok_Imagine_Video_1_5-d4fc3365_768x768_sheet_truepixel_512x512_raw_truepixel_312x312_raw.png",
+          "cols": 6,
+          "rows": 4,
+          "start": 0,
+          "frames": 24,
+          "fps": 21,
+          "mode": "loop",
+          "cw": 312,
+          "ch": 312,
+          "scale": 0.75,
+          "offY": 33,
+          "offX": -7
         }
       }
     }

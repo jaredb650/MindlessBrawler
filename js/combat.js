@@ -31,7 +31,7 @@ function pushFeed(text, color) {
 
 function hitSfx(move) {
   if (move.hitSound) playSfx(move.hitSound);                                                  // optional per-move override
-  else if (move.weapon === 'knife') playSfx(move.hitstop >= CFG.HITSTOP_ENDER ? 'stab_heavy' : 'stab_light');   // knife: heavy stab (upper slash) vs little stab (slash/thrust)
+  else if (move.weapon === 'knife' || move.weapon === 'machete' || move.weapon === 'saw') playSfx(move.hitstop >= CFG.HITSTOP_ENDER ? 'stab_heavy' : 'stab_light');   // blades/teeth: heavy stab vs little stab
   else if (move.hitstop >= CFG.HITSTOP_ENDER) playSfx(move.kind === 'kick' ? 'hit_heavy2' : 'hit_heavy');   // heavy KICKS = flesh impact, heavy PUNCHES = power punch (variety — hit_heavy was overused)
   else if (move.hitstop >= CFG.HITSTOP_MED) playSfx('hit_med');
   else playSfx('hit_light');
@@ -111,6 +111,71 @@ function spawnLantern(owner) {
   });
   playSfx('ground_pop');
 }
+// ── BLACKWILL's arsenal ──
+// MOLOTOV: the bottle itself on a direct hit — the FIRE POOL it splashes into is the real move.
+const MOLOTOV_MOVE = { anim: 'bullet', damage: CFG.MOLOTOV_DMG, guard: 'mid', blockstun: 10, hitstun: 18, hitstop: CFG.HITSTOP_MED, kbx: 2, kind: 'fire', molotov: true, label: 'MOLOTOV' };
+// FIRE POOL burn tick: small damage + a shove AWAY from the flames — you cannot walk through it.
+const FIRE_MOVE = { anim: 'bullet', damage: CFG.FIREPOOL_DMG, guard: 'mid', blockstun: 6, hitstun: 12, hitstop: 2, kbx: 3.5, kind: 'fire', label: 'BURNED' };
+// GRENADE detonation: resolved as an AoE hit at the fuse — launches.
+const GRENADE_MOVE = { anim: 'bullet', damage: CFG.GRENADE_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 7, kind: 'fire', launcher: true, launchVy: -11, label: 'GRENADE!' };
+function spawnMolotov(owner) {
+  const d = owner.facing;
+  // ARC CONTROL: the held direction at release aims the lob — forward = deep downfield,
+  // back = drop it at his feet (oki / corner trap), neutral = the standard toss.
+  const h = owner.pad.held;
+  const fwd = (d === 1 && h.right) || (d === -1 && h.left);
+  const bk = (d === 1 && h.left) || (d === -1 && h.right);
+  const arc = fwd ? CFG.MOLOTOV_LONG_MULT : bk ? CFG.MOLOTOV_SHORT_MULT : 1;
+  Projectiles.push({
+    x: owner.x + d * 40, y: CFG.FLOOR_Y - CFG.BODY_H * 0.4,   // released LOW — it's an underhand sling
+    vx: d * CFG.MOLOTOV_VX * arc, vy: CFG.MOLOTOV_VY, grav: CFG.MOLOTOV_GRAV,
+    w: 22, h: 22, owner, move: MOLOTOV_MOVE, kind: 'molotov', dead: false, age: 0,
+  });
+  playSfx('whoosh_light');
+}
+function spawnGrenade(owner, fuse) {
+  const d = owner.facing;
+  const airborne = owner.isAirborne();
+  Projectiles.push({
+    x: owner.x + d * 40, y: airborne ? owner.y - CFG.BODY_H * 0.5 : CFG.FLOOR_Y - CFG.BODY_H * 0.8,
+    vx: d * CFG.GRENADE_VX, vy: airborne ? CFG.GRENADE_VY * 1.15 : CFG.GRENADE_VY, grav: CFG.GRENADE_GRAV,
+    w: 18, h: 18, owner, kind: 'grenade', fuse: fuse != null ? fuse : CFG.GRENADE_FUSE, dead: false, age: 0,
+  });
+  playSfx('whoosh_light');
+}
+function spawnFirePool(x, owner, w, life) {
+  Projectiles.push({
+    x: Math.max(CFG.WALL_L + 30, Math.min(CFG.WALL_R - 30, x)), y: CFG.FLOOR_Y - 46,
+    vx: 0, vy: 0, grav: 0, w: w || CFG.FIREPOOL_W, h: 46,
+    owner, kind: 'firepool', dead: false, age: 0, lastBurn: -99, life: life || CFG.FIREPOOL_FRAMES,
+  });
+  playSfx('explosion');
+}
+
+// SCORCHED EARTH ordnance: impact grenades detonate ON CONTACT (body, floor, or wall) —
+// direct hit = the big move, near miss = the AoE knock. The rocket is the same idea, enormous.
+const IMPACT_NADE_MOVE = { anim: 'bullet', damage: CFG.IMPACT_NADE_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 5, kind: 'fire', launcher: true, launchVy: -9, label: 'IMPACT GRENADE' };
+const NADE_AOE_MOVE = { anim: 'bullet', damage: CFG.IMPACT_NADE_AOE_DMG, guard: 'mid', blockstun: 10, hitstun: 0, hitstop: CFG.HITSTOP_MED, kbx: 6, kind: 'fire', launcher: true, launchVy: -8, label: 'BLAST' };
+const ROCKET_MOVE = { anim: 'bullet', damage: CFG.ROCKET_DMG, guard: 'mid', blockstun: 18, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 13, kind: 'fire', launcher: true, launchVy: -15, label: 'ROCKET!!' };
+const ROCKET_AOE_MOVE = { anim: 'bullet', damage: CFG.ROCKET_AOE_DMG, guard: 'mid', blockstun: 14, hitstun: 0, hitstop: CFG.HITSTOP_ENDER, kbx: 8, kind: 'fire', launcher: true, launchVy: -10, label: 'ROCKET BLAST' };
+function spawnImpactNade(owner, i) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 44, y: CFG.FLOOR_Y - CFG.BODY_H * 0.72,
+    vx: d * (CFG.IMPACT_NADE_VX + i * CFG.IMPACT_NADE_STEP),   // an ADVANCING barrage — each thump reaches further downfield
+    vy: CFG.IMPACT_NADE_VY - (i % 2) * 0.7, grav: CFG.IMPACT_NADE_GRAV,
+    w: 20, h: 12, owner, kind: 'impactnade', dead: false, age: 0,
+  });
+}
+function spawnRocket(owner) {
+  const d = owner.facing;
+  Projectiles.push({
+    x: owner.x + d * 50, y: CFG.FLOOR_Y - CFG.BODY_H * 0.68,
+    vx: d * CFG.ROCKET_VX, vy: 0, grav: 0,
+    w: 42, h: 16, owner, kind: 'rocket', dead: false, age: 0,
+  });
+}
+
 // Fire ONE round of a STREAMING burst. The fighter fire-hook calls this once every `b.interval`
 // frames, passing the running shot index `i` (0..count-1). Every round flies STRAIGHT — the
 // trail/line emerges from the time between shots, NOT a per-bullet fan.
@@ -181,7 +246,10 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // running. COUNTERPLAY is structural: THROWS skip this entirely (a grab overwrites the
   // 'attack' state before it ever reaches here), MULTI-HIT breaks it (the N cap → ARMOR BREAK kneel),
   // and an `armorBreak:true` move blows straight through (clears the tally, falls to the real funnel).
-  const armorOnMove = vic.state === 'attack' && vic.move && vic.move.armor
+  // MINDLESS RAMPAGE armor (GIIIOOO, char.rampageArmor): while raging, EVERY attack windup
+  // carries 1 hit of super-armor — god mode does not flinch. Same counterplay as all armor.
+  const rampArmor = vic.rampage > 0 && vic.char.rampageArmor ? 1 : 0;
+  const armorOnMove = vic.state === 'attack' && vic.move && (vic.move.armor || rampArmor)
     && vic.f <= vic.move.startup + (vic.move.active || 0);
   const armorOnWalk = vic.char.id === 'xamora' && vic.state === 'walk' && vic.stamina > CFG.ARMOR_WALK_STAMINA
     && ((away === 1 && vic.pad.held.left) || (away === -1 && vic.pad.held.right));   // walking INTO the attacker
@@ -204,7 +272,8 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       // ARMOR BREAK: she absorbs N hits (move.armor) and KEEPS attacking — the hit that EXCEEDS the
       // budget buckles her to a knee (the punish window). So armor:1 eats one poke and the slam still
       // lands; a 2-hit string blows through. Walk-armor self-limits on stamina, so only moves break here.
-      if (armorOnMove && vic.armorHits > vic.move.armor) {
+      const ironWill = vic.char.ironWill && vic.hp <= vic.stats.maxHp * CFG.IRONWILL_HP_FRAC ? 1 : 0;   // the wounded bull soaks one more
+      if (armorOnMove && vic.armorHits > (vic.move.armor || rampArmor) + ironWill) {
         vic.armorHits = 0; vic.armorDamage = 0;
         spawnFloatText(vic.x, vic.y - CFG.BODY_H - 50, 'ARMOR BREAK!', '#ff5252');
         playSfx('crumple');
@@ -229,7 +298,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     game.shake = Math.max(game.shake, cpw === 2 ? CFG.SHAKE_HEAVY : cpw === 1 ? CFG.SHAKE_MED : CFG.SHAKE_LIGHT);
     spawnSpark(contactPoint.x, contactPoint.y, 'hit', cpw);
     if (cpw === 2) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD, 2);   // heavy → chunky globs
-    else if (move.weapon === 'knife' || cpw === 1) spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);
+    else if (move.weapon === 'knife' || move.weapon === 'machete' || move.weapon === 'saw' || cpw === 1) spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);
     else spawnBlood(contactPoint.x, contactPoint.y, away, 5, 0);   // light → fine spray
     hitSfx(move);
     pushFeed(move.label || MOVE_LABELS[move.anim] || move.anim, att.color);
@@ -336,6 +405,14 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     startCounter(att, vic, move, game);
     return;
   }
+  // PERFECT WEAVE payoff (GIIIOOO): a CHECK HOOK landed inside the perfect-weave window
+  // fires the full slip-counter cinematic — make them miss, make them pay.
+  if (live && att.perfectWeave > 0 && att.moveName === 'checkhook' && !att.isAirborne() && !vic.isAirborne()
+      && att.counterCD <= 0 && !game.counter) {
+    att.perfectWeave = 0;
+    startCounter(att, vic, move, game);
+    return;
+  }
   if (vic.inHitState()) vic.comboHits++;
   else { vic.comboHits = 1; vic.comboMoves = {}; vic.airHits = 0; vic.comboDmg = 0; vic.blockedPistolRounds = 0; }   // a clean hit breaks the consecutive-block chain
   const hits = vic.comboHits;
@@ -345,7 +422,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // per-character combo scaling: Vesper's many-hit juggles decay gentler + floor higher so her
   // rushdown pressure actually converts (the brawler keeps the global defaults → byte-identical).
   const dmgScale = Math.max(att.char.minDmgScale || CFG.MIN_DMG_SCALE, 1 - (att.char.dmgScalePerHit || CFG.DMG_SCALE_PER_HIT) * (hits - 1));
-  const dmg = Math.max(1, Math.round(move.damage * dmgScale * (att.char.dmgMult || 1)));   // per-character damage scaling (Vesper's rushdown hits harder)
+  const dmg = Math.max(1, Math.round(move.damage * dmgScale * (att.char.dmgMult || 1) * (att.rampage > 0 ? CFG.RAMPAGE_DMG_MULT : 1)));   // per-char scaling + GIIIOOO's MINDLESS RAMPAGE install (SAW REV pays in extra TEETH, not hidden numbers)
   vic.hp -= dmg;
   vic.comboDmg += dmg;   // running combo-damage tally (ui.js shows it under the hit counter)
   // a pained grunt on a meaty hit — random, skipped on crumple moves (those already grunt). The
@@ -366,7 +443,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   spawnSpark(contactPoint.x, contactPoint.y, 'hit', pw);
   // every clean hit spurts — chunkiness scales with power: heavy = big globs, light = fine spray
   if (pw === 2) spawnBlood(contactPoint.x, contactPoint.y, away, CFG.HEAVY_BLOOD, 2);
-  else if (move.weapon === 'knife') spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);   // a knife cut always draws blood
+  else if (move.weapon === 'knife' || move.weapon === 'machete' || move.weapon === 'saw') spawnBlood(contactPoint.x, contactPoint.y, away, 12, 1);   // a blade cut always draws blood (teeth too)
   else if (pw === 1) spawnBlood(contactPoint.x, contactPoint.y, away, 9, 1);
   else spawnBlood(contactPoint.x, contactPoint.y, away, 5, 0);   // light hit → small fine spray
   hitSfx(move);
@@ -383,7 +460,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     if (cf.kind === 'slashcombo') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startSlashCombo(att, vic, game, cf.opts); return; }
     if (cf.kind === 'magiccombo') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startMagicCombo(att, vic, game); return; }
-    if (cf.kind === 'kebab') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startKebab(att, vic, game); return; }   // SHISH KEBAB: carry → wall pin
+    if (cf.kind === 'kebab') { att.punchChain = 0; att.activeChains = []; att.pendingFinish = null; startKebab(att, vic, game, cf.opts && cf.opts.label); return; }   // wall carry → pin (Vesper SHISH KEBAB / Blackwill MEAT HOOK)
     // execution / skeet are command grabs handled at the gun fire-frame (fighter.js) — not fired here
   }
 
@@ -418,6 +495,52 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       && !['downed', 'fallheavy', 'crumple', 'wallsplat'].includes(vic.state)) {
     startSwordCombo(att, vic, game);   // clears att.swordReady
     return;
+  }
+
+  // ── HAYMAKER (GIIIOOO): the wall spike is EARNED, and it's a PUNCH — a CHECK HOOK thrown
+  // inside the window his COMBINATION opens (the same post-auto-combo rail as Meka's sword)
+  // blasts them dead-flat across the stage into the wall. ──
+  if (live && att.char.weaveCancel && att.moveName === 'checkhook' && att.swordReady > 0
+      && !vic.isAirborne() && vic.state !== 'downed') {
+    att.swordReady = 0;
+    vic.receiveSideSpike(away, game);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+    spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'HAYMAKER!!', '#ffe082');
+    pushFeed('HAYMAKER!!', att.color);
+    return;
+  }
+
+  // ── GROUND CRUSH (Blackwill's EXECUTIONER): the meteor-elbow beat FROM THE GROUND — a
+  // standing body is slammed flat, pinned crushed under the lights-down freeze, then the
+  // floor ERUPTS them skyward (reuses the nukeLaunch crush machinery wholesale). ──
+  if (live && move.groundCrush && !vic.isAirborne()) {
+    // multihit crushers (SAW PLUNGE): only the FINAL bite erupts — the earlier teeth PIN:
+    // the attacker hangs on the embedded blade (velocity zeroed) while they grind. Works on
+    // STANDING and DOWNED bodies alike (the meteor-elbow rule: floored bodies get the FULL
+    // grind, never a single pop — and the finishing bite pays an OTG bonus).
+    const crushFinal = !move.multihit || (att.hitCount || 0) + 1 >= multihitTimes(att, move);
+    if (!crushFinal) {
+      if (att.state === 'airattack') { att.vy = 0; att.vx = 0; }   // he RIDES the stuck saw
+      if (vic.state === 'downed') return;   // pinned ON the floor — the downed-branch pop must never fire mid-grind
+      // standing: fall through to the standard funnel — kbx 0 + noStunDecay = locked on the blade
+    } else {
+    if (vic.state === 'downed') { vic.hp = Math.max(0, vic.hp - CFG.SAWPLUNGE_OTG_BONUS); vic.comboDmg += CFG.SAWPLUNGE_OTG_BONUS; }   // extra pay for finishing a floored body
+    vic.y = CFG.FLOOR_Y; vic.vx = 0; vic.vy = 0;
+    vic.setState('downed');
+    vic.hitFlash = CFG.HIT_FLASH;
+    vic.nukeLaunch = { vx: away * 3, vy: CFG.GROUNDCRUSH_VY, delay: CFG.GROUNDCRUSH_DELAY };
+    game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);   // white pop, THEN the lights drop
+    game.impactFade = Math.max(game.impactFade, CFG.GROUNDCRUSH_FREEZE + 10);
+    game.hitstop = Math.max(game.hitstop, CFG.GROUNDCRUSH_FREEZE);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
+    spawnGroundShockwave(vic.x, CFG.FLOOR_Y - 8);
+    spawnSpike(vic.x, away);
+    spawnBlast(vic.x, CFG.FLOOR_Y - 44);
+    spawnDust(vic.x, CFG.FLOOR_Y, 16);
+    playSfx('wall_spike'); playSfx('explosion');
+    pushFeed('CRUSHED INTO THE EARTH!!', att.color);
+    return;
+    }
   }
 
   if (vic.hp <= 0) {
@@ -601,6 +724,14 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   //  the resolveMelee gate above means an otgNuke move only reaches here vs airborne
   //  bodies, which fall through to the shared spike branch below.)
   if (vic.isAirborne()) {
+    // PUNCTUATION (GIIIOOO's air-freedom capstone): the FINAL air attack of a full string
+    // SPIKES the airborne victim — finish the sentence, the floor finishes them (bounce → OTG).
+    if (live && att.state === 'airattack' && (att.char.airAttacks || 1) > 1
+        && att.airAtkUsed >= (att.char.airAttacks || 1) && move.spike == null) {
+      vic.receiveSpike(CFG.AXEKICK_SPIKE_VY, away, game);
+      spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'PUNCTUATION!!', '#ffe082');
+      return;
+    }
     // SIDE SPIKE vs an AIRBORNE/TUMBLING body (spinning back kick): blast them dead-flat
     // across the stage instead of juggling. Generic — no electrocution unless move.electric.
     if (move.sideSpikeAir) {
@@ -621,7 +752,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
       // rising multihit carries them up with you; the FINAL hit launches high —
       // but ONLY if the move actually launches (machine-gun blows has no launchVy,
       // so its final airborne hit must NOT pass undefined → NaN → vanished body).
-      const finalHit = (att.hitCount || 0) + 1 >= move.multihit.times;
+      const finalHit = (att.hitCount || 0) + 1 >= multihitTimes(att, move);
       const lv = finalHit && move.launchVy != null ? move.launchVy : -9;
       vic.setLaunched(away * move.kbx, lv, false);
       return;
@@ -650,7 +781,8 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   // ── SPIKE (elbow drop / axe kick) vs a STANDING body ──
   // Drive them straight into the floor with enough energy to BOUNCE → hard, untechable
   // knockdown + OTG. (Airborne/tumbling victims are spiked in the isAirborne branch above.)
-  if (move.spike != null) {
+  // groundCrush moves are EXEMPT: their grounded story is the pin → crush, never this spike.
+  if (move.spike != null && !move.groundCrush) {
     vic.receiveSpike(move.spike, away, game);
     return;
   }
@@ -667,7 +799,7 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
   }
 
   if (move.launcher) {
-    const finalHit = !move.multihit || (att.hitCount || 0) + 1 >= move.multihit.times;
+    const finalHit = !move.multihit || (att.hitCount || 0) + 1 >= multihitTimes(att, move);
     vic.setLaunched(away * move.kbx, finalHit ? move.launchVy : -9, true);
     return;
   }
@@ -690,6 +822,14 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
 
 // `move` is snapshotted by the caller: on a trade frame the first resolution
 // can knock the second attacker out of their move before this runs.
+// Effective multihit count for the attacker's LIVE move: SAW REV (move.revBites) converts
+// banked charge (att.cook) into EXTRA TEETH — +1 per SAW_REV_BITE_EVERY, capped.
+function multihitTimes(att, move) {
+  let t = move.multihit.times;
+  if (move.revBites && att.move === move && att.cook) t += Math.min(CFG.SAW_REV_BITES_MAX, Math.floor(att.cook / CFG.SAW_REV_BITE_EVERY));
+  return t;
+}
+
 function resolveMelee(att, box, move, vic, game) {
   if (!box || !move) return;
   if (vic.hp <= 0) return;   // no corpse-juggling on the K.O. screen
@@ -711,7 +851,7 @@ function resolveMelee(att, box, move, vic, game) {
   if (move.multihit && att.move === move) {
     att.hitCount = (att.hitCount || 0) + 1;
     att.lastHitF = att.f;
-    if (att.hitCount < move.multihit.times) att.moveHitDone = false;
+    if (att.hitCount < multihitTimes(att, move)) att.moveHitDone = false;
   }
 }
 
@@ -866,12 +1006,102 @@ function updateProjectiles(f1, f2, game) {
   for (const p of Projectiles) {
     if (p.dead) continue;
     p.age++;
+
+    // ── GRENADE: no contact hit — it BOUNCES on its own physics, then the fuse detonates an AoE ──
+    if (p.kind === 'grenade') {
+      p.vy += p.grav; p.x += p.vx; p.y += p.vy;
+      if (p.y >= CFG.FLOOR_Y - 8 && p.vy > 0) {                       // floor skip
+        p.y = CFG.FLOOR_Y - 8; p.vy = -p.vy * CFG.GRENADE_BOUNCE; p.vx *= 0.62;   // the skips die off — it stays mid-range
+        spawnDust(p.x, CFG.FLOOR_Y, 3);
+        playSfx('bounce');
+      }
+      if (p.x < CFG.WALL_L + 16 || p.x > CFG.WALL_R - 16) p.vx = -p.vx * 0.6;   // wall skip
+      if (--p.fuse <= 0) {
+        const gvic = p.owner === f1 ? f2 : f1;
+        spawnBlast(p.x, p.y); spawnBlast(p.x, p.y - 30);
+        spawnGroundShockwave(p.x, CFG.FLOOR_Y - 8);
+        spawnSpark(p.x, p.y, 'hit', 2); spawnDust(p.x, CFG.FLOOR_Y, 14);
+        game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 2);
+        game.flash = Math.max(game.flash, 5); game.flashMax = Math.max(game.flashMax, 5);
+        playSfx('explosion');
+        const blast = { x: p.x - CFG.GRENADE_RADIUS, y: CFG.FLOOR_Y - 240, w: CFG.GRENADE_RADIUS * 2, h: 240 };
+        if (gvic.hp > 0 && gvic.invuln <= 0 && gvic.state !== 'fallheavy' && rectsOverlap(blast, gvic.hurtbox())) {
+          landAttack(p.owner, gvic, GRENADE_MOVE, game, p.x, { x: gvic.x, y: gvic.y - CFG.BODY_H * 0.5 });
+        }
+        p.dead = true;
+      }
+      continue;
+    }
+    // ── SCORCHED EARTH ordnance: detonates on ANY contact — body, floor, or wall ──
+    if (p.kind === 'impactnade' || p.kind === 'rocket') {
+      p.vy += p.grav; p.x += p.vx; p.y += p.vy;
+      const rocket = p.kind === 'rocket';
+      const nvic = p.owner === f1 ? f2 : f1;
+      const rect = { x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h };
+      const direct = nvic.hp > 0 && nvic.invuln <= 0 && nvic.state !== 'fallheavy' && rectsOverlap(rect, nvic.hurtbox());
+      if (direct || p.y >= CFG.FLOOR_Y - 6 || p.x <= CFG.WALL_L + 12 || p.x >= CFG.WALL_R - 12) {
+        const by = Math.min(p.y, CFG.FLOOR_Y - 36);
+        spawnOrdnanceBoom(p.x, by, rocket);   // the custom fireball + smoke column + debris
+        spawnBlast(p.x, by); spawnSpark(p.x, by, 'hit', rocket ? 2 : 1); spawnDust(p.x, CFG.FLOOR_Y, rocket ? 18 : 8);
+        if (rocket) {
+          spawnBlast(p.x - 34, by - 22); spawnBlast(p.x + 34, by - 12);
+          spawnGroundShockwave(p.x, CFG.FLOOR_Y - 8);
+          game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 6);
+          game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
+        } else { spawnGroundShockwave(p.x, CFG.FLOOR_Y - 8); game.shake = Math.max(game.shake, CFG.SHAKE_MED + 2); }
+        playSfx('explosion');
+        if (direct) {
+          if (rocket) {   // a DIRECT rocket is an EVENT: the world stops on the impact, then the whiteout sends them flying
+            game.hitstop = Math.max(game.hitstop, CFG.ROCKET_DIRECT_FREEZE);
+            game.flash = Math.max(game.flash, CFG.KO_FLASH); game.flashMax = Math.max(game.flashMax, CFG.KO_FLASH);
+            game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 9);
+            spawnFloatText(nvic.x, nvic.y - CFG.BODY_H - 34, 'DIRECT HIT!!', '#ffd54f');
+          }
+          landAttack(p.owner, nvic, rocket ? ROCKET_MOVE : IMPACT_NADE_MOVE, game, p.x - p.vx * 2, { x: p.x, y: p.y });
+        } else {
+          const R = rocket ? CFG.ROCKET_AOE_R : CFG.IMPACT_NADE_AOE_R;
+          const blast = { x: p.x - R, y: CFG.FLOOR_Y - 240, w: R * 2, h: 240 };
+          if (nvic.hp > 0 && nvic.invuln <= 0 && nvic.state !== 'fallheavy' && rectsOverlap(blast, nvic.hurtbox())) {
+            landAttack(p.owner, nvic, rocket ? ROCKET_AOE_MOVE : NADE_AOE_MOVE, game, p.x, { x: nvic.x, y: nvic.y - CFG.BODY_H * 0.5 });
+          }
+        }
+        p.dead = true;
+      }
+      if (p.x < -100 || p.x > CFG.STAGE_W + 100) p.dead = true;
+      continue;
+    }
+    // ── FIRE POOL: stationary flames — a burn tick + a shove away every FIREPOOL_TICK frames ──
+    if (p.kind === 'firepool') {
+      if (p.age % 3 === 0) {                                          // rising embers
+        Particles.push({ x: p.x + (Math.random() - 0.5) * p.w, y: CFG.FLOOR_Y - 6 - Math.random() * 20,
+          vx: (Math.random() - 0.5) * 0.8, vy: -1.6 - Math.random() * 1.4, life: 10 + Math.random() * 10, maxLife: 20,
+          color: ['#ff9a36', '#ffce78', '#ff5f2e', '#fff3c8'][(Math.random() * 4) | 0], size: 2 + Math.random() * 3.5, grav: -0.02, additive: true });
+      }
+      const fvic = p.owner === f1 ? f2 : f1;
+      const rect = { x: p.x - p.w / 2, y: p.y, w: p.w, h: p.h };
+      if (fvic.hp > 0 && fvic.invuln <= 0 && fvic.state !== 'fallheavy' && p.age - p.lastBurn >= CFG.FIREPOOL_TICK
+          && rectsOverlap(rect, fvic.hurtbox())) {
+        p.lastBurn = p.age;
+        landAttack(p.owner, fvic, FIRE_MOVE, game, p.x, { x: fvic.x, y: fvic.y - CFG.BODY_H * 0.4 });   // kbx shoves AWAY from the pool center
+      }
+      if (p.age > (p.life || CFG.FIREPOOL_FRAMES)) p.dead = true;
+      continue;
+    }
+
     p.x += p.vx;
     if (p.vy) p.y += p.vy;          // arced bursts (uzi arc, etc.)
     if (p.grav) p.vy += p.grav;
+    // MOLOTOV hitting the GROUND: splash → the fire pool ignites where it broke.
+    if (p.kind === 'molotov' && p.y >= CFG.FLOOR_Y - 12) {
+      spawnFirePool(p.x, p.owner);
+      spawnSpark(p.x, CFG.FLOOR_Y - 20, 'hit', 1);
+      playSfx('glass_break');
+      p.dead = true;
+      continue;
+    }
     const vic = p.owner === f1 ? f2 : f1;
     const move = p.move || SUPER_MOVE;
-    const isB = p.kind === 'bullet' || p.kind === 'magic';   // magic orbs get the light bullet FX, not the cannon blast
+    const isB = p.kind === 'bullet' || p.kind === 'magic' || p.kind === 'molotov';   // magic orbs / bottles get the light bullet FX, not the cannon blast (or its super-chip)
     const rect = { x: p.x - p.w / 2, y: p.y, w: p.w, h: p.h };
     // armDelay: a placed TRAP (lantern) is inert for its first few frames so it can't be cast AS a melee.
     if (vic.hp > 0 && vic.invuln <= 0 && vic.state !== 'fallheavy' && p.age >= (p.armDelay || 0) && rectsOverlap(rect, vic.hurtbox())) {
@@ -885,6 +1115,11 @@ function updateProjectiles(f1, f2, game) {
       game.shake = Math.max(game.shake, isB ? CFG.SHAKE_LIGHT : CFG.SHAKE_HEAVY + 3);
       spawnSpark(p.x + Math.sign(p.vx) * p.w / 2, p.y + p.h / 2, 'hit', isB ? 0 : 2);
       if (!isB) playSfx('explosion');
+      // MOLOTOV breaking on a BODY: the fire pool ignites right at their feet.
+      if (p.kind === 'molotov') {
+        spawnFirePool(p.x, p.owner);
+        playSfx('glass_break');
+      }
       // the RIFLE round (the only blast-class bullet) DETONATES on impact — a real explosion.
       if (isB && move.blast) {
         const ix = p.x + Math.sign(p.vx) * p.w / 2, iy = p.y + p.h / 2;

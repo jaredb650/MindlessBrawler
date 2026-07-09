@@ -15,15 +15,16 @@ const CHAR_STYLE = {
   brawler: 'Cyborg brawler. Close-range powerhouse with deep combo routes — heavy punches and kicks that chain forever. Medium health, medium speed.',
   vesper:  'Stealth assassin. Blink-fast knife strings into devastating point-blank gun combos. Lower health, but blistering speed makes her lethal.',
   xamora:  'Fallen-angel heavyweight. Slow but devastating long-range staff sweeps and battle magic. The tank — huge health, controls the whole screen.',
+  giiiooo: 'Street boxer. Fastest fighter in the game — flicker jabs, snap foot-jabs, and triple air strings. Paper health, tiny hits… until MINDLESS RAMPAGE.',
+  blackwill: 'Heavy grappler. The biggest, slowest thing in the game — machete rekkas, an armored shoulder, molotov fire zones, bouncing grenades, and the CHAINSAW RIP grab.',
 };
 // Select-grid accent + fallback portrait colour per fighter.
-const CHAR_ACCENT = { brawler: '#4fc3f7', vesper: '#ef7a5a', xamora: '#ffd24a', locked1: '#8a90a3', blackwill: '#8e9aad' };
+const CHAR_ACCENT = { brawler: '#4fc3f7', vesper: '#ef7a5a', xamora: '#ffd24a', giiiooo: '#7ee08a', blackwill: '#8e9aad' };
 
 // Locked / coming-soon fighters: shown on the select grid as teasers but NOT selectable yet.
-const LOCKED_FIGHTERS = [
-  { id: 'locked1', name: '???', portrait: 'locked1', locked: true, note: 'Character not yet unlocked' },
-  { id: 'blackwill', name: 'BLACKWILL', portrait: 'blackwill', locked: true, note: 'Locked — coming soon' },
-];
+// (Both former teasers are REAL now — GIIIOOO and BLACKWILL live in CHAR_ROSTER. Keep the
+// list for future reveals.)
+const LOCKED_FIGHTERS = [];
 // The full select grid = playable roster + locked teasers (built lazily once CHAR_ROSTER exists).
 let SELECT_SLOTS = null;
 function selectSlots() {
@@ -174,6 +175,86 @@ const MOVELISTS = {
       { title: 'FINISHERS / TECH', rows: [
         ['Talon Snatch (command grab)', 'P+K'], ['Ground & Pound', 'P+K over downed'],
         ['Throw tech', 'mash P+K'], ['Back-roll / kip-up', 'tap away  /  jump on landing'],
+      ] },
+    ],
+  },
+  giiiooo: {
+    L: [
+      { title: 'MOVEMENT', rows: [
+        ['Move (fastest in game)', 'A D  ·  ← →'], ['Crouch', 'S  ·  ↓'], ['Jump', 'Space  ·  ;'],
+        ['Double jump', 'jump in air'], ['Run', 'dbl-tap toward'], ['Backdash', 'dbl-tap away'],
+        ['Block / parry', 'hold away  /  tap ≤7f'],
+      ] },
+      { title: 'HANDS  (P) — the boxing', rows: [
+        ['Flicker Jab', 'P'], ['One-Two (2 hits)', '▶ P'], ['Step-in Overhand', 'one-two → ▶ P'],
+        ['Rising Hook (launch)', '↑ P'], ['Shovel Hook (body ×2)', '↓ P'], ['Check Hook (bait)', '◀ P'],
+      ] },
+      { title: 'FEET  (K) — the foot jabs', rows: [
+        ['Foot Jab', 'K'], ['Shin Rain (rekka)', 'K → K → K'], ['Slide Kick (low)', '▶ K'],
+        ['Snap Lift (launch)', '↑ K'], ['Ankle Flick (low / OTG)', '↓ K'], ['Whip Kick (his hardest)', '◀ K'],
+      ] },
+    ],
+    R: [
+      { title: 'AIR FREEDOM — 3 attacks per airtime', rows: [
+        ['Air Flicker', 'P'], ['Cross Straight', '▶ P'], ['Sky One-Two (juggle up)', '↑ P'], ['Gut Drop', '↓ P'],
+        ['Double Foot Jab', 'K'], ['Bicycle Kick (juggle glue)', '↑ K'], ['Jet Kick (surges forward)', '▶ K'], ['Stomp Dive (safe)', '↓ K'],
+        ['Chain them!', 'up to 3 per jump · dbl-jump refreshes'],
+      ] },
+      { title: "SUPER  (full meter,  H  ·  ')", rows: [
+        ['MINDLESS RAMPAGE', 'super  (install: ~8s of BEAST damage + speed)'],
+        ['Rampage combo unlocks', 'overhand→whip kick · whip kick→rising hook · ↓P mid-Dempsey = ROLL AGAIN'],
+        ['The crash', 'rampage ends in neutral = briefly winded'],
+      ] },
+      { title: 'BOXER TECH', rows: [
+        ['THE WEAVE', 'back+JUMP mid-string (after a hit) — dissolve into the sway'],
+        ['Weave counter', 'P out of the weave = CHECK HOOK (crumples!)'],
+        ['PERFECT WEAVE', 'make them whiff through the sway → check hook = CINEMATIC counter'],
+        ['PUNCTUATION', '3rd air attack of a string SPIKES them to the floor'],
+        ['SKIP SMASH (overhead)', 'slide kick (hit) → ▶ P — the low/overhead mixup'],
+        ['DEMPSEY ROLL', 'shovel hook (hit) → ▶ P — cancel into overhand to end it'],
+        ['COMBINATION (keeps his turn)', 'jab → jab → one-two → overhand'],
+        ['HAYMAKER (wall spike — always earned)', 'SHIN RAIN (hit) → ▶ P   ·   post-COMBINATION → ◀ P'],
+        ['Pressure Rush / Sliding Jab', 'run + P / K'], ['Clinch', 'P+K'],
+        ['Throw tech', 'mash P+K'],
+      ] },
+    ],
+  },
+  blackwill: {
+    L: [
+      { title: 'MOVEMENT', rows: [
+        ['Move (slowest, heaviest)', 'A D  ·  ← →'], ['Crouch', 'S  ·  ↓'], ['Jump', 'Space  ·  ;'],
+        ['Run', 'dbl-tap toward'], ['Backdash', 'dbl-tap away'],
+        ['Block / parry', 'hold away  /  tap ≤7f'],
+      ] },
+      { title: 'MACHETE  (P)', rows: [
+        ['Machete Chop', 'P'], ['Backswing → CLEAVE (rekka)', 'P → P → P (cleave = overhead)'],
+        ['Harpoon Chop (lunge)', '▶ P'], ['Ripper (2-hit rising swipe → launch)', '↑ P'],
+        ['Gut Slash (low)', '↓ P'], ['EXECUTIONER (armor → GROUND CRUSH)', '◀ P'],
+      ] },
+      { title: 'BRUTE & ARSENAL  (K)', rows: [
+        ['Boot (makes space)', 'K'], ['Saw Sweep (BLASTS · wall-spikes airborne)', '▶ K'],
+        ['Saw Swing (4 bites LOCK them, armor)', '↑ K'], ['GRENADE (bounces → boom)', '↓ K'],
+        ['MOLOTOV (long flat underhand → fire pool)', '◀ K'], ['Curb Stomp (OTG)', '▶ K vs downed'],
+      ] },
+    ],
+    R: [
+      { title: 'AERIALS', rows: [
+        ['Air Machete', 'P'], ['Sky Cleave (air-to-air)', '↑ P'], ['Horizon Chop (reach)', '▶ P'], ['Grave Digger', '↓ P'],
+        ['Body Splash', 'K'], ['AIR FRAG (grenade)', '↑ K'], ['Dropkick', '▶ K'], ['Saw Plunge (5 bites → ERUPTION on grounded)', '↓ K'],
+      ] },
+      { title: "SUPER  (full meter,  H  ·  ')", rows: [
+        ['SCORCHED EARTH', 'super — grenade launcher: 6 impact rounds, then THE ROCKET'],
+      ] },
+      { title: 'THE GRAPPLER', rows: [
+        ['CHAINSAW RIP (command grab)', 'P+K — longest grab range · they mash to escape'],
+        ['LOCK → SHIP', 'saw swing (4 bites) → ▶ K saw sweep'],
+        ['MEAT HOOK (chain)', 'machete → gut slash → harpoon — carried to the wall on the blade'],
+        ['SAW REV', 'hold K through saw swing — charge 4 teeth up to EIGHT'],
+        ['Saw ender choice', 'hold ◀ as the rip ends = toss BEHIND (side switch)'],
+        ['Grenade COOK', 'HOLD K through the toss — shorter fuse'],
+        ['Molotov aiming', 'hold ▶ = deep lob · hold ◀ = drop at his feet'],
+        ['IRON WILL', 'below 35% HP his armor soaks +1 hit'],
+        ['Throws hit 1.5x', 'judo toss / suplex'], ['Run Cleave / Tackle', 'run + P / K'],
       ] },
     ],
   },

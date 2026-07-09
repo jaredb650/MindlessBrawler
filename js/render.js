@@ -376,6 +376,22 @@ function drawShockwaves(ctx) {
   ctx.globalAlpha = 1;
 }
 
+// ORDNANCE BOOM (Blackwill's SCORCHED EARTH): a proper military explosion — an additive
+// FIREBALL ring bursting outward, a column of rolling SMOKE, and debris. `big` = the rocket.
+function spawnOrdnanceBoom(x, y, big) {
+  const cols = ['#fff3c8', '#ffce78', '#ff9a36', '#ff5f2e'];
+  const n = big ? 28 : 13;
+  for (let i = 0; i < n; i++) {   // the fireball
+    const a = Math.random() * Math.PI * 2, sp = (big ? 7.5 : 4.5) * (0.4 + Math.random() * 0.8);
+    Particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.75, life: 10 + Math.random() * (big ? 14 : 8), maxLife: big ? 24 : 16, color: cols[(Math.random() * cols.length) | 0], size: (big ? 6 : 4) + Math.random() * (big ? 7 : 4), grav: -0.04, additive: true });
+  }
+  for (let i = 0; i < (big ? 11 : 5); i++) {   // the smoke column, rolling upward
+    Particles.push({ x: x + (Math.random() - 0.5) * (big ? 64 : 32), y: y - Math.random() * 12, vx: (Math.random() - 0.5) * 1.2, vy: -1.4 - Math.random() * 1.8, life: 18 + Math.random() * (big ? 24 : 12), maxLife: big ? 42 : 28, color: ['#5a5a60', '#6e6a66', '#48443f'][(Math.random() * 3) | 0], size: (big ? 7 : 5) + Math.random() * 5, grav: -0.035 });
+  }
+  spawnRumble(x, y, 1);   // debris
+  if (big) spawnRumble(x, y, -1);
+}
+
 // Horizontal SIDE-SPIKE burst — energy streaking in the launch direction (its own distinct look).
 function spawnSideSpike(x, y, dir) {
   const cols = ['#ffffff', '#ffd54f', '#ffb74d', '#fff59d'];
@@ -593,6 +609,22 @@ const VESPER_LOOK = {
   torsoW: 25, headR: 13.5, armW: 9, legW: 11, armWR: 8, legWR: 10,
   female: true, hair: '#15121b', longHair: true, shades: true, dualWield: true,
 };
+// GIIIOOO: a smaller, wiry STREET-KID frame — narrow torso, quick limbs, bare-knuckle wraps
+// (light gloves), short dark hair. Scale under 1 so he reads as the little guy on the roster.
+const GIIIOOO_LOOK = {
+  glove: '#c9483a', skin: '#c98d5e', bootShade: 0.38,
+  torsoW: 26, headR: 14, armW: 9.5, legW: 11.5, armWR: 9, legWR: 11,
+  female: false, hair: '#1b1b22',
+  scale: 0.92,
+};
+// BLACKWILL: the HEAVIEST silhouette — a hulking frame broader than Xamora, dark work gloves,
+// shaved head. The machete/chainsaw props come with his sprites; the capsule sells the mass.
+const BLACKWILL_LOOK = {
+  glove: '#23231f', skin: '#caa287', bootShade: 0.5,
+  torsoW: 40, headR: 15, armW: 14, legW: 16, armWR: 13, legWR: 15,
+  female: false, hair: null,
+  scale: 1.16, macheteIdle: true,   // the machete rests in his hand — he always reads as armed
+};
 // Xamora: a taller, broader WINGED frame — heavyset, angel wings, carries a bo staff. v1 reskins the brawler body.
 const XAMORA_LOOK = {
   glove: '#caa64a', skin: '#e6c6a4', bootShade: 0.40,
@@ -797,6 +829,8 @@ function drawFighter(ctx, f, game) {
   if (drawSpritePose(ctx, f, game)) return;   // ANY character with sprite config + a matching sheet → sprite; else vector
   if (f.charType === 'vesper') return drawFighterBrawler(ctx, f, game, VESPER_LOOK);
   if (f.charType === 'xamora') return drawFighterBrawler(ctx, f, game, XAMORA_LOOK);
+  if (f.charType === 'giiiooo') return drawFighterBrawler(ctx, f, game, GIIIOOO_LOOK);
+  if (f.charType === 'blackwill') return drawFighterBrawler(ctx, f, game, BLACKWILL_LOOK);
   return drawFighterBrawler(ctx, f, game);
 }
 // AFTERIMAGE TRAIL — when a body is moving fast (a lunge / slide / air-dash / hard launch), draw a few
@@ -807,7 +841,7 @@ function drawFighter(ctx, f, game) {
 function drawFighterTrail(ctx, f, game) {
   const hist = f.trailHist;
   const total = Math.hypot(f.x - f.prevX, f.y - f.prevY);
-  const active = !!hist && hist.length >= 4 && !!(f.move && f.move.dashTrail) && total >= (CFG.TRAIL_MIN_SPEED || 5);
+  const active = !!hist && hist.length >= 4 && (!!(f.move && f.move.dashTrail) || f.rampage > 0) && total >= (CFG.TRAIL_MIN_SPEED || 5);   // MINDLESS RAMPAGE: afterimages stream off ANY fast movement while it burns
   if (active && !f._trailing) playSfx('swipe');           // rising edge → one swipe per dash burst
   f._trailing = active;
   if (!active) return;
@@ -1030,9 +1064,9 @@ function drawFighterBrawler(ctx, f, game, look) {
       break;
     }
     case 'backdash': lean(P, -0.2); P.footF.x = 30; P.footR.x = -28; break;
-    case 'crouch': case 'crouchjab': case 'sweep': {
+    case 'crouch': case 'crouchjab': case 'sweep': case 'gutslash': case 'anklflick': {
       crouchPose(P);
-      if (target) strikeTo(P, target, key === 'crouchjab' ? 'punch' : 'kick');
+      if (target) strikeTo(P, target, (key === 'crouchjab' || key === 'gutslash') ? 'punch' : 'kick');
       P.faceMood = 1;
       break;
     }
@@ -1468,7 +1502,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = -1;
       break;
     }
-    case 'airpunch': {
+    case 'airpunch': case 'gairjab': case 'gaircross': case 'gairupper': case 'airmachete': case 'skycleave': case 'horizonchop': {
       lean(P, 0.18);
       P.footF = { x: 10, y: -34 }; P.footR = { x: -10, y: -28 };   // legs tucked, airborne
       P.legBendF = -1; P.legBendR = -1;   // knees bow forward (was backward)
@@ -1476,7 +1510,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'divekick': {
+    case 'divekick': case 'stompdive': case 'sawplunge': {
       lean(P, 0.42);                                                // pitched forward into the dive
       P.footR = { x: -6, y: -30 }; P.legBendR = -1;                 // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');                     // lead leg spears down-forward
@@ -1484,7 +1518,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'elbowdrop': {
+    case 'elbowdrop': case 'gairdown': case 'gravedigger': {
       lean(P, 0.4);                                                // pitched forward into the dive
       P.footF = { x: 12, y: -34 }; P.footR = { x: -8, y: -28 };     // legs tucked, airborne
       P.legBendF = -1; P.legBendR = -1;                            // knees bow forward
@@ -1497,7 +1531,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'jumpkick': case 'flyknee': case 'airuzi': {   // airuzi reuses the jump-kick vector pose as a placeholder until its sprite is assigned
+    case 'jumpkick': case 'flyknee': case 'airuzi': case 'gairkick': case 'bicyclekick': case 'jetkick': {   // airuzi reuses the jump-kick vector pose as a placeholder until its sprite is assigned
       lean(P, key === 'flyknee' ? 0.35 : 0.2);
       P.footR = { x: -8, y: -36 }; P.legBendR = -1;         // trailing leg tucked (knee forward)
       if (target) strikeTo(P, target, 'kick');
@@ -1554,7 +1588,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'tornado': {
+    case 'tornado': case 'whipkick': {
       // a HIGH spinning heel hook: the lead leg whips out front to head height
       // while the body counter-rotates (the scale-flip above spins the 360).
       lean(P, 0.3);                                   // torque into the spin
@@ -1568,9 +1602,9 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
-    case 'dashpunch': case 'dashkick': {
+    case 'dashpunch': case 'dashkick': case 'dashrush': case 'dashslide': case 'runcleave': case 'runtackle': case 'harpoonchop': {
       lean(P, 0.42);   // committed — leaning hard into the lunge
-      if (target) strikeTo(P, target, key === 'dashpunch' ? 'punch' : 'kick');
+      if (target) strikeTo(P, target, (key === 'dashkick' || key === 'dashslide' || key === 'runtackle') ? 'kick' : 'punch');
       P.faceMood = 1;
       break;
     }
@@ -1611,7 +1645,7 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = -1;
       break;
     }
-    case 'overhand': {
+    case 'overhand': case 'skipsmash': {   // skipsmash: GIIIOOO's short-hop overhead rides the same over-the-top arc (the gazelleHop supplies the hop)
       lean(P, 0.42);                               // commit hard into the haymaker
       // rear fist cocked HIGH & back → loops OVER THE TOP → drops down onto their head.
       // y dips up over the peak (the -40·sin bump) then lands high (~head height), so it
@@ -1656,6 +1690,191 @@ function drawFighterBrawler(ctx, f, game, look) {
       P.faceMood = 1;
       break;
     }
+    // ── GIIIOOO: the boxer reads — every pose sells hands, footwork, and the weave ──
+    case 'gjab': {                     // FLICKER — long lead-arm snap off a side-on stance
+      lean(P, 0.12);
+      P.handR = { x: 12, y: -140 };    // rear hand GLUED to the chin
+      if (target) strikeTo(P, target, 'punch');
+      P.faceMood = 1;
+      break;
+    }
+    case 'onetwo': {                   // ONE-TWO — jab then the rear-hand cross, two distinct beats
+      lean(P, 0.18);
+      const second = (f.hitCount || 0) >= 1;
+      if (target) strikeTo(P, target, 'punch', second);
+      (second ? P.handF : P.handR).x = 12;   // the other hand stays home
+      P.faceMood = 1;
+      break;
+    }
+    case 'checkhook': {                // CHECK HOOK — the SLIP first, then the pivot punch
+      const su = mv ? mv.startup : 6;
+      if (f.f < su * 0.7) {
+        lean(P, -0.3); P.head.x -= 10; P.head.y += 6;                 // head comes off the line
+        P.handF = { x: 26, y: -134 }; P.handR = { x: 10, y: -140 };   // guard up through the sway
+      } else {
+        lean(P, 0.3);
+        if (target) strikeTo(P, target, 'punch');
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'shovelhook': {               // SHOVEL HOOKS — alternating short digs to the body
+      crouchPose(P); lean(P, 0.24);
+      const altS = (f.hitCount || 0) % 2 === 0;
+      if (target) strikeTo(P, { x: target.x, y: target.y + (altS ? 4 : -6) }, 'punch', !altS);
+      P.faceMood = 1;
+      break;
+    }
+    case 'footjab': case 'footjab2': { // FOOT JAB — tall fencer's posture, the leg snaps straight out
+      P.sho.y -= 4;
+      guardUp(P);
+      if (target) strikeTo(P, target, 'kick');
+      P.faceMood = 1;
+      break;
+    }
+    case 'shinrain': {                 // SHIN RAIN — the leg is a piston (action-line overlay sells the blur)
+      P.sho.y -= 4;
+      guardUp(P);
+      const altR = f.f % 2 < 1;
+      strikeTo(P, { x: altR ? 80 : 48, y: altR ? -122 : -100 }, 'kick');
+      P.faceMood = 1;
+      break;
+    }
+    case 'snaplift': {                 // SNAP LIFT — weight back, the toe FLICKS up past their chin
+      lean(P, -0.08);
+      strikeTo(P, { x: 34 + 20 * ext, y: -110 - 62 * ext }, 'kick');
+      P.faceMood = 1;
+      break;
+    }
+    case 'dempsey': {                  // DEMPSEY ROLL — figure-8 weave, hooks off both sides
+      const w = Math.sin(f.f * 0.55);
+      lean(P, 0.3);
+      P.sho.x += w * 10; P.head.x += w * 14; P.head.y += Math.abs(w) * 6;
+      const altD = (f.hitCount || 0) % 2 === 0;
+      if (target) strikeTo(P, { x: target.x, y: target.y + (altD ? -8 : 6) }, 'punch', altD);
+      P.faceMood = 1;
+      break;
+    }
+    // ── BLACKWILL: heavy blade arcs, the ram, the throwables, the saw ──
+    case 'machete': case 'machete2': { // CHOP + BACKSWING — cocked across the body, then the wide arc
+      lean(P, 0.26);
+      const ret = key === 'machete2';
+      if (f.f <= (mv ? mv.startup : 7) * 0.6) {
+        P.handF = ret ? { x: 42, y: -150 } : { x: -18, y: -152 };    // wind-up side flips per swing
+        P.handR = { x: 8, y: -128 };
+      } else if (target) {
+        strikeTo(P, target, 'punch');
+        P.handR = { x: 4, y: -122 };
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'cleave': case 'sawswing': {  // TWO-HANDED OVERHEAD — hauled high, driven down
+      const suC = mv ? mv.startup : 12;
+      if (f.f < suC) {
+        lean(P, -0.12);
+        P.handF = { x: 10, y: -198 }; P.handR = { x: -2, y: -192 };  // both hands OVERHEAD
+        P.armBendF = -1; P.armBendR = -1;
+      } else {
+        lean(P, 0.34);
+        P.handF = { x: 58, y: -84 }; P.handR = { x: 44, y: -96 };    // the chop lands out front
+        if (target) P.trail = { to: target, isLeg: false };
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'ripperupper': {              // the rising swipe — the blade hand RIDES the arc, shins to sky
+      lean(P, 0.24);
+      const suR = mv ? mv.startup : 8;
+      const eR = Math.max(0, Math.min(1, (f.f - suR) / 11));
+      strikeTo(P, { x: 42 - 16 * eR, y: -66 - 138 * eR }, 'punch');
+      P.handR = { x: 6, y: -126 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'executioner': case 'haymaker': {   // THE HOME RUN — full coil back, then everything into it (GIIIOOO's haymaker shares the arc)
+      const suE = mv ? mv.startup : 11;
+      if (f.f < suE) {
+        lean(P, -0.2); P.sho.x -= 8;
+        P.handF = { x: -36, y: -140 }; P.handR = { x: -22, y: -120 };   // blade loaded WAY behind
+      } else {
+        lean(P, 0.4);
+        if (target) strikeTo(P, target, 'punch');
+        P.handR = { x: 20, y: -100 };
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'sawsweep': {                 // the chainsaw swept FLAT across — a horizontal wall of teeth
+      lean(P, 0.3);
+      const suW = mv ? mv.startup : 10;
+      const eW = Math.max(0, Math.min(1, (f.f - suW * 0.4) / (suW * 0.6 + 4)));
+      const angW = -1.0 + eW * 1.15;                 // wound back across the body → swept out front
+      P.handR = { x: 0 - Math.cos(angW) * 8, y: -122 };
+      P.handF = { x: 14 + Math.cos(angW) * 36, y: -118 + Math.sin(angW) * 22 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'grenadetoss': case 'airfrag': {   // THE LOB — rear arm arcs over the top (holds while cooking)
+      lean(P, 0.1 + ext * 0.15);
+      P.handR = { x: -16 + ext * 66, y: -150 - Math.sin(ext * Math.PI) * 42 };
+      P.armBendR = -1;
+      P.handF = { x: 26, y: -120 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'molotovtoss': {              // UNDERHAND — the bottle slung LOW, released flat and far
+      lean(P, 0.18 + ext * 0.12);
+      P.handR = { x: -22 + ext * 76, y: -58 - ext * 48 };   // low swing → flat forward release
+      P.armBendR = 1;
+      P.handF = { x: 24, y: -122 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'curbstomp': {                // knee hauled HIGH, then driven straight down
+      if (f.f < (mv ? mv.startup : 9) * 0.8) {
+        lean(P, -0.06);
+        P.footF = { x: 18, y: -72 }; P.legBendF = 1;
+      } else {
+        lean(P, 0.2);
+        strikeTo(P, { x: 30, y: -18 }, 'kick');
+      }
+      P.faceMood = 1;
+      break;
+    }
+    case 'dropkick': {                 // both boots forward, body laid flat behind them
+      lean(P, 0.55);
+      P.footF = { x: 52, y: -100 }; P.footR = { x: 46, y: -86 };   // double boots OUT
+      P.legBendF = -1; P.legBendR = -1;
+      P.handF = { x: -14, y: -130 }; P.handR = { x: -26, y: -116 };   // arms trail behind
+      P.faceMood = 1;
+      break;
+    }
+    case 'bodysplash': {               // the falling wall — limbs SPREAD
+      lean(P, 0.32);
+      P.handF = { x: 34, y: -160 }; P.handR = { x: -22, y: -158 };
+      P.armBendF = -1; P.armBendR = -1;
+      P.footF = { x: 26, y: -20 }; P.footR = { x: -24, y: -16 };
+      P.faceMood = 1;
+      break;
+    }
+    case 'sawgrab': {                  // holding them ON the saw — the whole body rattles with it
+      const jitA = (f.animClock % 2) * 2 - 1;
+      lean(P, 0.3);
+      P.handF = { x: 44 + jitA, y: -110 + jitA }; P.handR = { x: 30 - jitA, y: -118 };
+      P.footF.x = 30; P.footR.x = -26;
+      P.faceMood = 1;
+      break;
+    }
+    case 'sawgrabbed': {               // the victim: convulsing on the blade, hands clawing at it
+      const jitV = (f.animClock % 2) * 2 - 1;
+      lean(P, -0.2);
+      P.sho.x += jitV * 2; P.head.x += jitV * 3;
+      P.handF = { x: 30, y: -120 }; P.handR = { x: 22, y: -100 };
+      P.armBendF = -1;
+      P.faceMood = -1;
+      break;
+    }
     default: {
       if ((isPunch || isKick) && target) {
         lean(P, 0.16);
@@ -1668,7 +1887,7 @@ function drawFighterBrawler(ctx, f, game, look) {
   // guard arms while holding back in neutral (pre-block readability)
   if (!mv && f.backHeldFrames > 0 && ['idle', 'walk', 'crouch'].includes(f.state)) guardUp(P);
 
-  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, weapon: f.move && f.move.weapon, gun: f.move && f.move.gun, strikeRear: f.move && f.move.strikeHand === 'rear', mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
+  drawSkeleton(ctx, P, { body, dark, glove, boot, skin, dead, flash, key, look, animClock: f.animClock, superKind: f.superKind, superF: f.f, weapon: f.move && f.move.weapon, gun: f.move && f.move.gun, strikeRear: f.move && f.move.strikeHand === 'rear', mvActive: (mv && f.f > mv.startup && f.f <= mv.startup + Math.min(mv.active, 9)) || key === 'supercombo' || key === 'magiccombo' });
 
   // ── elemental / motion overlays (drawn over the body, in local space) ──
   if (key === 'overhand') drawElectricArcs(ctx, P.handR.x, P.handR.y, 22, 4);   // the charged fist crackles blue
@@ -1676,7 +1895,12 @@ function drawFighterBrawler(ctx, f, game, look) {
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.5, 44, 4);
     drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.8, 30, 3);
   }
-  if (key === 'machinegun') { drawActionLines(ctx, P.handF.x, P.handF.y, 1); drawActionLines(ctx, P.handR.x, P.handR.y, 1); }
+  if (key === 'machinegun' || key === 'dempsey') { drawActionLines(ctx, P.handF.x, P.handF.y, 1); drawActionLines(ctx, P.handR.x, P.handR.y, 1); }
+  if (key === 'shinrain') { drawActionLines(ctx, P.footF.x, P.footF.y, 1); drawActionLines(ctx, P.footF.x + 10, P.footF.y - 14, 1); }   // the leg is a BLUR
+  if (f.rampage > 0) {   // MINDLESS RAMPAGE aura — barely-contained energy arcs off the body
+    drawElectricArcs(ctx, 0, -CFG.BODY_H * 0.55, 36, 3);
+    drawElectricArcs(ctx, 10, -CFG.BODY_H * 0.85, 22, 2);
+  }
   if (key === 'swordfinish') drawSword(ctx, P.handF.x, P.handF.y, f.f, f.swordWind);   // the blade + slash sweep
 
   ctx.restore();
@@ -1847,7 +2071,11 @@ function drawSkeleton(ctx, P, c) {
   // WEAPONS (Vesper dual-wields): the active weapon in the lead hand (+ slash line / muzzle flash
   // on its active frames), and a sidearm resting in the off hand. dualWield → the lead hand is
   // never empty (knife by default). Brawler: no weapon, no dualWield → nothing draws.
-  const activeW = c.weapon || (L.dualWield ? 'knife' : (L.staffWeapon ? 'staff' : null));
+  // SCORCHED EARTH: he visibly holds the launchers — the MGL through the barrage phase,
+  // then the Carl Gustav shouldered for the rocket.
+  const scorchedPhase = (c.key === 'superstart' && c.superKind === 'scorched')
+    ? (c.superF < CFG.SUPER_STARTUP + CFG.SCORCHED_NADES * CFG.SCORCHED_NADE_INTERVAL + 4 ? 'mgl' : 'gustav') : null;
+  const activeW = (c.key === 'sawgrab') ? 'saw' : scorchedPhase || c.weapon || (L.dualWield ? 'knife' : (L.staffWeapon ? 'staff' : (L.macheteIdle ? 'machete' : null)));
   const aHand = c.strikeRear ? P.handR : P.handF;   // the STRIKING hand — weapon + slash line + muzzle
   const oHand = c.strikeRear ? P.handF : P.handR;   // the OFF hand — the resting sidearm
   if (activeW === 'staff') {
@@ -1893,6 +2121,101 @@ function drawSkeleton(ctx, P, c) {
       ctx.beginPath(); ctx.arc(hx, hy, 30, ang - 0.95, ang + 0.55); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(hx, hy, 37, ang - 0.75, ang + 0.35); ctx.stroke();
+    }
+  } else if (activeW === 'machete') {
+    // BLACKWILL's MACHETE — a BIG single-edge blade (2.5x the knife), heavy chop arc on actives.
+    const hx = aHand.x, hy = aHand.y;
+    let ux = hx - P.sho.x, uy = hy - P.sho.y; const d = Math.hypot(ux, uy) || 1; ux /= d; uy /= d;
+    const ang = Math.atan2(uy, ux);
+    capsule(ctx, hx, hy, hx + ux * 52, hy + uy * 52, 7, c.flash ? '#ffffff' : '#c9cfd8');                    // the blade
+    capsule(ctx, hx + ux * 28, hy + uy * 28, hx + ux * 52, hy + uy * 52, 4, c.flash ? '#ffffff' : '#eef2f7'); // edge highlight
+    capsule(ctx, hx - uy * 6, hy + ux * 6, hx + uy * 6, hy - ux * 6, 4, c.flash ? '#ffffff' : '#3a3128');     // guard
+    if (c.mvActive) {   // HEAVY chop arc — wider and hotter than the knife's slash line
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = c.flash ? '#ffffff' : 'rgba(255,244,214,0.9)'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(hx, hy, 54, ang - 1.05, ang + 0.5); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hx, hy, 64, ang - 0.8, ang + 0.3); ctx.stroke();
+    }
+  } else if (activeW === 'saw') {
+    // THE CHAINSAW — engine housing in both hands, bar thrust out, and a chain of teeth that
+    // VISIBLY RUNS (offset scrolls with animClock). Rattle-jitter while it bites; exhaust puffs.
+    const rev = c.animClock || 0;
+    const biting = c.mvActive || c.key === 'sawgrab';
+    const jit = biting ? (rev % 2) * 2 - 1 : 0;
+    const fx = P.handF.x, fy = P.handF.y + jit, rx0 = P.handR.x, ry0 = P.handR.y + jit;
+    let ux = fx - rx0, uy = fy - ry0; const dd = Math.hypot(ux, uy) || 1; ux /= dd; uy /= dd;
+    const bx = fx + ux * 6, by = fy + uy * 6;
+    const tx = fx + ux * 58, ty = fy + uy * 58;
+    capsule(ctx, rx0 - ux * 10, ry0 - uy * 10, fx + ux * 4, fy + uy * 4, 10, c.flash ? '#ffffff' : '#8a2f24');       // engine housing (red)
+    capsule(ctx, rx0 - ux * 6, ry0 - uy * 6 - 10, rx0 + ux * 4, ry0 + uy * 4 - 12, 4, c.flash ? '#ffffff' : '#2a2a30'); // top handle
+    capsule(ctx, bx, by, tx, ty, 6, c.flash ? '#ffffff' : '#5b6068');                                                 // the BAR
+    ctx.fillStyle = c.flash ? '#ffffff' : '#d7dde6';
+    for (let k = 0; k < 7; k++) {   // the tooth chain, marching around the bar
+      const t = ((k / 7) + (rev % 10) / 10) % 1;
+      const px = bx + ux * (t * 50), py = by + uy * (t * 50);
+      ctx.fillRect(px - uy * 8 - 1.5, py + ux * 8 - 1.5, 3, 3);
+      ctx.fillRect(px + uy * 8 - 1.5, py - ux * 8 - 1.5, 3, 3);
+    }
+    if (biting) {
+      ctx.fillStyle = 'rgba(130,130,138,0.5)';   // two-stroke exhaust
+      ctx.beginPath(); ctx.arc(rx0 - ux * 16, ry0 - uy * 16 - 12 - (rev % 8), 4 + (rev % 8) * 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,220,120,0.9)'; ctx.lineWidth = 2; ctx.lineCap = 'round';   // grind sparks off the tip
+      for (const a of [-0.7, -0.2, 0.4]) { ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(a) * 12, ty - Math.abs(Math.sin(a)) * 12); ctx.stroke(); }
+    }
+  } else if (activeW === 'mgl') {
+    // MILKOR MGL — the real silhouette: collapsible stock, pistol grip, a BIG fat drum
+    // amidships under a full-length top rail, long barrel + chunky muzzle, vertical foregrip.
+    const fx = P.handF.x, fy = P.handF.y, rx = P.handR.x, ry = P.handR.y;
+    let ux = fx - rx, uy = fy - ry; const dd = Math.hypot(ux, uy) || 1; ux /= dd; uy /= dd;
+    const px = -uy, py = ux;                                    // perpendicular (down = +)
+    const gunY = -6;                                            // bore line rides a touch above the grip hands
+    const bx = rx + px * gunY, by = ry + py * gunY;             // rear of receiver (above rear grip hand)
+    const mx = bx + ux * 78, my = by + uy * 78;                 // muzzle tip
+    const g1 = c.flash ? '#ffffff' : '#33363b', g2 = c.flash ? '#ffffff' : '#22252a', g3 = c.flash ? '#ffffff' : '#3f434a';
+    // collapsible STOCK: angled back from the receiver with a butt pad
+    capsule(ctx, bx, by, bx - ux * 20 - 2, by - uy * 20 - 3, 4, g1);
+    capsule(ctx, bx - ux * 22 - 2, by - uy * 22 - 8, bx - ux * 22 - 2, by - uy * 22 + 6, 4.5, g2);
+    // full-length TOP RAIL / receiver spine
+    capsule(ctx, bx, by, mx - ux * 10, my - uy * 10, 3.5, g1);
+    // the DRUM — the big fat cylinder amidships (side view: a thick rounded slab)
+    const dcx = bx + ux * 34, dcy = by + uy * 34 + 7;
+    capsule(ctx, dcx - ux * 12, dcy - uy * 12, dcx + ux * 12, dcy + uy * 12, 13, g3);
+    ctx.strokeStyle = c.flash ? '#dddddd' : '#1c1f24'; ctx.lineWidth = 2;   // chamber seams (they crawl as it revolves)
+    const seamShift = ((c.animClock || 0) * 0.8) % 8;
+    for (let k = -1; k <= 1; k++) {
+      const sxx = dcx + ux * (k * 8 + seamShift - 4), syy = dcy + uy * (k * 8 + seamShift - 4);
+      ctx.beginPath(); ctx.moveTo(sxx - px * 11, syy - py * 11); ctx.lineTo(sxx + px * 11, syy + py * 11); ctx.stroke();
+    }
+    // BARREL forward of the drum + chunky muzzle
+    capsule(ctx, dcx + ux * 14, dcy + uy * 14 - 4, mx, my, 4.5, g1);
+    capsule(ctx, mx - ux * 9, my - uy * 9, mx, my, 6, g2);
+    // PISTOL GRIP under the receiver (rear hand) + vertical FOREGRIP (front hand)
+    capsule(ctx, bx + ux * 6, by + uy * 6, rx, ry, 3.5, g2);
+    capsule(ctx, mx - ux * 26, my - uy * 26, fx, fy, 3.5, g2);
+    // SIGHT unit on top
+    capsule(ctx, dcx + ux * 2 - px * 20, dcy + uy * 2 - py * 20, dcx + ux * 10 - px * 20, dcy + uy * 10 - py * 20, 3.5, g2);
+    const t0 = CFG.SUPER_STARTUP;
+    if (c.superF >= t0 && ((c.superF - t0) % CFG.SCORCHED_NADE_INTERVAL) < 3) {   // the THUMP flash
+      ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(mx + ux * 4, my + uy * 4, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,233,150,0.9)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (const a of [-0.4, 0, 0.4]) { ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(a) * 18, my + Math.sin(a) * 18); ctx.stroke(); }
+    }
+  } else if (activeW === 'gustav') {
+    // CARL GUSTAV — the recoilless rifle SHOULDERED: long fat tube, rear venturi cone, back-blast.
+    const sx = P.sho.x - 28, sy = P.sho.y - 7;
+    const tx = P.sho.x + 56, ty = P.sho.y - 9;
+    capsule(ctx, sx, sy, tx, ty, 8, c.flash ? '#ffffff' : '#4a4d3c');                                    // the tube (OD green)
+    capsule(ctx, tx - 8, ty - 1, tx, ty, 9.5, c.flash ? '#ffffff' : '#3a3d30');                          // muzzle ring
+    ctx.fillStyle = c.flash ? '#ffffff' : '#3a3d30';                                                     // rear VENTURI cone
+    ctx.beginPath(); ctx.moveTo(sx, sy - 6); ctx.lineTo(sx - 13, sy - 10); ctx.lineTo(sx - 13, sy + 10); ctx.lineTo(sx, sy + 6); ctx.closePath(); ctx.fill();
+    capsule(ctx, sx + 26, sy + 8, sx + 26, sy + 18, 3.5, c.flash ? '#ffffff' : '#33363a');               // grip post
+    const rocketF = CFG.SUPER_STARTUP + CFG.SCORCHED_NADES * CFG.SCORCHED_NADE_INTERVAL + CFG.SCORCHED_ROCKET_DELAY;
+    if (Math.abs(c.superF - rocketF) < 5) {                                                              // FIRE: muzzle bloom + the back-blast
+      ctx.fillStyle = c.flash ? '#ffffff' : '#ffe9a0'; ctx.beginPath(); ctx.arc(tx + 6, ty, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 1; k <= 4; k++) fxBlock(ctx, sx - 14 - k * 9, sy + (Math.random() - 0.5) * 8, 6 - k, k < 2 ? '#fff3c8' : '#ff9a36', 0.8 - k * 0.15);   // BACK-BLAST
+      ctx.globalCompositeOperation = 'source-over';
     }
   } else if (activeW === 'pistol') {
     const hx = aHand.x, hy = aHand.y;
@@ -1975,6 +2298,59 @@ function drawMech(ctx, f, alpha) {
 
 function drawProjectile(ctx, p) {
   const d = Math.sign(p.vx);
+  // ── BLACKWILL's arsenal ──
+  if (p.kind === 'molotov') {   // tumbling bottle with a lit rag
+    const a = p.age * 0.35;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(a);
+    ctx.fillStyle = '#7a5a2e'; ctx.fillRect(-5, -10, 10, 20);            // the bottle
+    ctx.fillStyle = '#3d2c14'; ctx.fillRect(-3, -14, 6, 5);              // the neck
+    ctx.restore();
+    fxBlock(ctx, p.x + Math.cos(a) * 10, p.y - 14 + Math.sin(a) * 4, 4, '#ff9a36', 0.95);   // the flame
+    fxBlock(ctx, p.x + Math.cos(a) * 12, p.y - 18, 3, '#fff3c8', 0.8);
+    return;
+  }
+  if (p.kind === 'grenade') {   // dark ball, red blink accelerating as the fuse runs out
+    ctx.fillStyle = '#2c2f2a';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4a4f45'; ctx.fillRect(p.x - 2, p.y - 12, 4, 5);
+    const blink = p.fuse < 24 ? (p.fuse % 6 < 3) : (p.age % 16 < 4);
+    if (blink) fxBlock(ctx, p.x + 3, p.y - 3, 3, '#ff5252', 1);
+    return;
+  }
+  if (p.kind === 'impactnade' || p.kind === 'rocket') {   // SCORCHED EARTH ordnance — mini mech-cannon shells
+    const big = p.kind === 'rocket';
+    const dd = Math.sign(p.vx) || 1;
+    const ang = Math.atan2(p.vy || 0, p.vx || 1);
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang);
+    ctx.fillStyle = big ? '#3a3f45' : '#4a4f45';
+    ctx.beginPath(); ctx.ellipse(0, 0, big ? 21 : 10, big ? 8 : 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffce78';
+    ctx.beginPath(); ctx.ellipse(big ? 13 : 6, 0, big ? 7 : 3.5, big ? 5 : 3, 0, 0, Math.PI * 2); ctx.fill();   // hot tip
+    if (big) { ctx.fillStyle = '#8a2f24'; ctx.fillRect(-21, -7, 8, 14); }   // rocket tail band
+    ctx.restore();
+    ctx.globalCompositeOperation = 'lighter';   // exhaust streaming behind
+    for (let k = 1; k <= (big ? 5 : 3); k++) fxBlock(ctx, p.x - dd * k * (big ? 11 : 7), p.y + Math.sin(p.age * 0.9 + k) * 2.5, (big ? 5.5 : 3.5) - k * 0.5, k < 2 ? '#fff3c8' : '#ff9a36', 0.85 - k * 0.14);
+    ctx.globalCompositeOperation = 'source-over';
+    return;
+  }
+  if (p.kind === 'firepool') {   // flickering flame wall along the burning patch
+    const life = 1 - p.age / CFG.FIREPOOL_FRAMES;
+    ctx.globalCompositeOperation = 'lighter';
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const fx = p.x - p.w / 2 + (i + 0.5) * (p.w / n);
+      const flick = Math.sin(p.age * 0.5 + i * 1.7) * 0.5 + 0.5;
+      const h = (14 + flick * 22) * (0.5 + life * 0.5);
+      fxBlock(ctx, fx, CFG.FLOOR_Y - 4 - h, 4 + flick * 3, i % 2 ? '#ff9a36' : '#ff5f2e', 0.55 + flick * 0.35);
+      fxBlock(ctx, fx + 2, CFG.FLOOR_Y - 4 - h * 0.55, 4, '#fff3c8', 0.4 + flick * 0.3);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.5 * life + 0.2;
+    ctx.fillStyle = '#3a1c0c';   // scorched ground
+    ctx.beginPath(); ctx.ellipse(p.x, CFG.FLOOR_Y - 2, p.w * 0.55, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    return;
+  }
   if (p.kind === 'magic' && p.hue === 'shockwave') {   // Rising Pole's SHOCK FRONT — energy arcs rolling forward off the ground
     const d2 = d || 1, cx = p.x, cy = p.y + p.h * 0.55, ca = d2 === 1 ? 0 : Math.PI;
     ctx.save(); ctx.lineCap = 'round';
@@ -2308,7 +2684,9 @@ function render(ctx, game, alpha) {
     ctx.fillStyle = combo ? '#ff7b7b' : beam ? '#8fe9ff' : '#ffe082';
     ctx.font = 'bold 64px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(combo ? 'SUPER COMBO' : beam ? 'OVERDRIVE BEAM' : 'MECH CANNON', CFG.STAGE_W / 2, 200);
+    const rampage = who && who.superKind === 'rampage';
+    const scorched = who && who.superKind === 'scorched';
+    ctx.fillText(rampage ? 'MINDLESS RAMPAGE' : scorched ? 'SCORCHED EARTH' : combo ? 'SUPER COMBO' : beam ? 'OVERDRIVE BEAM' : 'MECH CANNON', CFG.STAGE_W / 2, 200);
   }
 
   // counter-hit cinematic: dim the room, the two of them on top of the slip

@@ -241,6 +241,90 @@ const CFG = {
   OVERCLOCK_HP_FRAC: 0.3,       // hp fraction at/below which the overclock kicks in
   OVERCLOCK_REGEN_MULT: 1.6,    // stamina regen multiplier while overclocked (stacks with the blockstun half-rate)
 
+  // MINDLESS RAMPAGE (GIIIOOO's super — an INSTALL, not a hit). His kill condition: meter
+  // fills fast, damage is tiny... until he pops it and the street kid turns into a beast.
+  // While it runs: damage multiplied, movement faster, afterimages + crackle. When it
+  // expires in neutral he CRASHES — briefly winded (all-in has a price).
+  RAMPAGE_FRAMES: 480,          // install duration (~8s)
+  RAMPAGE_DMG_MULT: 2.2,        // every hit lands MUCH harder during the rampage — god mode, not a buff
+  RAMPAGE_SPEED_MULT: 1.35,     // walk/run speed multiplier while raging — visibly faster, not subtly
+  RAMPAGE_CRASH_FRAMES: 30,     // winded beat when it expires in neutral (reuses the gassed state, shortened)
+  // (char.rampageArmor: every attack windup has 1 hit of super-armor while raging — he does not flinch)
+
+  // ── BLACKWILL (char #5): heavy grappler — machete, chainsaw, throwables ──
+  // MOLOTOV (◀K): an UNDERHAND sling — flat, fast, and FAR (his long-range tool; the
+  // grenade owns mid-range with its lob-and-bounce). Splashes into the fire pool on impact.
+  MOLOTOV_VX: 13, MOLOTOV_VY: -4.5, MOLOTOV_GRAV: 0.42,
+  MOLOTOV_DMG: 22,              // the bottle itself on a direct hit (the pool is the point)
+  FIREPOOL_FRAMES: 170,         // how long the flames burn (~2.8s of area denial)
+  FIREPOOL_W: 130,              // width of the burning patch
+  FIREPOOL_TICK: 14,            // a burn every N frames while standing in it...
+  FIREPOOL_DMG: 6,              // ...for this much (chip pressure, not a killer)
+  // GRENADE (↓K): bounces a couple times, then EXPLODES — AoE launch + moderate damage.
+  GRENADE_VX: 5.2, GRENADE_VY: -9.5, GRENADE_GRAV: 0.5,   // shorter first hop — the grenade OWNS mid-range, the molotov owns far
+  GRENADE_BOUNCE: 0.55,         // floor-bounce restitution (it skips a couple times)
+  GRENADE_FUSE: 75,             // frames until detonation
+  GRENADE_DMG: 55,
+  GRENADE_RADIUS: 130,          // blast reach from the detonation point
+  // CHAINSAW RIP — his P+K command grab (replaces the clinch, like Xamora's Talon Snatch):
+  // grabs you and SAWS. Mash to shove him off early (same feel as the ground&pound mash-out).
+  SAW_GRAB_FRAMES: 12,          // the grab/rev beat before the teeth bite
+  SAW_TICKS: 6,                 // saw bites if you don't escape...
+  SAW_TICK_EVERY: 8,            // ...one every N frames
+  SAW_TICK_DMG: 16,             // per bite (~96 total — heavy, but mashable)
+  SAW_ESCAPE_THRESHOLD: 50,     // victim mash (× CLINCH_MASH_PER_PRESS) to break the grip early
+  SAW_HURL_VX: 10, SAW_HURL_VY: -8,   // the contemptuous throw-away when he's done
+  SAWPLUNGE_STUCK_FRAMES: 34,   // a WHIFFED plunge jams the saw in the floor — he wrenches it out, fully punishable
+  SAWPLUNGE_OTG_BONUS: 45,      // finishing a FLOORED body with the plunge pays extra (the meteor-elbow rule)
+
+  // SCORCHED EARTH — his super: he pulls a Milkor-style GRENADE LAUNCHER and thumps out
+  // SIX impact grenades — fast, flat, tight arcs, exploding ON IMPACT (direct hit = huge,
+  // near miss = AoE knock) — then shoulders a ROCKET for the straight-line finale.
+  SCORCHED_NADES: 6,            // rounds in the cylinder
+  SCORCHED_NADE_INTERVAL: 15,   // a THUMP every quarter second — a bombardment, not a spray
+  SCORCHED_ROCKET_DELAY: 34,    // the half-second SWAP beat — he drops the MGL and shoulders the Gustav
+                                //   (and the victim gets back UP from the barrage, so the rocket hits them STANDING)
+  IMPACT_NADE_VX: 13,           // round 1 lands mid-screen...
+  IMPACT_NADE_STEP: 2.3,        // ...and each thump reaches FURTHER — round 6 crosses ~75% of the stage
+  IMPACT_NADE_VY: -2.6,         // just enough loft for the tight arc
+  IMPACT_NADE_GRAV: 0.3,
+  IMPACT_NADE_DMG: 55,          // a DIRECT hit hurts badly (×6 potential — blockable, chip applies)
+  IMPACT_NADE_AOE_R: 110,       // near-miss blast reach...
+  IMPACT_NADE_AOE_DMG: 32,      // ...for real chip + a knock
+  ROCKET_VX: 19,                // dead straight, chest height
+  ROCKET_DMG: 190,              // eating the rocket is a CATASTROPHE
+  ROCKET_DIRECT_FREEZE: 26,     // direct hit: the world stops on the impact... then the whiteout sends them flying
+  ROCKET_AOE_R: 190,            // the massive detonation
+  ROCKET_AOE_DMG: 75,
+  // GRENADE COOK — hold K through the toss to cook it: he stands holding the live grenade,
+  // the fuse burning down, and releases a shorter-fuse (even instant) blast. A declared bet.
+  GRENADE_COOK_MAX: 48,         // max frames the throw can be held (fuse shrinks 1:1)
+  // MOLOTOV ARC CONTROL — the held direction at release aims the lob: forward = deep
+  // downfield arc, back = drop it at his feet (oki/wall), neutral = the standard toss.
+  MOLOTOV_LONG_MULT: 1.5,
+  MOLOTOV_SHORT_MULT: 0.5,
+  // IRON WILL — below this HP fraction his ARMORED moves absorb one extra hit. The
+  // wounded bull is harder to stop (comeback pressure that still loses to throws/grabs).
+  IRONWILL_HP_FRAC: 0.35,
+
+  // GIIIOOO boxer tech (research pass): the WEAVE — his backdash doubles as a boxer's sway.
+  WEAVE_CANCEL_COST: 6,         // stamina to dissolve a CONNECTED string into the weave (back+JUMP mid-string)
+  WEAVE_COUNTER_WINDOW: 8,      // backdash frames in which P converts to the CHECK HOOK counter (dart back in)
+  PERFECT_WEAVE_WINDOW: 40,     // an attack WHIFFING through his sway opens this window — a check hook inside it fires the full slip-counter CINEMATIC
+  // SAW REV (Blackwill): hold K through the SAW SWING windup — the saw screams, and the
+  // charge converts into EXTRA TEETH: 4 bites base, up to EIGHT fully revved.
+  SAW_REV_MAX: 48,              // max frames the rev can be held (armor 1 covers the gamble — barely)
+  SAW_REV_BITE_EVERY: 12,       // every N revved frames = +1 bite...
+  SAW_REV_BITES_MAX: 4,         // ...capped at +4 (the full 8-tooth scream)
+  // GROUND CRUSH (Blackwill's EXECUTIONER): the meteor-elbow beat delivered FROM THE GROUND —
+  // the overhand slams a standing body flat, pins it crushed under the lights-down beat,
+  // then the floor erupts them skyward. His answer to the meteor elbow, no jump required.
+  GROUNDCRUSH_VY: -24,          // the delayed eruption launch
+  GROUNDCRUSH_FREEZE: 22,       // impact freeze under the dim
+  GROUNDCRUSH_DELAY: 4,         // live frames crushed flat after the freeze, then the eruption
+
+  // (grenade afterfire was CUT — fire is the MOLOTOV's identity; the grenade's is the boom)
+
   // THE FLATLINER — just-frame overhand off the machine-gun's FINAL hit → one-punch KO.
   // A clean primed overhand diverts into the shared cine harness (kind:'flatliner') instead
   // of the blast: small impact hitstop, white flash, freeze, body crumples, round ends.

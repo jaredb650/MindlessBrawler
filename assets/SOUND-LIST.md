@@ -46,6 +46,10 @@ counter_hit · ko.
 | `bounce` | launched body bouncing off the floor — soft body whump |
 | `body_slam` | body hitting the ground hard — heavy slam |
 | `hard_slam` | BRUTAL-tier impact (top of the impact-energy table: hard spikes, high falls) — flesh impact with bones crackling ✅ |
+| `chainsaw_rev` | BLACKWILL's chainsaw revving up at the grab (CHAINSAW RIP) |
+| `glass_break` | molotov shattering — bottle break + fire whoomp |
+| `grenade_launcher` | SCORCHED EARTH: the MGL thump, per round ✅ |
+| `rocket_fire` | SCORCHED EARTH: the Carl Gustav letting go ✅ |
 | `meteor_crush` | METEOR ELBOW nuking a grounded body — the finisher's own impact voice ✅ |
 | `ground_pop` | downed body kicked off the floor (OTG) — juicy thwack |
 | `wall_splat` | body splatting into the wall — hard crunch + thud |

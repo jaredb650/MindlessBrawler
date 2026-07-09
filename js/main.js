@@ -187,7 +187,7 @@ function runSuplexCine(game, ex) {
   if (ex.f === Math.round(CFG.SUPLEX_FRAMES * 0.5)) att.facing = -att.facing;
   if (ex.f >= CFG.SUPLEX_FRAMES) {
     vic.y = CFG.FLOOR_Y;
-    vic.hp = Math.max(0, vic.hp - CFG.SUPLEX_DMG);
+    vic.hp = Math.max(0, vic.hp - Math.round(CFG.SUPLEX_DMG * ((att.char && att.char.throwDmgMult) || 1)));   // grapplers (Blackwill) spike HARDER
     vic.setState('fallheavy'); vic.noTech = true; vic.thrower = null;   // spiked — untechable hard knockdown
     att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
     game.cine = null;
@@ -272,6 +272,86 @@ function runGroundPoundCine(game, ex) {
     pushFeed('GROUND & POUND!', att.color);
   }
 }
+// CHAINSAW RIP entry (Blackwill's P+K command grab — his clinch replacement): he grabs
+// you, revs, and SAWS. Modeled on the ground&pound: canned cine, mash to shove him off.
+function beginChainsawRip(att, vic, game) {
+  att.facing = Math.sign(vic.x - att.x) || att.facing;
+  vic.facing = -att.facing;
+  att.setState('sawgrab');
+  vic.setState('sawgrabbed');
+  vic.invuln = 0;
+  vic.y = CFG.FLOOR_Y; vic.vx = 0; vic.vy = 0;
+  startCine('chainsaw', att, vic, game, { total: CFG.SAW_GRAB_FRAMES + CFG.SAW_TICKS * CFG.SAW_TICK_EVERY + 12 });
+  playSfx('throw_grab');
+  playSfx('chainsaw_rev');
+  pushFeed('CHAINSAW RIP!!', att.color);
+}
+
+// CHAINSAW RIP: grab/rev beat → saw bites (blood + shake per tooth) → hurl away.
+// The victim MASHES to shove him off early (same feel/mechanics as the GP mash-out).
+function runChainsawCine(game, ex) {
+  const { att, vic } = ex;
+  vic.x = att.x + att.facing * (CFG.BODY_W + 14);   // held on the blade
+  vic.y = CFG.FLOOR_Y;
+  // MASH OUT: fresh presses build escape — shove him off, deny the remaining teeth.
+  if (ex.f > CFG.SAW_GRAB_FRAMES && vic.hp > 0) {
+    const p = vic.pad;
+    let pressed = 0;
+    for (const b of ['punch', 'kick', 'jump', 'super']) if (p.pressed[b]) { p.consume(b); pressed++; }
+    if (p.tapDir !== 0) pressed++;
+    if (pressed > 0) ex.mash = (ex.mash || 0) + CFG.CLINCH_MASH_PER_PRESS * pressed;
+    if (ex.mash >= CFG.SAW_ESCAPE_THRESHOLD) {
+      const away = Math.sign(vic.x - att.x) || -vic.facing;
+      att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+      att.pushVel = -away * 7;
+      vic.setState(vic.stamina <= 0 ? 'gassed' : 'idle');
+      vic.pushVel = away * CFG.CLINCH_BREAK_PUSHBACK;
+      game.shake = Math.max(game.shake, CFG.SHAKE_MED);
+      playSfx('clinch_break');
+      pushFeed('SHOVED OFF!', vic.color);
+      game.cine = null;
+      return;
+    }
+  }
+  if (ex.f > CFG.SAW_GRAB_FRAMES && ex.f <= CFG.SAW_GRAB_FRAMES + CFG.SAW_TICKS * CFG.SAW_TICK_EVERY) {
+    const t = ex.f - CFG.SAW_GRAB_FRAMES;
+    if (t % CFG.SAW_TICK_EVERY === 1) {   // a tooth bites
+      vic.hp -= CFG.SAW_TICK_DMG;
+      vic.hitFlash = CFG.HIT_FLASH;
+      spawnBlood(vic.x - att.facing * 6, CFG.FLOOR_Y - CFG.BODY_H * 0.55, att.facing, 8, 1);
+      spawnSpark(vic.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, 'hit', 1);
+      game.shake = Math.max(game.shake, 4);
+      game.hitstop = Math.max(game.hitstop, 3);
+      playSfx('stab_light');
+      if (vic.hp <= 0) {   // sawed to death → hurl the body, KO flow takes it
+        vic.hp = 0;
+        att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+        vic.setLaunched(att.facing * CFG.SAW_HURL_VX, CFG.SAW_HURL_VY, true); vic.noTech = true;
+        spawnBlood(vic.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, att.facing, 24, 2);
+        game.cine = null;
+      }
+    }
+  } else if (ex.f >= ex.data.total) {
+    // done sawing → the ENDER IS A CHOICE (grappler decision, King-style):
+    //   hold BACK  = toss them OVER THE SHOULDER — side switch (corner escape / corner PUT)
+    //   otherwise  = hurl them downfield with contempt (corner carry)
+    const heldBack = (att.facing === 1 && att.pad.held.left) || (att.facing === -1 && att.pad.held.right);
+    att.setState(att.stamina <= 0 ? 'gassed' : 'idle');
+    if (heldBack) {
+      vic.x = att.x - att.facing * 50;                     // yanked past him
+      vic.setLaunched(-att.facing * CFG.SAW_HURL_VX, CFG.SAW_HURL_VY, true);
+      att.facing = -att.facing;                            // he turns to watch them fly
+      pushFeed('TOSSED ASIDE!', att.color);
+    } else {
+      vic.setLaunched(att.facing * CFG.SAW_HURL_VX, CFG.SAW_HURL_VY, true);
+    }
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY);
+    spawnBlood(vic.x, CFG.FLOOR_Y - CFG.BODY_H * 0.5, att.facing, 14, 2);
+    playSfx('throw_slam');
+    game.cine = null;
+  }
+}
+
 // THE FLATLINER entry: a just-frame overhand connected clean (combat.js diverted here
 // out of the blast branch). Hand BOTH bodies to the shared cine harness (kind:'flatliner').
 // White flash + a SMALL impact hitstop ONLY — runFlatlinerCine OWNS the full freeze via
@@ -930,7 +1010,7 @@ function runKickComboCine(game, ex) {
 }
 
 // ── SHISH KEBAB (slash→slash→thrust): the thrust impales the victim and CARRIES them into the wall, pinning them.
-function startKebab(att, vic, game) {
+function startKebab(att, vic, game, label) {
   att.facing = Math.sign(vic.x - att.x) || att.facing;
   const wallX = att.facing === 1 ? CFG.WALL_R - CFG.BODY_W / 2 : CFG.WALL_L + CFG.BODY_W / 2;
   startCine('kebab', att, vic, game, { wallX, vicX0: vic.x, into: -att.facing });   // into = direction the pinned body faces (into the stage)
@@ -938,7 +1018,7 @@ function startKebab(att, vic, game) {
   vic.sideSpikeFrames = 0; vic.pendingElectric = 0; vic.electrified = 0; vic.wallSpiked = false; vic.noTech = false;
   game.hitstop = Math.max(game.hitstop, 5); game.flash = Math.max(game.flash, 6); game.flashMax = Math.max(game.flashMax, 6);
   spawnSpark(vic.x, CFG.FLOOR_Y - 110, 'hit', 1); playSfx('stab_light');
-  pushFeed('SHISH KEBAB!!', att.color);
+  pushFeed(label || 'SHISH KEBAB!!', att.color);
 }
 function runKebabCine(game, ex) {
   const { att, vic, data } = ex;
@@ -967,7 +1047,7 @@ function runKebabCine(game, ex) {
   }
 }
 
-const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine, slashcombo: runSlashComboCine, scissortake: runScissorTakeCine, exec3: runExecution3Cine, skeet: runSkeetCine, kickcombo: runKickComboCine, kebab: runKebabCine, talonsnatch: runTalonSnatchCine, skytalon: runSkyTalonCine };
+const CINE_RUN = { suplex: runSuplexCine, groundpound: runGroundPoundCine, chainsaw: runChainsawCine, flatliner: runFlatlinerCine, supercombo: runSuperComboCine, magiccombo: runMagicComboCine, swordcombo: runSwordComboCine, tango: runTangoCine, slashcombo: runSlashComboCine, scissortake: runScissorTakeCine, exec3: runExecution3Cine, skeet: runSkeetCine, kickcombo: runKickComboCine, kebab: runKebabCine, talonsnatch: runTalonSnatchCine, skytalon: runSkyTalonCine };
 
 function runCine(game) {
   const ex = game.cine;
