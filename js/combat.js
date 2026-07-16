@@ -510,6 +510,18 @@ function landAttack(att, vic, move, game, sourceX, contactPoint) {
     return;
   }
 
+  // FULL SAW REV (Blackwill): banking the entire charge grows SAW SWING to eight
+  // bites. The eighth clean bite cashes out with the shared horizontal wall-spike;
+  // partial revs and blocked bites keep the normal lock-in-place reaction.
+  if (live && move.revFinalSideSpike && att.cook >= CFG.SAW_REV_MAX
+      && move.multihit && (att.hitCount || 0) + 1 >= multihitTimes(att, move)) {
+    vic.receiveSideSpike(away, game);
+    game.shake = Math.max(game.shake, CFG.SHAKE_HEAVY + 4);
+    spawnFloatText(vic.x, vic.y - CFG.BODY_H - 30, 'FULL REV!!', '#ffd54f');
+    pushFeed('FULL REV — WALL SPIKE!!', att.color);
+    return;
+  }
+
   // ── GROUND CRUSH (Blackwill's EXECUTIONER): the meteor-elbow beat FROM THE GROUND — a
   // standing body is slammed flat, pinned crushed under the lights-down freeze, then the
   // floor ERUPTS them skyward (reuses the nukeLaunch crush machinery wholesale). ──

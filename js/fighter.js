@@ -234,7 +234,10 @@ class Fighter {
       const mv = this.move;
       // flying uppercut only strikes on the way UP — the fall is the commitment
       if (this.moveName === 'flyuppercut' && this.vy > 2) return null;
-      const hb = mv.hitbox;
+      // A fully banked SAW REV earns the charged arc authored on the move. Keep
+      // partial revs on the normal box: the extra reach is the max-charge payoff,
+      // not a silent buff to every overhead.
+      const hb = mv.revHitbox && this.cook >= CFG.SAW_REV_MAX ? mv.revHitbox : mv.hitbox;
       // PHASED hitbox: an array of {t0,t1,x,y,w,h} segments, each live for its own
       // frame window (the axe kick's heel-square → chop-box). Single boxes still
       // use the startup/active gate below.

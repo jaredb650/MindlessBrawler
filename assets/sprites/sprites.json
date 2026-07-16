@@ -5009,22 +5009,56 @@
           ]
         },
         "ripperupper": {
-          "src": "assets/sprites/blackwill/blackwill_ripperupper_v1.png",
+          "src": "assets/sprites/blackwill/blackwill_ripperupper_v2.png",
           "cols": 8,
           "rows": 1,
           "start": 0,
           "frames": 8,
-          "fps": 14,
+          "fps": 30,
           "mode": "syncMove",
-          "cw": 896,
-          "ch": 896,
-          "scale": 0.335,
+          "cw": 512,
+          "ch": 512,
+          "scale": 0.55,
           "offX": 0,
-          "offY": 20,
+          "offY": 25,
           "snap": true,
-          "exclude": [
-            0,
-            1
+          "order": [
+            {
+              "cell": 0
+            },
+            {
+              "cell": 1
+            },
+            {
+              "cell": 2
+            },
+            {
+              "cell": 3
+            },
+            {
+              "cell": 4
+            },
+            {
+              "cell": 5
+            },
+            {
+              "cell": 6
+            },
+            {
+              "cell": 7
+            },
+            {
+              "cell": 7
+            },
+            {
+              "cell": 7
+            },
+            {
+              "cell": 7
+            },
+            {
+              "cell": 7
+            }
           ]
         },
         "runcleave": {

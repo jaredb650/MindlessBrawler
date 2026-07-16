@@ -610,7 +610,11 @@ const BLACKWILL_MOVES = {
   executioner: { anim: 'executioner', startup: 11, active: 4, recovery: 22, damage: 90, hitstun: 0, blockstun: 16, stamina: 12,
     guard: 'mid', kind: 'punch', kbx: 6, hitstop: CFG.HITSTOP_ENDER, weapon: 'machete', heavy: true, armor: 1,
     groundCrush: true, popsGround: true, noFlowCancel: true, label: 'EXECUTIONER!!',
-    hitbox: { x: 22, y: -158, w: 104, h: 52 }, cancels: [] },
+    hitbox: [
+      { t0: 11, t1: 13, x: 6, y: -165, w: 138, h: 175 },   // blade drops through the forward upper arc
+      { t0: 13, t1: 15, x: 8, y: -180, w: 128, h: 190 },   // follow-through reaches the floor without hitting behind him
+    ],
+    cancels: [] },
   // ── BRUTE + ARSENAL (K) ──
   // neutral K: BOOT — a stomping push-kick that makes space (for the throwables).
   boot: { anim: 'boot', startup: 6, active: 3, recovery: 11, damage: 40, hitstun: 18, blockstun: 10, stamina: 4,
@@ -630,7 +634,10 @@ const BLACKWILL_MOVES = {
   // still standing when it ends — right in grab range. Overhead, armored, horrifying.
   sawswing: { anim: 'sawswing', startup: 13, active: 18, recovery: 6, damage: 22, hitstun: 14, blockstun: 16, stamina: 11,
     guard: 'high', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, weapon: 'saw', heavy: true, armor: 1, popsGround: true, noFlowCancel: true, label: 'SAW SWING!',
-    hitbox: { x: 14, y: -172, w: 88, h: 112 }, multihit: { times: 4, interval: 2 }, noStunDecay: true, revBites: true, cancels: ['sawsweep'] },   // SAW REV = extra teeth (up to 8); lock them → ▶K ships them
+    hitbox: { x: 14, y: -172, w: 88, h: 112 },
+    revHitbox: { x: 10, y: -185, w: 180, h: 205 },   // max rev: the full forward overhead-to-floor chainsaw arc
+    multihit: { times: 4, interval: 2 }, noStunDecay: true, revBites: true, revFinalSideSpike: true,
+    cancels: ['sawsweep'] },   // SAW REV = extra teeth (up to 8); the fully revved 8th bite wall-spikes
   // ↓K: GRENADE — lobbed out, BOUNCES a couple times, then explodes: AoE launch. (combat.js)
   grenadetoss: { anim: 'grenadetoss', startup: 12, active: 3, recovery: 20, damage: 0, hitstun: 0, blockstun: 0, stamina: 9,
     guard: 'mid', kind: 'kick', kbx: 0, hitstop: CFG.HITSTOP_LIGHT, planted: true, label: 'GRENADE',
