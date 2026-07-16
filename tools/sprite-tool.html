@@ -262,6 +262,7 @@ const STATE_SLOTS = [
   {grp:'States · neutral & locomotion'},
   ['idle','Idle'],['walk','Walk'],['run','Run'],['crouch','Crouch'],['backdash','Backdash'],
   ['prejump','Jump · start'],['air','Jump · air (loop)'],['land','Jump · land'],
+  ['elbowdropland','Meteor elbow · crash-landing (falls back to Jump · land if unset)'],
   {grp:'States · hit reactions'},
   ['blockstun','Block'],['hitstun','Hitstun'],['crumple','Crumple'],['launched','Launched'],
   ['fallheavy','Hard knockdown'],['wallsplat','Wall splat'],['gassed','Gassed'],['electrified','Electrified'],
@@ -434,7 +435,7 @@ function renderEditor(){
     <div class="hint" id="tlhint"></div>
     <hr>
     <h3>Alignment</h3>
-    ${ctrlRange('scale','scale',0.3,2.5,0.005,v=>(+v).toFixed(3))}
+    ${ctrlRange('scale','scale',0.05,2.5,0.005,v=>(+v).toFixed(3))}
     ${ctrlRange('offX','offX',-400,400,1)}
     ${ctrlRange('offY','offY',-300,500,1)}
     <button class="full" id="autobtn">⊿ Auto-align (feet to floor + center)</button>

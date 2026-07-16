@@ -38,12 +38,104 @@ def green_mask(im):
     return (g > 90) & (g > r * 1.25) & (g > b * 1.25)
 
 
-def find_components(im, rows, min_px):
+def seeded_components(mask, cols, rows, min_px):
+    """Split touching frame silhouettes using the center of each expected cell as a seed.
+
+    AI sheets sometimes leave only a one-pixel bridge between a long weapon and the
+    next pose. A plain connected-component pass merges those frames, while an equal
+    grid clips the weapon. Seed each frame from the middle 40% of its nominal cell,
+    then grow labels through the real foreground so overhanging limbs/weapons stay
+    attached to their owning body.
+    """
+    import numpy as np
+    H, W = mask.shape
+    cols, rows = max(1, cols), max(1, rows)
+    labels = np.full((H, W), -1, dtype=np.int16)
+    q = deque()
+    centers = []
+
+    for r in range(rows):
+        y0, y1 = round(r * H / rows), round((r + 1) * H / rows)
+        for c in range(cols):
+            idx = r * cols + c
+            cx0 = round((c + 0.30) * W / cols)
+            cx1 = round((c + 0.70) * W / cols)
+            centers.append(((c + 0.5) * W / cols, (r + 0.5) * H / rows))
+            ys, xs = np.where(mask[y0:y1, cx0:cx1])
+            if not len(xs):
+                # Very wide/leaning poses can miss the narrow seed band. Fall back
+                # to the nominal cell, still without using it as a crop boundary.
+                gx0, gx1 = round(c * W / cols), round((c + 1) * W / cols)
+                ys, xs = np.where(mask[y0:y1, gx0:gx1])
+                xs = xs + gx0
+            else:
+                xs = xs + cx0
+            ys = ys + y0
+            for y, x in zip(ys.tolist(), xs.tolist()):
+                if labels[y, x] < 0:
+                    labels[y, x] = idx
+                    q.append((y, x))
+
+    # Multi-source geodesic growth. Where two silhouettes touch, labels meet at
+    # the shortest foreground path instead of at a hard rectangular boundary.
+    while q:
+        cy, cx = q.popleft()
+        lab = labels[cy, cx]
+        for dy in (-1, 0, 1):
+            ny = cy + dy
+            if ny < 0 or ny >= H:
+                continue
+            for dx in (-1, 0, 1):
+                nx = cx + dx
+                if 0 <= nx < W and mask[ny, nx] and labels[ny, nx] < 0:
+                    labels[ny, nx] = lab
+                    q.append((ny, nx))
+
+    # Disconnected props/effects cannot be reached through the silhouette. Keep
+    # each such island intact and give it to the nearest expected frame center.
+    orphan = mask & (labels < 0)
+    seen = np.zeros((H, W), dtype=bool)
+    for sy, sx in zip(*np.where(orphan)):
+        if seen[sy, sx]:
+            continue
+        oq = deque([(sy, sx)]); seen[sy, sx] = True; pts = []
+        while oq:
+            cy, cx = oq.popleft(); pts.append((cy, cx))
+            for dy in (-1, 0, 1):
+                ny = cy + dy
+                if ny < 0 or ny >= H:
+                    continue
+                for dx in (-1, 0, 1):
+                    nx = cx + dx
+                    if 0 <= nx < W and orphan[ny, nx] and not seen[ny, nx]:
+                        seen[ny, nx] = True; oq.append((ny, nx))
+        my = sum(p[0] for p in pts) / len(pts)
+        mx = sum(p[1] for p in pts) / len(pts)
+        lab = min(range(len(centers)), key=lambda i: (mx - centers[i][0]) ** 2 + (my - centers[i][1]) ** 2)
+        for y, x in pts:
+            labels[y, x] = lab
+
+    comps = []
+    for idx in range(cols * rows):
+        ys, xs = np.where(labels == idx)
+        if len(xs) < min_px:
+            return []
+        minx, maxx, miny, maxy = xs.min(), xs.max(), ys.min(), ys.max()
+        m = labels[miny:maxy + 1, minx:maxx + 1] == idx
+        comps.append((int(minx), int(miny), int(maxx), int(maxy), int(len(xs)), m))
+    return comps
+
+
+def find_components(im, rows, min_px, alpha_mode=False, cols=None):
     """Find each character as a connected non-green blob (full extent, NEVER clipped by a grid),
     then return their bboxes in reading order (top->bottom rows, left->right within a row).
     Robust for big/rotated poses that overflow an equal-split cell."""
     import numpy as np
-    mask = ~green_mask(im)                 # True where character
+    a = np.asarray(im)
+    # Image-generation output is chroma-keyed to alpha before it reaches this
+    # tool. Prefer that authoritative matte when present so green costume props
+    # (Blackwill's grenades) are never mistaken for the legacy green backdrop.
+    mask = (a[:, :, 3] > 8) if alpha_mode else ~green_mask(im)   # True where character
     H, W = mask.shape
     seen = np.zeros((H, W), dtype=bool)
     comps = []
@@ -74,6 +166,12 @@ def find_components(im, rows, min_px):
                     for (cy, cx) in pts:
                         m[cy - miny, cx - minx] = True
                     comps.append((minx, miny, maxx, maxy, len(pts), m))
+    expected = (cols or 0) * max(1, rows or 1)
+    if expected and len(comps) != expected:
+        seeded = seeded_components(mask, cols, rows, min_px)
+        if seeded:
+            return seeded
+
     # reading order: cluster by centroid-y into `rows` bands, sort each band by centroid-x
     comps.sort(key=lambda c: (c[1] + c[3]) / 2)
     rows = max(1, rows or 1)
@@ -88,7 +186,7 @@ def find_components(im, rows, min_px):
 
 def sample_green(px, W, H):
     # most-common-ish green from the four corners
-    cands = [px[2, 2], px[W - 3, 2], px[2, H - 3], px[W - 3, H - 3]]
+    cands = [px[2, 2][:3], px[W - 3, 2][:3], px[2, H - 3][:3], px[W - 3, H - 3][:3]]
     greens = [c for c in cands if is_green(*c)]
     return greens[0] if greens else (11, 224, 26)
 
@@ -101,9 +199,9 @@ def white_bands(px, W, H, axis):
     other = H if axis == 'col' else W
     for i in range(span):
         if axis == 'col':
-            frac = sum(1 for y in range(0, other, 3) if is_white(*px[i, y])) / (other / 3)
+            frac = sum(1 for y in range(0, other, 3) if is_white(*px[i, y][:3])) / (other / 3)
         else:
-            frac = sum(1 for x in range(0, other, 3) if is_white(*px[x, i])) / (other / 3)
+            frac = sum(1 for x in range(0, other, 3) if is_white(*px[x, i][:3])) / (other / 3)
         hot = frac > 0.5
         if hot and not inb:
             start, inb = i, True
@@ -128,11 +226,11 @@ def cells_from_bands(bands, span):
     return cells
 
 
-def char_bbox(px, x0, y0, x1, y1, pad=2):
+def char_bbox(px, x0, y0, x1, y1, foreground, pad=2):
     minx, maxx, miny, maxy, cnt = 10**9, -1, 10**9, -1, 0
     for y in range(y0 + pad, y1 - pad):
         for x in range(x0 + pad, x1 - pad):
-            if not is_green(*px[x, y]):
+            if foreground(x, y):
                 cnt += 1
                 if x < minx: minx = x
                 if x > maxx: maxx = x
@@ -141,9 +239,13 @@ def char_bbox(px, x0, y0, x1, y1, pad=2):
     return (minx, miny, maxx, maxy, cnt)
 
 
-def foot_cx(px, minx, miny, maxx, maxy):
+def foot_cx(px, minx, miny, maxx, maxy, foreground, component_mask=None):
     band = max(8, int((maxy - miny) * 0.08))
-    xs = [x for y in range(maxy - band, maxy + 1) for x in range(minx, maxx + 1) if not is_green(*px[x, y])]
+    if component_mask is None:
+        xs = [x for y in range(maxy - band, maxy + 1) for x in range(minx, maxx + 1) if foreground(x, y)]
+    else:
+        xs = [x for y in range(maxy - band, maxy + 1) for x in range(minx, maxx + 1)
+              if component_mask[y - miny, x - minx]]
     return (sum(xs) / len(xs)) if xs else (minx + maxx) / 2
 
 
@@ -168,12 +270,15 @@ def main():
     ap.add_argument('--min-px', type=int, default=200, help='min non-green px for a cell to count as occupied')
     a = ap.parse_args()
 
-    im = Image.open(a.input).convert('RGB'); W, H = im.size; px = im.load()
+    im = Image.open(a.input).convert('RGBA'); W, H = im.size; px = im.load()
+    alpha_mode = im.getextrema()[3][0] < 250
+    foreground = ((lambda x, y: px[x, y][3] > 8) if alpha_mode
+                  else (lambda x, y: not is_green(*px[x, y][:3])))
     GREEN = tuple(int(v) for v in a.green.split(',')) if a.green else sample_green(px, W, H)
 
     # --- collect each frame's character bbox (reading order) ---
     if a.detect == 'components':
-        frames = find_components(im, a.rows or 1, a.min_px)   # blob per character — overflow-safe
+        frames = find_components(im, a.rows or 1, a.min_px, alpha_mode, a.cols)   # blob per character — overflow-safe
     else:
         if a.auto_grid:
             cbands, rbands = white_bands(px, W, H, 'col'), white_bands(px, W, H, 'row')
@@ -187,7 +292,7 @@ def main():
         frames = []
         for (y0, y1) in ycells:
             for (x0, x1) in xcells:
-                bb = char_bbox(px, x0, y0, x1, y1)
+                bb = char_bbox(px, x0, y0, x1, y1, foreground)
                 if bb[4] >= a.min_px:
                     frames.append(bb)
     if not frames:
@@ -195,7 +300,8 @@ def main():
 
     CELL = a.cell
     # pre-compute the foot x per frame (used for feet anchor + the clip-safe horizontal extent)
-    fcx = {i: foot_cx(px, *bb[:4]) for i, bb in enumerate(frames)}
+    fcx = {i: foot_cx(px, *bb[:4], foreground, bb[5] if len(bb) > 5 else None)
+           for i, bb in enumerate(frames)}
     maxh = max(b[3] - b[1] for b in frames)
     SCALE = (CELL * a.margin) / maxh
     if a.fit == 'safe':
@@ -208,22 +314,26 @@ def main():
 
     def render_cell(i, bb):
         minx, miny, maxx, maxy = bb[0], bb[1], bb[2], bb[3]
-        crop = im.crop((minx, miny, maxx + 1, maxy + 1)).convert('RGB')
+        crop = im.crop((minx, miny, maxx + 1, maxy + 1)).convert('RGBA')
         mask = bb[5] if len(bb) > 5 else None
         if mask is not None:   # keep ONLY this character's blob; wipe any overlapping neighbour to green
             import numpy as np
-            arr = np.asarray(crop).copy(); arr[~mask] = GREEN
-            crop = Image.fromarray(arr.astype('uint8'))
+            arr = np.asarray(crop).copy()
+            if alpha_mode: arr[~mask, 3] = 0
+            else: arr[~mask, :3] = GREEN
+            crop = Image.fromarray(arr.astype('uint8'), 'RGBA')
         nw, nh = max(1, round(crop.width * SCALE)), max(1, round(crop.height * SCALE))
         crop = crop.resize((nw, nh), Image.LANCZOS)
-        cell = Image.new('RGB', (CELL, CELL), GREEN)
+        cell = Image.new('RGBA', (CELL, CELL), (0, 0, 0, 0) if alpha_mode else GREEN + (255,))
         if a.anchor == 'feet':
             ox = round(CELL / 2 - (fcx[i] - minx) * SCALE)
         else:
             ox = (CELL - nw) // 2
-        oy = CELL - nh - a.floor
-        cell.paste(crop, (ox, oy))
-        return cell
+        # Rotating / tumbling poses need a stable visual center; feet anchoring
+        # intentionally keeps every boot line on the baked floor instead.
+        oy = (CELL - nh) // 2 if a.anchor == 'center' else CELL - nh - a.floor
+        cell.alpha_composite(crop, (ox, oy))
+        return cell if alpha_mode else cell.convert('RGB')
 
     os.makedirs(a.out, exist_ok=True)
     if a.mode == 'cells':
@@ -233,7 +343,8 @@ def main():
         print(f'wrote {len(frames)} single-cell sprites -> {a.out}/{a.name}_1..{len(frames)}.png '
               f'({CELL}x{CELL}, uniform scale {SCALE:.3f}, anchor={a.anchor}, green={GREEN})')
     else:
-        sheet = Image.new('RGB', (CELL * len(frames), CELL), GREEN)
+        sheet = Image.new('RGBA' if alpha_mode else 'RGB', (CELL * len(frames), CELL),
+                          (0, 0, 0, 0) if alpha_mode else GREEN)
         for i, bb in enumerate(frames):
             sheet.paste(render_cell(i, bb), (i * CELL, 0))
         p = os.path.join(a.out, f'{a.name}.png')
