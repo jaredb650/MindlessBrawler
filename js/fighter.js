@@ -152,6 +152,7 @@ class Fighter {
     this.gliding = false;        // Xamora's wings: slow-fall glide active this frame
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
+    this.landAnim = null;        // sheet-key override for the CURRENT 'land' state; null = shared jump land
     this.superFlash = false;   // main consumes → triggers cinematic freeze
     this.superKind = 'cannon'; // 'cannon' (neutral) | 'beam' (forward) | 'combo' (back)
     this.comboStrike = 'punch';// super-combo flurry: which strike the current teleport hit shows (render)
@@ -1806,9 +1807,11 @@ class Fighter {
             ? (this.madeContact ? CFG.FLY_LAND_RECOVERY_HIT : CFG.FLY_LAND_RECOVERY)
             : this.moveName === 'sawplunge' ? (this.madeContact ? CFG.LAND_FRAMES + 6 : CFG.SAWPLUNGE_STUCK_FRAMES)
             : this.moveName === 'divekick' ? CFG.DIVEKICK_LAND_RECOVERY
-            : this.moveName === 'elbowdrop' ? CFG.DIVEKICK_LAND_RECOVERY   // diving elbow = same long, punishable plant as the divekick
+            : this.moveName === 'elbowdrop' && this.move && this.move.otgNuke ? CFG.ELBOWDROP_LAND_RECOVERY
+            : this.moveName === 'elbowdrop' ? CFG.DIVEKICK_LAND_RECOVERY
             : this.moveName === 'airpunch' ? CFG.AIRPUNCH_LAND_RECOVERY
             : this.state === 'airattack' ? CFG.LAND_FRAMES + 4 : CFG.LAND_FRAMES;
+          this.landAnim = this.moveName === 'elbowdrop' && this.move && this.move.otgNuke ? 'elbowdropland' : null;
           this.setState('land');
         }
       }
