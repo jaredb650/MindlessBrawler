@@ -746,24 +746,41 @@ function spriteJump(entry, f, game) {
     return null;
   }
   f._jumpF0 = null;
-  if (f.state === 'land' && lnd) { f._landF0 = gf - f.f; return { key: 'land', frame: Math.min(lnd.frames - 1, ((gf - f._landF0) * (lnd.fps || 30) / 60) | 0) }; }
-  if (f.state === 'idle' && lnd && f._landF0 != null) { const fr = ((gf - f._landF0) * (lnd.fps || 30) / 60) | 0; if (fr < lnd.frames) return { key: 'land', frame: fr }; }
-  f._landF0 = null;
+  if (f.state === 'land') {
+    const lk = f.landAnim && entry.sheets[f.landAnim] ? f.landAnim : 'land', ls = entry.sheets[lk];
+    if (ls) {
+      const steps = lk === 'land' ? null : spriteSteps(ls, ls.frames || 1), count = steps ? steps.length : ls.frames;
+      f._landF0 = gf - f.f; f._landKey = lk;
+      const idx = Math.min(count - 1, ((gf - f._landF0) * (ls.fps || 30) / 60) | 0);
+      return steps ? { key: lk, step: steps[idx] } : { key: lk, frame: idx };
+    }
+  }
+  if (f.state === 'idle' && f._landF0 != null) {
+    const ls = entry.sheets[f._landKey || 'land'];
+    if (ls) {
+      const lk = f._landKey || 'land', steps = lk === 'land' ? null : spriteSteps(ls, ls.frames || 1);
+      const fr = ((gf - f._landF0) * (ls.fps || 30) / 60) | 0, count = steps ? steps.length : ls.frames;
+      if (fr < count) return steps ? { key: lk, step: steps[fr] } : { key: lk, frame: fr };
+    }
+  }
+  f._landF0 = null; f._landKey = null;
   return null;
 }
 function drawSpritePose(ctx, f, game) {
   const entry = SPRITES.chars[f.charType];
   if (!entry) return false;   // no sprite config for this character → vector
-  let key, frame = null;
+  let key, frame = null, jumpStep = null;
   const js = spriteJump(entry, f, game);   // jump phases drive themselves; cancelled by any non-jump state
-  if (js) { key = js.key; frame = js.frame; }
+  if (js) { key = js.key; frame = js.frame; jumpStep = js.step || null; }
   else { key = spriteAnimKey(entry, f); if (!key) return false; }
   const sh = entry.sheets[key];
   if (!sh || !sh.ready || !sh.canvas) return false;   // not loaded yet → vector fallback
   const g = entry.global, nf = sh.frames || 1;
   const cw = sh.cw || g.cellW || SPR_CELL_W, ch = sh.ch || g.cellH || SPR_CELL_H;
   let stepObj;
-  if (frame != null) {
+  if (jumpStep) {
+    stepObj = jumpStep;
+  } else if (frame != null) {
     // Jump phases (spriteJump) resolve an explicit frame INDEX on their own clock — keep the legacy
     // cell + per-frame-nudge lookup for them (jump sheets don't use the `order` timeline).
     const c = sh.cells && sh.cells[frame];

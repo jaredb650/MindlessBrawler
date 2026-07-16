@@ -361,6 +361,8 @@ const CFG = {
   ELBOWDROP_VX: 7,                // forward dive of VESPER's dive-grab elbow (× facing) — hers keeps the old arc
   ELBOWDROP_VY: 13,               // downward dive speed of Vesper's version (positive = down)
   ELBOWDROP_DROP_VY: 16,          // MEKA's meteor drop: dead-vertical fall speed (no forward travel)
+  ELBOWDROP_LAND_RECOVERY: 36,    // MEKA's crash-landing plant: the full 6-cell @10fps crash-and-rise sheet (0.6s).
+                                  // Deliberately long, uncancellable, and fully hittable — the meteor's price tag.
   ELBOWDROP_OTG_BONUS: 110,       // flat bonus on a DOWNED body (on top of base) — the finisher payoff
   ELBOWDROP_OTG_VY: -30,          // the eruption launch off a downed body — the HARDEST launch in the game (crescent is -25): "THIS is what the move is for"
   ELBOWDROP_FREEZE: 26,           // the nuke's impact freeze (hitstop) — held under the lights-down IMPACT FADE (execution-style dim, NOT the KO blackout: that read as a K.O.)
