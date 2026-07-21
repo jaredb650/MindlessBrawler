@@ -189,90 +189,135 @@ function drawSlashes(ctx) {
 
 // Blood gout — a directional spray (mostly along `dir`) that arcs and falls fast.
 // The Flatliner's money shot; also a light spurt on the connecting blow.
-// `power` (0 light · 1 med · 2 heavy) scales the CHUNK size: heavy = big chunky globs, light = fine spray.
+// `power` (0 light · 1 med · 2 heavy) scales the COUNT, not the size: every tier is built from
+// the same tiny droplets + tracer lines, heavies just throw far more of them (plus a few gibs).
+const BLOOD_C = '#a93226';                              // THE blood color — every droplet, drop, and tracer
+const BLOOD_DARKS = ['#7b241c', '#641e16', '#5e1a13'];  // reserved for the BIG gibs (chunks of meat)
 function spawnBlood(x, y, dir, n, power) {
-  const reds = ['#c0392b', '#a93226', '#922b21', '#7b241c', '#5e1a13'];   // tight crimson ramp (no bright AA red)
   const p = power == null ? 1 : power;
-  // squirt STREAKS — fast directional crimson lines mixed in with the chunks (opaque, no soft mist)
-  for (let i = 0, sn = 3 + (n >> 2); i < sn; i++) {
-    const sp = 7 + Math.random() * 9;
+  // TRACER LINES — thin whips on the finer 2px grid that arc and leave a trace (the spark look,
+  // in crimson). Deliberately the MINORITY of the spray, and born TIGHT at the impact point —
+  // the droplet dots below are the body of it.
+  for (let i = 0, wn = 1 + (n >> 2) + p * 2; i < wn; i++) {
+    const sp = 10 + Math.random() * 10;
     Particles.push({
-      x, y: y + (Math.random() - 0.5) * 20,
-      vx: dir * sp + (Math.random() - 0.5) * 3, vy: -Math.random() * 5 - 1,
-      life: 30 + Math.random() * 20, maxLife: 50,
-      color: reds[(Math.random() * 3) | 0],
-      size: 2 + Math.random() * 2 + p, grav: 0.45,
-      blood: true,        // stains the floor/wall where it lands
-      streak: 2.4,        // velocity-aligned chunky squirt — long enough to read as a line, not a dot
+      x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 10,
+      vx: dir * sp * (0.7 + Math.random() * 0.5) + (Math.random() - 0.5) * 4,
+      vy: -(2 + Math.random() * 8),                    // flung upward → the trail arcs over and whips down
+      life: 26 + Math.random() * 18, maxLife: 44,
+      color: BLOOD_C,
+      size: 1.8 + Math.random() * 1.4, grav: 0.5,
+      blood: true,
+      streak: 3.2 + Math.random() * 1.6,               // long trail — reads as a traced dash in flight
+      px: 2,                                           // finer grid → a thin line, not a chunk train
     });
   }
-  for (let i = 0; i < n; i++) {
+  // DROPLET DOTS — the body of the spray at every tier: tiny, numerous, wide fan. Heavies get
+  // their weight from sheer count, not bigger squares.
+  for (let i = 0, dn = n + p * 4; i < dn; i++) {
     const sp = 3 + Math.random() * 10;
     Particles.push({
       x, y: y + (Math.random() - 0.5) * 36,
       vx: dir * sp * (0.5 + Math.random()) + (Math.random() - 0.5) * 4,
       vy: -Math.random() * 7 - 0.5,                    // sprays up/out, then falls
       life: 40 + Math.random() * 34, maxLife: 74,      // lives long enough to REACH the floor → stains the ground
-      color: reds[(Math.random() * reds.length) | 0],
-      size: (1.5 + Math.random() * 2) + p * 1.8,       // smaller chunks; still scales with hit power
-      grav: 0.42,                                      // falls fast → lands + pools
-      blood: true,                                     // stains the floor/wall where it lands
+      color: BLOOD_C,
+      size: (1.8 + Math.random() * 1.8) + p * 0.7, grav: 0.42,   // happy-medium drops (a whisper of power scaling, not the old squares)
+      blood: true, px: 2,                              // stains where it lands; 2px grid keeps edges fine
     });
   }
   // a portion flung DOWNWARD so the floor right under the hit catches blood (environmental gore)
-  for (let i = 0, dn = Math.max(2, n >> 1); i < dn; i++) {
+  for (let i = 0, rn = Math.max(2, n >> 1); i < rn; i++) {
     Particles.push({
       x: x + (Math.random() - 0.5) * 26, y: y + Math.random() * 22,
       vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 5,
       life: 50 + Math.random() * 34, maxLife: 84,
-      color: reds[(Math.random() * reds.length) | 0],
-      size: (1.5 + Math.random() * 2) + p * 1.4, grav: 0.5, blood: true,
+      color: BLOOD_C, size: (1.6 + Math.random() * 1.6) + p * 0.5, grav: 0.5, blood: true, px: 2,
     });
   }
-  if (p >= 2) for (let i = 0; i < 4; i++) {            // heavy hits throw a few chunky globs (half-size now)
-    const sp = 2 + Math.random() * 6;
+  // GIBS — HEAVIEST tier only: a few DARK, irregular chunks of meat. Each is a polyomino
+  // cluster of grid blocks rolled ONCE at spawn (re-rolling per frame would make the chunk boil).
+  if (p >= 2) for (let i = 0; i < 3; i++) {
+    const sp = 2 + Math.random() * 6, cs = 3.5 + Math.random() * 2.5;
+    const lobes = [{ dx: 0, dy: 0, s: cs }];
+    for (let k = 0, kn = 1 + ((Math.random() * 3) | 0); k < kn; k++)
+      lobes.push({ dx: (Math.random() - 0.5) * cs * 1.7, dy: (Math.random() - 0.5) * cs * 1.7, s: cs * (0.5 + Math.random() * 0.45) });
     Particles.push({
       x, y: y + (Math.random() - 0.5) * 24,
       vx: dir * sp + (Math.random() - 0.5) * 3, vy: -Math.random() * 6 - 1,
       life: 44 + Math.random() * 24, maxLife: 70,
-      color: reds[3 + ((Math.random() * 2) | 0)],
-      size: 3 + Math.random() * 2, grav: 0.5, blood: true,
+      color: BLOOD_DARKS[(Math.random() * BLOOD_DARKS.length) | 0],
+      size: cs, grav: 0.5, blood: true, gib: true, lobes,
     });
   }
 }
+// Draw a gib: the lobe cluster over a dark rim — one ragged mass, not a square.
+function fxGib(ctx, p, alpha) {
+  for (const l of p.lobes) fxBlock(ctx, p.x + l.dx, p.y + l.dy, l.s + FX_PX, '#2e0a08', alpha);   // rim pass
+  for (const l of p.lobes) fxBlock(ctx, p.x + l.dx, p.y + l.dy, l.s, p.color, alpha);             // meat pass
+}
 
 // A persistent blood decal where a drop hit the floor (pool) or a wall (drip).
-const STAIN_CAP = 600;   // persistent gore — the arena soaks in blood over the round (ring-buffer recycles oldest)
-let stainWrite = 0;      // ring-buffer cursor — overwrite oldest in O(1) (was Array.shift, O(n) per drop)
-function spawnStain(x, y, vertical) {
+// Each landing leaves a TINY droplet — soaking the arena is a long, earned process. Once the
+// live list crosses STAIN_BAKE_AT it's all folded into a persistent offscreen decal canvas, so
+// gore accumulates ALL MATCH with no cleanup and a per-frame cost that never grows.
+const STAIN_CAP = 600;       // hard safety for the live list (bake normally fires long before)
+const STAIN_BAKE_AT = 400;   // live stains past this → fold everything into the bake decal
+let stainWrite = 0;          // ring-buffer cursor — overwrite oldest in O(1) (was Array.shift, O(n) per drop)
+let stainBake = null, stainBakeCtx = null;   // the arena's permanent blood state (drawImage'd under the live stains)
+function spawnStain(x, y, vertical, color, r) {
   const s = {
-    x, y, r: 3 + Math.random() * 7, vertical: !!vertical,
-    color: ['#7b241c', '#922b21', '#641e16'][(Math.random() * 3) | 0],
-    a: 0.4 + Math.random() * 0.4,
+    x, y, r: r != null ? r : 2 + Math.random() * 3.5, vertical: !!vertical,
+    // FULLY OPAQUE — translucent decals read as washed-out maroon over the floor (the darker
+    // the color, the worse). Color rides in from the particle that landed (gibs stain dark).
+    color: color || BLOOD_C,
+    a: 1,
   };
   if (Stains.length < STAIN_CAP) Stains.push(s);
   else { Stains[stainWrite % STAIN_CAP] = s; stainWrite++; }   // recycle the oldest slot, no shift/reindex
+  if (Stains.length >= STAIN_BAKE_AT) bakeStains();
 }
 
-// rematch: drop the decals AND reset the ring cursor (else the next match recycles a
-// non-oldest slot once it refills). resetMatch() calls this instead of Stains.length = 0.
-function clearStains() { Stains.length = 0; stainWrite = 0; }
+// Fold every live stain into the permanent decal, then clear the live list. A few hundred
+// rects, once — imperceptible. The canvas is never cleared mid-match, so bakes pile on bakes.
+function bakeStains() {
+  if (!stainBake) {
+    stainBake = document.createElement('canvas');
+    stainBake.width = CFG.STAGE_W; stainBake.height = CFG.STAGE_H;
+    stainBakeCtx = stainBake.getContext('2d');
+  }
+  drawStainRects(stainBakeCtx);
+  Stains.length = 0; stainWrite = 0;
+}
 
-function drawStains(ctx) {
+// rematch: drop the live decals, reset the ring cursor, AND wipe the baked arena state.
+// resetMatch() calls this instead of Stains.length = 0.
+function clearStains() {
+  Stains.length = 0; stainWrite = 0;
+  if (stainBakeCtx) stainBakeCtx.clearRect(0, 0, stainBake.width, stainBake.height);
+}
+
+function drawStainRects(ctx) {
   for (const s of Stains) {
     ctx.globalAlpha = s.a;
     ctx.fillStyle = s.color;
-    const sx = Math.round(s.x / FX_PX) * FX_PX, sy = Math.round(s.y / FX_PX) * FX_PX;
-    if (s.vertical) {                                  // wall drip — narrow vertical chunky streak
-      const w = Math.max(FX_PX, Math.round(s.r * 0.7 / FX_PX) * FX_PX), h = Math.max(FX_PX, Math.round(s.r * 1.6 / FX_PX) * FX_PX);
+    const q = s.r < 3 ? 2 : FX_PX;   // tiny droplets sit on the finer 2px grid; big splats stay chunky
+    const sx = Math.round(s.x / q) * q, sy = Math.round(s.y / q) * q;
+    if (s.vertical) {                                  // wall drip — narrow vertical streak
+      const w = Math.max(q, Math.round(s.r * 0.7 / q) * q), h = Math.max(q, Math.round(s.r * 1.6 / q) * q);
       ctx.fillRect(sx - (w >> 1), sy, w, h);
-    } else {                                           // floor pool — wide flat chunky splat (many overlap into an organic pool)
-      const w = Math.max(FX_PX, Math.round(s.r * 1.8 / FX_PX) * FX_PX), h = Math.max(FX_PX, Math.round(s.r * 0.7 / FX_PX) * FX_PX);
+    } else {                                           // floor droplet/pool — wide flat splat (many overlap into an organic pool)
+      const w = Math.max(q, Math.round(s.r * 1.8 / q) * q), h = Math.max(q, Math.round(s.r * 0.7 / q) * q);
       ctx.fillRect(sx - (w >> 1), sy - (h >> 1), w, h);
-      if (s.r > 5) ctx.fillRect(sx - (w >> 2), sy - (h >> 1) - FX_PX, (w >> 1), FX_PX);   // a small raised lump → irregular pixel edge
+      if (s.r > 5) ctx.fillRect(sx - (w >> 2), sy - (h >> 1) - q, (w >> 1), q);   // a small raised lump → irregular pixel edge
     }
   }
   ctx.globalAlpha = 1;
+}
+
+function drawStains(ctx) {
+  if (stainBake) ctx.drawImage(stainBake, 0, 0);   // the soaked-in arena — one blit, however bloody it gets
+  drawStainRects(ctx);                             // recent landings still live on top
 }
 
 function spawnDust(x, y, n) {
@@ -511,9 +556,11 @@ function updateFx() {
     p.x += p.vx; p.y += p.vy; p.vy += p.grav; p.life--;
     // blood that reaches a surface leaves a permanent stain, then pools out
     if (p.blood) {
-      if (p.y >= CFG.FLOOR_Y) { spawnStain(p.x, CFG.FLOOR_Y + 1, false); Particles.splice(i, 1); continue; }
+      // the stain inherits the drop: gibs leave big dark splats, droplets leave tiny dots
+      const sr = p.gib ? 5 + Math.random() * 3 : 1 + p.size * (0.45 + Math.random() * 0.45);
+      if (p.y >= CFG.FLOOR_Y) { spawnStain(p.x, CFG.FLOOR_Y + 1, false, p.color, sr); Particles.splice(i, 1); continue; }
       if (p.x <= CFG.WALL_L + 2 || p.x >= CFG.WALL_R - 2) {
-        spawnStain(Math.max(CFG.WALL_L + 2, Math.min(CFG.WALL_R - 2, p.x)), p.y, true); Particles.splice(i, 1); continue;
+        spawnStain(Math.max(CFG.WALL_L + 2, Math.min(CFG.WALL_R - 2, p.x)), p.y, true, p.color, sr); Particles.splice(i, 1); continue;
       }
     }
     if (p.life <= 0) Particles.splice(i, 1);
@@ -746,6 +793,8 @@ function spriteJump(entry, f, game) {
     return null;
   }
   f._jumpF0 = null;
+  // A landing may carry its own sheet (f.landAnim, e.g. the meteor elbow's crash-landing);
+  // fall back to the shared jump 'land' sheet when that key isn't configured.
   if (f.state === 'land') {
     const lk = f.landAnim && entry.sheets[f.landAnim] ? f.landAnim : 'land', ls = entry.sheets[lk];
     if (ls) {
@@ -789,22 +838,29 @@ function drawSpritePose(ctx, f, game) {
     // Everything else: build the ordered step list (explicit `order`, else the legacy start/frames window
     // with exclusions + loop), then pick ONE step by the playback clock.
     const steps = spriteSteps(sh, nf), nfe = steps.length || 1;
-    let idx;
-    // Cinematic states (heel drop / side kick / …) clear the move and run a short sequencer, so the normal
-    // fps clock barely advances. If this fighter is the one a cine is driving and the cine knows its length,
-    // scale the WHOLE sheet across the cine so the sprite plays start→finish instead of holding one frame.
-    if (game.cine && (game.cine.att === f || game.cine.vic === f) && game.cine.data && game.cine.data.total) {
-      idx = Math.min(nfe - 1, Math.max(0, (game.cine.f / game.cine.data.total * nfe) | 0));
-    } else if (sh.mode === 'syncMove' && f.move) {   // attack sheets: scale the cycle to the move's total length
-      const dur = (f.move.startup || 0) + (f.move.active || 0) + (f.move.recovery || 0);
-      idx = dur > 0 ? Math.min(nfe - 1, (f.f / dur * nfe) | 0) : 0;
+    // Swordfinish has a separate held windup pose. The cinematic flips swordWind off exactly when a
+    // real swipe lands, so keep the chamber cell frozen until that moment instead of letting the
+    // attack art play early during the 12/22-frame anticipation beat.
+    if (key === 'swordfinish' && f.swordWind && sh.windFrame != null) {
+      stepObj = { cell: sh.windFrame | 0 };
     } else {
-      const ft = Math.floor(f.f * (sh.fps || 30) / 60);
-      if (sh.mode === 'once') idx = Math.min(ft, nfe - 1);
-      else if (sh.mode === 'boomerang' && nfe > 1) { const per = 2 * (nfe - 1), p = ((ft % per) + per) % per; idx = p < nfe ? p : per - p; }   // ping-pong: 0→n-1→0…
-      else idx = ((ft % nfe) + nfe) % nfe;   // default = loop
+      let idx;
+      // Cinematic states (heel drop / side kick / …) clear the move and run a short sequencer, so the normal
+      // fps clock barely advances. If this fighter is the one a cine is driving and the cine knows its length,
+      // scale the WHOLE sheet across the cine so the sprite plays start→finish instead of holding one frame.
+      if (game.cine && (game.cine.att === f || game.cine.vic === f) && game.cine.data && game.cine.data.total) {
+        idx = Math.min(nfe - 1, Math.max(0, (game.cine.f / game.cine.data.total * nfe) | 0));
+      } else if (sh.mode === 'syncMove' && f.move) {   // attack sheets: scale the cycle to the move's total length
+        const dur = (f.move.startup || 0) + (f.move.active || 0) + (f.move.recovery || 0);
+        idx = dur > 0 ? Math.min(nfe - 1, (f.f / dur * nfe) | 0) : 0;
+      } else {
+        const ft = Math.floor(f.f * (sh.fps || 30) / 60);
+        if (sh.mode === 'once') idx = Math.min(ft, nfe - 1);
+        else if (sh.mode === 'boomerang' && nfe > 1) { const per = 2 * (nfe - 1), p = ((ft % per) + per) % per; idx = p < nfe ? p : per - p; }   // ping-pong: 0→n-1→0…
+        else idx = ((ft % nfe) + nfe) % nfe;   // default = loop
+      }
+      stepObj = steps[idx] || { cell: sh.start || 0 };
     }
-    stepObj = steps[idx] || { cell: sh.start || 0 };
   }
   const cell = stepObj.cell, cols = sh.cols || 1;
   const sx = (cell % cols) * cw, sy = ((cell / cols) | 0) * ch;
@@ -2290,6 +2346,27 @@ function drawMech(ctx, f, alpha) {
   const d = f.facing;
   const bx = f.x - d * 110;
   const by = CFG.FLOOR_Y;
+  const entry = SPRITES.chars[f.charType], sh = entry && entry.sheets.mechcannon;
+  if (sh && sh.ready && sh.canvas) {
+    const nf = sh.frames || 1, cw = sh.cw || 1024, ch = sh.ch || 1024, cols = sh.cols || 1;
+    const ft = Math.floor(f.f * (sh.fps || 10) / 60);
+    const frame = sh.mode === 'once' ? Math.min(ft, nf - 1) : ((ft % nf) + nf) % nf;
+    const cell = (sh.start || 0) + frame, sx = (cell % cols) * cw, sy = ((cell / cols) | 0) * ch;
+    const scale = sh.scale != null ? sh.scale : 1, dw = cw * scale, dh = ch * scale;
+    const offX = sh.offX || 0, offY = sh.offY || 0;
+    const facesLeft = sh.faceLeft != null ? sh.faceLeft : !!entry.global.artFacesLeft;
+    const flip = facesLeft ? d === 1 : d === -1;
+    ctx.save();
+    ctx.globalAlpha = alpha !== undefined ? alpha : Math.min(1, f.f / 8);
+    ctx.translate(bx, by);
+    if (flip) ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sh.canvas, sx, sy, cw, ch, -dw / 2 + offX, -dh + offY, dw, dh);
+    ctx.restore();
+    return;
+  }
+
+  // Sprite load failure fallback: keep the old vector mech so the super never renders empty.
   ctx.save();
   ctx.globalAlpha = alpha !== undefined ? alpha : Math.min(1, f.f / 8);
   ctx.fillStyle = '#2e3440';
@@ -2625,8 +2702,10 @@ function render(ctx, game, alpha) {
     if (p.additive) continue;
     const t = Math.max(0, p.life / p.maxLife);
     if (p.blood) {
-      const a = t > 0.22 ? 1 : 0.7, outline = p.size >= 4 ? '#2e0a08' : null;   // gore stays opaque; dark outline on globs
-      if (p.streak) fxStreak(ctx, p, a, outline); else fxBlock(ctx, p.x, p.y, p.size, p.color, a, outline);
+      const a = t > 0.22 ? 1 : 0.7;   // gore stays opaque until the last flicker
+      if (p.gib) fxGib(ctx, p, a);    // dark ragged chunk cluster
+      else if (p.streak) fxStreak(ctx, p, a, null);
+      else fxBlock(ctx, p.x, p.y, p.size, p.color, a, null, p.px);   // droplet dot (2px grid)
     } else {
       fxBlock(ctx, p.x, p.y, p.size, p.color, fxStepA(t), p.outline);   // dust / debris → stepped fade (rubble carries a dark outline)
     }

@@ -152,7 +152,7 @@ class Fighter {
     this.gliding = false;        // Xamora's wings: slow-fall glide active this frame
     this.runDir = 0; this.bdDir = 0;
     this.landFrames = CFG.LAND_FRAMES;
-    this.landAnim = null;        // sheet-key override for the CURRENT 'land' state; null = shared jump land
+    this.landAnim = null;      // sheet-key override for the CURRENT 'land' state (meteor elbow's crash-landing) — null = the shared jump 'land' sheet
     this.superFlash = false;   // main consumes → triggers cinematic freeze
     this.superKind = 'cannon'; // 'cannon' (neutral) | 'beam' (forward) | 'combo' (back)
     this.comboStrike = 'punch';// super-combo flurry: which strike the current teleport hit shows (render)
@@ -377,6 +377,15 @@ class Fighter {
     if (mv && mv.gazelleHop && this.y < CFG.FLOOR_Y) { this.y = CFG.FLOOR_Y; this.vy = 0; }
     // a clinch strike loops back into the hold — keep working the body until auto-release
     if (this.inClinch && this.clinchTimer < CFG.CLINCH_MAX_FRAMES) { this.setState('clinch'); return; }
+    // A crouching attack with down still held returns DIRECTLY to crouch (no idle bounce),
+    // with the state clock fast-forwarded so a `once` crouch sheet holds its settled last
+    // frame instead of replaying the stand→sink transition. Crouch logic never reads f,
+    // so any value well past the sink animation works.
+    if (mv && mv.crouching && this.pad.held.down && this.stamina > 0) {
+      this.setState('crouch');
+      this.f = 600;
+      return;
+    }
     this.setState(this.stamina <= 0 ? 'gassed' : 'idle');
   }
 
@@ -1807,10 +1816,12 @@ class Fighter {
             ? (this.madeContact ? CFG.FLY_LAND_RECOVERY_HIT : CFG.FLY_LAND_RECOVERY)
             : this.moveName === 'sawplunge' ? (this.madeContact ? CFG.LAND_FRAMES + 6 : CFG.SAWPLUNGE_STUCK_FRAMES)
             : this.moveName === 'divekick' ? CFG.DIVEKICK_LAND_RECOVERY
-            : this.moveName === 'elbowdrop' && this.move && this.move.otgNuke ? CFG.ELBOWDROP_LAND_RECOVERY
+            : this.moveName === 'elbowdrop' && this.move && this.move.otgNuke ? CFG.ELBOWDROP_LAND_RECOVERY  // METEOR's crash-and-rise plant (otgNuke = Meka's; Vesper's dive grab keeps the divekick plant)
             : this.moveName === 'elbowdrop' ? CFG.DIVEKICK_LAND_RECOVERY
             : this.moveName === 'airpunch' ? CFG.AIRPUNCH_LAND_RECOVERY
             : this.state === 'airattack' ? CFG.LAND_FRAMES + 4 : CFG.LAND_FRAMES;
+          // Meteor elbow's plant is its own animation (body crashed on its side → push back up),
+          // NOT the shared jump-land sheet. Renderer falls back to 'land' if the sheet isn't configured.
           this.landAnim = this.moveName === 'elbowdrop' && this.move && this.move.otgNuke ? 'elbowdropland' : null;
           this.setState('land');
         }

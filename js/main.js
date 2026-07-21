@@ -443,12 +443,13 @@ function runSuperComboCine(game, ex) {
       att.y = aerial ? CFG.FLOOR_Y - 64 - (data.hits % 2) * 42 : CFG.FLOOR_Y;
       att.facing = Math.sign(vic.x - att.x) || att.facing;
       att.comboStrike = (data.hits % 2 === 0) ? 'kick' : 'punch';
-      data.poseF0 = ex.f;
+      data.poseF0 = ex.f; att.f = 0;                                // reset NOW so hitstop freezes the new strike, not the old blur
       vic.hp = Math.max(1, Math.round(data.startHp * (1 - data.hits / (CFG.COMBO_HITS + 5))));   // chunk them low (sword finishes)
       spawnSpark(vic.x + (Math.random() - 0.5) * 44, CFG.FLOOR_Y - 80 - Math.random() * 70, 'hit', 1);
       spawnElectric(ghostX, ghostY - CFG.BODY_H * 0.5, 5);           // teleport streak off the old spot
       spawnDust(att.x, CFG.FLOOR_Y, 4);
       game.shake = Math.max(game.shake, 3 + data.hits * 0.4);
+      game.hitstop = Math.max(game.hitstop, 2);                       // hold the readable strike cell on every teleport hit
       playSfx(data.hits % 2 === 0 ? 'hit_heavy2' : 'hit_med');
       data.interval = Math.max(CFG.COMBO_MIN_INTERVAL, data.interval - CFG.COMBO_ACCEL);
       data.nextHit = ex.f + Math.round(data.interval);
@@ -464,7 +465,7 @@ function runSuperComboCine(game, ex) {
     }
   } else {   // sword: 3 slashes, the last one KILLS
     if (data.swipe < CFG.SWORD_SWIPES && ex.f >= data.swordAt) {
-      data.swipe++; data.poseF0 = ex.f; att.swordWind = false;   // a real swipe → the slash sweep
+      data.swipe++; data.poseF0 = ex.f; att.f = 0; att.swordWind = false;   // a real swipe → freeze the contact cell immediately
       const last = data.swipe >= CFG.SWORD_SWIPES;
       // TELEPORT to a fresh angle for each slash (left, right, then the killing blow from ABOVE)
       const side = data.swipe % 2 === 1 ? -1 : 1;
@@ -592,7 +593,7 @@ function runSwordComboCine(game, ex) {
   att.f = Math.max(0, ex.f - data.poseF0);
 
   if (data.swipe < CFG.SWORD_COMBO_SWIPES && ex.f >= data.swordAt) {
-    data.swipe++; data.poseF0 = ex.f; att.swordWind = false;   // a real swipe → the slash sweep
+    data.swipe++; data.poseF0 = ex.f; att.f = 0; att.swordWind = false;   // a real swipe → freeze the contact cell immediately
     const last = data.swipe >= CFG.SWORD_COMBO_SWIPES;
     const side = data.swipe % 2 === 1 ? -1 : 1;   // teleport to alternating flanks for each slash
     att.x = Math.max(CFG.WALL_L + 40, Math.min(CFG.WALL_R - 40, data.vicX + side * 84));
